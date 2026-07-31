@@ -1,0 +1,13 @@
+# Sphinx build output
+build/
+source/_build/
+
+# Python virtual environments and cache files
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+
+# Local OS/editor metadata
+.DS_Store
+Thumbs.db
