@@ -13,8 +13,8 @@
 | 运行包 manifest | `demo/manifest.sha256` | 部署前必须在临时目录执行 `sha256sum -c manifest.sha256`。 | manifest 所属发布版本号。 |
 | X5 交叉编译包 | `x5_4cam_cross_toolchain_20260708.tar.gz` | 用于开发机交叉编译公开 demo；不建议在 X5 板端原生编译。 | 包大小、SHA256、正式下载页和保留策略。 |
 | 文档版本 | 待产品确认 | 本站是第一版可审阅用户文档；内容以当前公开 demo 仓和公开头文件为准。 | 文档版本号、发布日期、对应产品发布版本。 |
-| ROS2 示例仓 | `RoboBaton_4P_ROS2_demo` | 当前可用；包名 `robobaton_4p_ros2_demo`，`package.xml` 版本 `0.1.0`，提供 ROS2 构建、install 部署、raw/compressed 图像、CameraInfo、IMU 和温度 topic。 | 对外 release/tag、正式发布编号和支持周期。 |
-| ROS2 install 包 | `1.ros2_build/install` | 可部署到 X5 `/root/ros2_demo/install`；runtime 文件位于 `lib/robobaton_4p_ros2_demo/`，使用 `abi_manifest.sha256` 校验。 | install 包名、下载位置、发布编号。 |
+| ROS2 示例仓 | `RoboBaton_4P_ROS2_demo` | 当前可用；包名 `robobaton_4p_ros2_demo`，`package.xml` 版本 `1.0.0`，提供 ROS2 构建、install 部署、raw/compressed 图像、CameraInfo、IMU 和温度 topic。 | 对外 release/tag、正式发布编号和支持周期。 |
+| ROS2 install 包 | `1.ros2_build/install` | 可部署到 X5 `/root/ros2_demo/install`；推荐入口为 install 根目录 `robobaton_ros2_env.bash`，runtime 文件位于 `lib/robobaton_4p_ros2_demo/`，使用 `abi_manifest.sha256` 校验。 | install 包名、下载位置、发布编号。 |
 
 ## 运行包 manifest 摘要
 

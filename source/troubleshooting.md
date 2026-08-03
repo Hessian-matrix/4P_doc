@@ -46,11 +46,21 @@
 
 | 项目 | 内容 |
 |---|---|
-| 现象 | `ros2 launch` 找不到包、节点启动时报 `.so` 缺失，或搬迁 install 后 `setup.sh` 环境不正确。 |
-| 检查 | 使用 Bash：`source /opt/ros/humble/setup.bash && source /root/ros2_demo/install/setup.bash`；确认 `ls /root/ros2_demo/install/lib/robobaton_4p_ros2_demo`。 |
-| 正常结果 | 能找到 `robobaton_sensors_node`、`robobaton_imu_rate_monitor`、`abi_manifest.sha256`、`libicm42688.so*`、`libsc132.so*` 和 `libturbojpeg.so*`。 |
-| 常见原因 | 只上传了单个 ELF、没有上传完整 install、使用搬迁后的 POSIX `setup.sh` 但未设置 `COLCON_CURRENT_PREFIX`。 |
-| 恢复/需收集信息 | 重新部署完整 `/root/ros2_demo/install`；确需 `sh` 时用 `COLCON_CURRENT_PREFIX=/root/ros2_demo/install . /root/ros2_demo/install/setup.sh`。 |
+| 现象 | `ros2 launch` 找不到包、节点启动时报 `.so` 缺失，或搬迁 install 后环境不正确。 |
+| 检查 | 使用 Bash：`source /root/ros2_demo/install/robobaton_ros2_env.bash`；确认 `ls /root/ros2_demo/install/lib/robobaton_4p_ros2_demo`。 |
+| 正常结果 | 能找到 `robobaton_ros2_env.bash`、`robobaton_sensors_node`、`robobaton_imu_rate_monitor`、`abi_manifest.sha256`、NV12 compressed 插件、`libicm42688.so*` 和 `libsc132.so*`。 |
+| 常见原因 | 只上传了单个 ELF、没有上传完整 install、ROS2 underlay 路径不是默认 `/opt/ros/humble/setup.bash`、使用搬迁后的 POSIX `setup.sh` 但未设置 `COLCON_CURRENT_PREFIX`。 |
+| 恢复/需收集信息 | 重新部署完整 `/root/ros2_demo/install`；非默认 underlay 用 `ROBOBATON_ROS_UNDERLAY=/path/to/setup.bash` 覆盖；确需 `sh` 时用 `COLCON_CURRENT_PREFIX=/root/ros2_demo/install . /root/ros2_demo/install/setup.sh`。 |
+
+## ROS2 topic list 只看到系统话题
+
+| 项目 | 内容 |
+|---|---|
+| 现象 | `ros2 topic list` 只看到 `/parameter_events`、`/rosout`，或 graph 结果与节点日志不一致。 |
+| 检查 | 先 `source /root/ros2_demo/install/robobaton_ros2_env.bash`，再执行 `ros2 topic list --no-daemon --include-hidden-topics`；必要时执行 `/root/ros2_demo/install/robobaton_ros2_env.bash --restart-daemon`。 |
+| 正常结果 | 能看到 `/robobaton/cam0/image_raw`、`/robobaton/cam0/image_raw/compressed`、`/robobaton/cam0/camera_info`、`/robobaton/imu/data` 等 topic。 |
+| 常见原因 | `ros2 daemon` 在未加载本包 overlay 或 FastDDS SHM profile 时启动；`/dev/shm` 不可写、空间不足或残留异常 FastDDS segment。 |
+| 恢复/需收集信息 | 使用环境脚本重新加载后重启 daemon；用 `/root/ros2_demo/install/robobaton_ros2_env.bash --check` 查看 profile 和 `/dev/shm`；只有确认 ROS2 节点、launch 和 run 进程都已退出后，才运行 `--clean-shm`。 |
 
 ## ROS2 raw NV12 无法通用显示
 

@@ -12,6 +12,7 @@
 - ICM-42688 FIFO/TMST时间戳、25至2000Hz离散ODR和non-ROS联合`sensor_demo`。
 - ROS2四路NV12 raw、X5硬件JPEG compressed image和IMU topic发布。
 - FastDDS SHM运行配置、发布率指标、typed C++ topic-rate probe和矩阵化证据。
+- ROS2 install 根目录环境脚本 `robobaton_ros2_env.bash`，统一加载 underlay、overlay、FastDDS SHM profile 和日志缓冲设置。
 - 所有自研SO提供`*_get_version()` C ABI；交付可执行文件提供无需硬件的`--version`。
 
 ### 修复

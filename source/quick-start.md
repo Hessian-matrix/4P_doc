@@ -120,14 +120,15 @@ UART TX/RX 使用 `3.3V` 逻辑电平并要求共地。按板卡顶视图，`DEB
 ```bash
 ssh root@<x5-ip>
 # 以下命令在 X5 板端 SSH 终端中执行。
-source /opt/ros/humble/setup.bash
-source /root/ros2_demo/install/setup.bash
+source /root/ros2_demo/install/robobaton_ros2_env.bash
 ros2 launch robobaton_4p_ros2_demo robobaton_sensors.launch.py
 ```
 
-另开一个已 source 相同环境的终端做快速检查：
+另开一个终端加载同一环境后做快速检查；查看 topic graph 时优先绕过可能过期的 daemon：
 
 ```bash
+source /root/ros2_demo/install/robobaton_ros2_env.bash
+ros2 topic list --no-daemon --include-hidden-topics
 ros2 topic hz /robobaton/cam0/image_raw
 ros2 topic hz /robobaton/cam0/image_raw/compressed
 ros2 topic echo /robobaton/cam0/camera_info --once
@@ -142,4 +143,4 @@ ROS2 不提供 RTSP；需要 RTSP 时使用 non-ROS `/root/demo` 路径。
 - RTSP 无法拉流：确认板端 demo 仍在运行、端口为 `554/555/556/557`、path 为 `/PRR`，并优先用 `ffprobe -rtsp_transport tcp` 区分网络和播放器问题。
 - 单路无图：先用 `./cam_demo --camera-id <0|1|2|3> --diagnostics` 单独检查对应 FPC、供电、I2C、MIPI/VIN 链路。
 - IMU 无数据：确认 `/dev/spidev2.0` 存在，采样率使用 `25/50/100/200/500/1000/2000Hz` 之一。
-- ROS2 topic 无数据：确认已经 source `/opt/ros/humble/setup.bash` 和 `/root/ros2_demo/install/setup.bash`，且没有其他相机应用占用 camera/VIO 资源。
+- ROS2 topic 无数据：确认已经 `source /root/ros2_demo/install/robobaton_ros2_env.bash`，优先用 `ros2 topic list --no-daemon --include-hidden-topics` 排除过期 daemon，且没有其他相机应用占用 camera/VIO 资源。

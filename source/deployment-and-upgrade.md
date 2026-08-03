@@ -109,6 +109,7 @@ ROS2 使用独立目录 `/root/ros2_demo`，不要和 non-ROS `/root/demo` 混�
 ```bash
 cd <ros2-demo-root>
 test -d 1.ros2_build/install
+test -x 1.ros2_build/install/robobaton_ros2_env.bash
 python3 script/verify_install.py 1.ros2_build/install
 test -f 1.ros2_build/install/lib/robobaton_4p_ros2_demo/abi_manifest.sha256
 ```
@@ -149,7 +150,7 @@ ssh root@<x5-ip> "\
   sha256sum -c abi_manifest.sha256"
 ```
 
-archive checksum 覆盖完整 install tree 传输内容；checksum 失败时不得解包、不得切换，并删除 `/root/ros2_demo.new` 保留旧 `/root/ros2_demo`。包内 verifier 和 `abi_manifest.sha256` 的边界是 runtime 可执行文件、image_transport 插件、相关动态库、RUNPATH 和 relocatable Bash setup；它们不覆盖 setup、config、launch、plugin XML/resource 和所有 ROS2 转发库，也不替代板端 topic、NV12 布局或 IMU 频率检查。
+archive checksum 覆盖完整 install tree 传输内容；checksum 失败时不得解包、不得切换，并删除 `/root/ros2_demo.new` 保留旧 `/root/ros2_demo`。包内 verifier 和 `abi_manifest.sha256` 的边界是 runtime 可执行文件、image_transport 插件、相关动态库、RUNPATH、runtime 环境脚本、relocatable Bash setup 和 ABI 子集；它们不替代板端 topic、NV12 布局或 IMU 频率检查。
 
 校验失败时删除临时目录并保留旧包：
 
@@ -177,16 +178,15 @@ ssh root@<x5-ip> "\
 
 ```bash
 ssh root@<x5-ip>
-source /opt/ros/humble/setup.bash
-source /root/ros2_demo/install/setup.bash
+source /root/ros2_demo/install/robobaton_ros2_env.bash
 ros2 launch robobaton_4p_ros2_demo robobaton_sensors.launch.py
 ```
 
 终端 B：加载同一环境后检查 topic：
 
 ```bash
-source /opt/ros/humble/setup.bash
-source /root/ros2_demo/install/setup.bash
+source /root/ros2_demo/install/robobaton_ros2_env.bash
+ros2 topic list --no-daemon --include-hidden-topics
 ros2 topic hz /robobaton/cam0/image_raw
 ros2 topic hz /robobaton/cam0/image_raw/compressed
 ros2 topic echo /robobaton/cam0/camera_info --once
@@ -208,4 +208,4 @@ ssh root@<x5-ip> "\
   mv \"\$latest_bak\" /root/ros2_demo"
 ```
 
-回滚后重新执行 `source /root/ros2_demo/install/setup.bash`、launch 和 topic 检查。
+回滚后重新执行 `source /root/ros2_demo/install/robobaton_ros2_env.bash`、launch 和 topic 检查。

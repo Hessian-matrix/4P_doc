@@ -8,12 +8,13 @@ ROS2 与 non-ROS RTSP 是两条独立使用路径。ROS2 demo 不提供 RTSP；n
 
 ## 功能边界
 
-ROS2 包名为 `robobaton_4p_ros2_demo`，版本 `0.1.0`。主要产物：
+ROS2 包名为 `robobaton_4p_ros2_demo`，版本 `1.0.0`。主要产物：
 
 - 节点：`robobaton_sensors_node`
 - IMU 频率检查工具：`robobaton_imu_rate_monitor`
 - Launch：`launch/robobaton_sensors.launch.py`
 - 默认配置：`config/robobaton_sensors.yaml`
+- 安装环境脚本：install 根目录的 `robobaton_ros2_env.bash`，用于统一加载 ROS2 underlay、本包 overlay、FastDDS SHM profile 和日志缓冲设置。
 
 已开放能力：
 
@@ -69,13 +70,13 @@ script/build_x5_ros2.sh --clean --cross-root "$X5_CROSS_ROOT"
 └── log/
 ```
 
-安装包目录为 `1.ros2_build/install`，使用 merged install 布局，包含 `setup.bash`、`setup.sh`、`share/robobaton_4p_ros2_demo/` 和 `lib/robobaton_4p_ros2_demo/`。构建完成后运行包内 verifier：
+安装包目录为 `1.ros2_build/install`，使用 merged install 布局，包含 `robobaton_ros2_env.bash`、`setup.bash`、`setup.sh`、`share/robobaton_4p_ros2_demo/` 和 `lib/robobaton_4p_ros2_demo/`。构建完成后运行包内 verifier：
 
 ```bash
 python3 script/verify_install.py 1.ros2_build/install
 ```
 
-如果构建时报 `ModuleNotFoundError: No module named 'ament_package'`，先确认宿主机已经 source `/opt/ros/humble/setup.bash`，且 `/usr/bin/python3` 能导入 `ament_package`。
+该 verifier 检查 ROS2 install runtime 文件、可执行文件、NV12 compressed image_transport 插件、相关动态库、RUNPATH、runtime 环境脚本、relocatable Bash setup 和 `abi_manifest.sha256`。构建脚本通过 verifier 后会输出推荐运行入口；部署到 X5 后使用 `source /root/ros2_demo/install/robobaton_ros2_env.bash` 一次性加载 ROS2 underlay 和本包 overlay。如果构建时报 `ModuleNotFoundError: No module named 'ament_package'`，先确认宿主机已经 source `/opt/ros/humble/setup.bash`，且 `/usr/bin/python3` 能导入 `ament_package`。
 
 ## 安全部署
 
@@ -135,15 +136,20 @@ ssh root@<x5-ip> "\
 
 ## 运行
 
-X5 板端先加载 ROS Humble，再加载 ROS2 demo overlay：
+X5 板端推荐加载 install 根目录环境脚本。脚本默认加载 `/opt/ros/humble/setup.bash`，再加载本包 overlay，并设置 FastDDS SHM profile 和 `RCUTILS_LOGGING_BUFFERED_STREAM=0`：
 
 ```bash
-source /opt/ros/humble/setup.bash
-source /root/ros2_demo/install/setup.bash
+source /root/ros2_demo/install/robobaton_ros2_env.bash
 ros2 launch robobaton_4p_ros2_demo robobaton_sensors.launch.py
 ```
 
-已搬迁 install 推荐使用 Bash `setup.bash`，它可以自定位当前前缀。确需 POSIX `sh` 时，必须显式提供 install 前缀：
+只想运行一次命令时，可以直接执行脚本作为 wrapper：
+
+```bash
+/root/ros2_demo/install/robobaton_ros2_env.bash ros2 topic list --no-daemon --include-hidden-topics
+```
+
+板端 ROS2 underlay 路径不同时，先设置 `ROBOBATON_ROS_UNDERLAY=/path/to/setup.bash`。确需 POSIX `sh` 时，必须显式提供 install 前缀：
 
 ```sh
 . /opt/ros/humble/setup.sh
@@ -173,10 +179,24 @@ ros2 launch robobaton_4p_ros2_demo robobaton_sensors.launch.py
 
 ## 快速检查
 
+查看 graph 时优先绕过可能过期的 daemon：
+
+```bash
+/root/ros2_demo/install/robobaton_ros2_env.bash ros2 topic list --no-daemon --include-hidden-topics
+/root/ros2_demo/install/robobaton_ros2_env.bash ros2 node list --no-daemon
+```
+
+如果必须使用普通 `ros2 topic list`，先在已加载环境下重启 daemon：
+
+```bash
+/root/ros2_demo/install/robobaton_ros2_env.bash --restart-daemon
+/root/ros2_demo/install/robobaton_ros2_env.bash ros2 topic list --include-hidden-topics
+```
+
 IMU 1000Hz 频率优先用包内 C++ monitor：
 
 ```bash
-ros2 run robobaton_4p_ros2_demo robobaton_imu_rate_monitor
+/root/ros2_demo/install/robobaton_ros2_env.bash ros2 run robobaton_4p_ros2_demo robobaton_imu_rate_monitor
 ```
 
 默认订阅 `/robobaton/imu/data`，每秒输出 `ROB2_IMU_RATE ... hz=...`。启动后的第一行可能包含 DDS 匹配和半个统计窗口，判断稳定频率时看后续连续多行。
@@ -184,17 +204,29 @@ ros2 run robobaton_4p_ros2_demo robobaton_imu_rate_monitor
 常用覆盖参数：
 
 ```bash
-ros2 run robobaton_4p_ros2_demo robobaton_imu_rate_monitor --ros-args \
+/root/ros2_demo/install/robobaton_ros2_env.bash ros2 run robobaton_4p_ros2_demo robobaton_imu_rate_monitor --ros-args \
   -p topic:=/robobaton/imu/data -p report_period_ms:=1000 -p qos_depth:=100
 ```
 
 raw、compressed 和 CameraInfo 检查：
 
 ```bash
-ros2 topic hz /robobaton/cam0/image_raw
-ros2 topic hz /robobaton/cam0/image_raw/compressed
-ros2 topic echo /robobaton/cam0/camera_info --once
-ros2 topic echo /robobaton/imu/temperature --once
+/root/ros2_demo/install/robobaton_ros2_env.bash ros2 topic hz /robobaton/cam0/image_raw
+/root/ros2_demo/install/robobaton_ros2_env.bash ros2 topic hz /robobaton/cam0/image_raw/compressed
+/root/ros2_demo/install/robobaton_ros2_env.bash ros2 topic echo /robobaton/cam0/camera_info --once
+/root/ros2_demo/install/robobaton_ros2_env.bash ros2 topic echo /robobaton/imu/temperature --once
+```
+
+FastDDS SHM 和环境变量检查：
+
+```bash
+/root/ros2_demo/install/robobaton_ros2_env.bash --check
+```
+
+只有在已停止 launch、`ros2 daemon stop` 且确认没有 `robobaton_sensors_node`、`ros2 launch`、`ros2 run` 进程时，才允许清理遗留 FastDDS SHM 文件：
+
+```bash
+/root/ros2_demo/install/robobaton_ros2_env.bash --clean-shm
 ```
 
 `ros2 topic hz` 可用于低频 topic 快速诊断；在 X5 Cortex-A55 上，它可能因 Python 消息构造、回调和统计开销低估 1000Hz IMU topic，不作为本包 IMU 1000Hz 发布率门禁。

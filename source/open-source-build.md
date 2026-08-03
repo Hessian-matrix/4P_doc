@@ -184,13 +184,13 @@ script/build_x5_ros2.sh --clean --cross-root "$X5_CROSS_ROOT"
 └── log/
 ```
 
-install 包位于 `1.ros2_build/install`，默认使用 merged install 布局。构建完成后运行 install verifier：
+install 包位于 `1.ros2_build/install`，默认使用 merged install 布局，并在 install 根目录提供 `robobaton_ros2_env.bash` 作为板端推荐运行入口。构建完成后运行 install verifier：
 
 ```bash
 python3 script/verify_install.py 1.ros2_build/install
 ```
 
-该 verifier 检查 ROS2 install runtime 文件、可执行文件、NV12 compressed image_transport 插件、相关动态库、RUNPATH、relocatable Bash setup 和 `abi_manifest.sha256`。它不替代板端 topic、NV12 布局或 IMU 频率检查。
+该 verifier 检查 ROS2 install runtime 文件、可执行文件、NV12 compressed image_transport 插件、相关动态库、RUNPATH、runtime 环境脚本、relocatable Bash setup 和 `abi_manifest.sha256`。它不替代板端 topic、NV12 布局或 IMU 频率检查。
 
 常用覆盖项：
 
