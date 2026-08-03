@@ -104,12 +104,14 @@ cd /root/demo
 
 UART：
 
+V1 只交付串口软件调用示例；下面的命令不代表 UART 硬件通信已经完成 V1 验收。
+
 ```bash
 cd /root/demo
 ./serial_port_demo --port /dev/ttyS1 --mode txrx --baud 115200
 ```
 
-UART 物理 pinout、电平、3V3 方向/电流和热插拔能力待产品确认；不要接入 USB-UART VCC。
+UART TX/RX 使用 `3.3V` 逻辑电平并要求共地。按板卡顶视图，`DEBUG_UART` 从左到右为 `GND/RX/TX`，`UART7` 和 `UART1` 为 `3V3/RX/TX/GND`；图片没有标出 Pin 1。3V3 供电方向/电流和热插拔能力待产品确认，不要接入 USB-UART VCC、5V TTL 或 RS-232。完整边界见[硬件连接与安全](hardware-and-safety.md#uart-pinout-与-v1-边界)。
 
 ## 6. ROS2 最短运行
 

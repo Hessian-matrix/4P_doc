@@ -24,4 +24,5 @@ RoboBaton 4P 产品文档
    data-contracts
    code-and-interfaces
    troubleshooting
+   changelog
    release-and-support

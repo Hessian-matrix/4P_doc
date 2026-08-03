@@ -9,7 +9,7 @@
 | `libsc132.so` / camera callback 原始帧 | 标准方向 NV12 `1280x1088` |
 | RTSP 对外流 | H.264 默认；支持 H.265 |
 | FOV | 水平 `148.4°`、垂直 `126.6°`、对角 `193.8°` |
-| camera FPS | 支持 `25/30/40/50/60fps`；默认 `30fps`；`60fps` 为显式高帧率档 |
+| camera FPS | V1 稳定功能配置为 `25/30/40/50fps`，默认 `30fps`；`60fps` 是显式 `stress-only` 压力配置，不是稳定发布 profile |
 | RTSP path | `/PRR` |
 | 端口映射 | camera 0/1/2/3 -> `554/555/556/557` |
 
@@ -29,7 +29,15 @@
 
 `sc132_frame_set_config_t.max_skew_ns` 才是配组放行上限；默认值为 `2000000 ns`。
 
-`software_gpio` 触发模式下，demo 对外诊断的 `camera_ts_ns` 和 RTSP PTS 会映射到启动时冻结 offset 对应的 `system_realtime` epoch。其他触发模式保留 SC132 原生时间域。底层 C API 头文件中的 `timestamp_ns` 不保证与墙上时钟同域；不要把 demo 打印时间和底层原始时间域混写。
+## Trigger 模式
+
+| 模式 | V1 状态 | 公开合同 |
+|---|---|---|
+| `software_gpio` | 已验证；V1 唯一稳定模式 | 默认模式，使用 GPIO417 软件触发。 |
+| `vin_lpwm` | 实验性 / 未验收 | CLI/配置仍接受该值，但不属于 V1 稳定发布合同。 |
+| `none` | 实验性 / 未验收 | CLI/配置仍接受该值，但不属于 V1 稳定发布合同。 |
+
+在 V1 已验证的 `software_gpio` 模式下，demo 对外诊断的 `camera_ts_ns` 和 RTSP PTS 会映射到启动时冻结 offset 对应的 `system_realtime` epoch。显式使用实验性的 `vin_lpwm` 或 `none` 时，时间戳保留 SC132 原生时间域，不声明为 V1 wall/realtime 合同。底层 C API 头文件中的 `timestamp_ns` 不保证与墙上时钟同域；不要把 demo 打印时间和底层原始时间域混写。
 
 ## IMU
 
@@ -79,7 +87,7 @@ ROS2 QoS：
 
 ROS2 raw `Image.step` 使用底层 DMA buffer 的 stride；`data.size()` 使用底层 Y/UV buffer size，可能大于紧凑 `width * height * 3 / 2`。订阅端不得按紧凑 NV12 假设直接索引 UV 平面。
 
-ROS2 `header.stamp` 不是发布时刻。`software_gpio`/`gpio` 触发模式下，节点启动时冻结 `CLOCK_REALTIME - CLOCK_MONOTONIC_RAW` offset，并把相机 SC132 raw timestamp 映射到 system realtime/ROS stamp；其他 trigger mode 保留底层 SC132 时间域，不声明为 wall/realtime。IMU `sample_timestamp_ns` 会通过同一个冻结 offset 映射到 system realtime/ROS 时间戳；IMU 不使用 `host_timestamp_ns` 作为消息时间。
+ROS2 `header.stamp` 不是发布时刻。在 V1 已验证的 `software_gpio` 模式下，节点启动时冻结 `CLOCK_REALTIME - CLOCK_MONOTONIC_RAW` offset，并把相机 SC132 raw timestamp 映射到 system realtime/ROS stamp。实验性的 `vin_lpwm` 和 `none` 保留底层 SC132 时间域，不声明为 V1 wall/realtime 合同。IMU `sample_timestamp_ns` 会通过同一个冻结 offset 映射到 system realtime/ROS 时间戳；IMU 不使用 `host_timestamp_ns` 作为消息时间。
 
 ROS2 当前不发布 RTSP、TF 外参或标定；相机/IMU 硬同步仍不提供。需要通用可视化时优先订阅 `/image_raw/compressed`，不要假设 raw NV12 可被普通 RGB/BGR 工具直接显示。
 
@@ -92,8 +100,12 @@ ROS2 当前不发布 RTSP、TF 外参或标定；相机/IMU 硬同步仍不提�
 | 默认波特率 | `115200` |
 | 数据格式 | 8N1、raw、无 flow control |
 | demo 模式 | `tx`、`rx`、`txrx`、`echo` |
+| TX/RX 信号逻辑电平 | `3.3V` |
+| V1 交付边界 | 只交付 `serial_port_demo` 软件示例；UART 硬件通信不属于 V1 已验收功能 |
 
-UART demo 的 Linux 设备名不等于硬件 pinout 证明。电平、Pin 1、3V3 方向/电流和热插拔能力均待产品确认。
+现有公开板卡顶视图中，接口位于板卡上边缘；按图从左到右，`DEBUG_UART` 为 `GND/RX/TX`，`UART7` 和 `UART1` 均为 `3V3/RX/TX/GND`。图片没有标出 Pin 1；从线缆端或连接器插接面观察时不得直接照抄左右顺序。三组接口的 TX/RX 均使用 `3.3V` 逻辑电平，必须共地，禁止接入 5V TTL 或 RS-232。
+
+`3V3` 引脚标签不代表 V1 承诺对外供电能力。3V3 方向、允许电流和热插拔能力仍待产品确认；连接 USB-UART 时只连接匹配的 3.3V TX/RX/GND 信号，不连接适配器 VCC。
 
 ## 待确认坐标/外参
 

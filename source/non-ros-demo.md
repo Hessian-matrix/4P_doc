@@ -81,7 +81,7 @@ imu:
 
 - `camera.width` / `camera.height` 固定为 `1280` / `1088`，修改会被拒绝。
 - 完整四目路径固定为四路；单颗 sensor 诊断使用 `cam_demo --camera-id`。
-- `camera.fps` 常用默认 `30`，`cam_demo` 支持 `25/30/40/50/60`；`60` 为显式高帧率档。
+- `camera.fps` 默认 `30`；`25/30/40/50` 是 V1 稳定功能配置；`60` 是显式 `stress-only` 压力配置，不是稳定发布 profile。
 - `rtsp.codec` 支持 `h264` 和 `h265`。
 - IMU 采样率支持 `25/50/100/200/500/1000/2000Hz`。
 
@@ -109,7 +109,15 @@ pgrep -a cam-service
 --frame-timeout-ms <ms>
 ```
 
-限制：`--rotate 180` 只支持 `30fps`，不支持 `25/40/50/60fps`。
+Trigger 模式状态：
+
+| 模式 | V1 状态 |
+|---|---|
+| `software_gpio` | 默认且唯一已验证的 V1 稳定模式。 |
+| `vin_lpwm` | 实验性参数，未验收，不属于 V1 稳定合同。 |
+| `none` | 实验性参数，未验收，不属于 V1 稳定合同。 |
+
+限制：`--rotate 180` 只支持 `30fps`，不支持 `25/40/50/60fps`。`60fps` 必须显式指定，仅用于压力测试。
 
 默认四路 RTSP：
 
@@ -157,6 +165,8 @@ cd /root/demo
 IMU 路径使用 GPIO395 DRDY + sensor timestamp FIFO，不使用 GPIO397、FSYNC 或 `icm42688_pulse_fsync()`。
 
 ## 6. 串口 Demo
+
+V1 只交付 `serial_port_demo` 软件示例；UART 实际硬件通信尚未纳入 V1 验收。UART TX/RX 使用 `3.3V` 逻辑电平，接线必须共地，禁止 5V TTL、RS-232 和 USB-UART VCC。板卡顶视图 pinout、Pin 1 限制和 3V3 供电边界见[硬件连接与安全](hardware-and-safety.md#uart-pinout-与-v1-边界)。
 
 ```bash
 cd /root/demo

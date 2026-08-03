@@ -209,7 +209,7 @@ ros2 topic echo /robobaton/imu/temperature --once
 | `diagnostics.rate_log_period_ms` | `1000` | 启用 rate metrics 时必须大于 0。 |
 | `diagnostics.rate_run_id` | `""` | 仅接受安全 ASCII 标识字符；公开文档不要求使用内部 run ID。 |
 | `camera.camera_mask` | `15` | bit0..bit3 对应 cam0..cam3；只支持单颗或完整四路，不支持 2/3 路。 |
-| `camera.fps` | `30` | 支持 `25/30/40/50/60fps`；`60fps` 为显式高帧率档。 |
+| `camera.fps` | `30` | `25/30/40/50fps` 为 V1 稳定功能配置；`60fps` 是显式 `stress-only` 压力配置，不是稳定发布 profile。 |
 | `camera.rotate_degrees` | `0` | 支持 `0/90/180/270`；`180` 只允许 `30fps`，`25/40/50/60fps`均拒绝。 |
 | `camera.frame_set_max_skew_ns` | `2000000` | 帧组放行上限，单位 ns。 |
 | `camera.frame_set_timeout_ms` | `100` | 帧组等待超时，单位 ms。 |
@@ -220,7 +220,7 @@ ros2 topic echo /robobaton/imu/temperature --once
 | `camera.publish_compressed_image` | `true` | 是否注册 raw 与 compressed image_transport 发布插件。 |
 | `camera.compressed_jpeg_quality` | `80` | JPEG quality，范围 `1..100`。 |
 | `camera.frame_id_prefix` | `robobaton_cam` | 生成 `robobaton_cam0_optical_frame` 等 frame_id。 |
-| `camera.trigger_mode` | `software_gpio` | 请只使用已验证的 `software_gpio`、`vin_lpwm` 或 `none`。 |
+| `camera.trigger_mode` | `software_gpio` | 只有 `software_gpio` 是 V1 已验证模式；`vin_lpwm`、`none` 为实验性 / 未验收参数。 |
 | `imu.sample_rate_hz` | `1000` | ICM-42688 sample rate，建议使用公开支持档位。 |
 | `imu.read_mode` | `sensor_timestamp_fifo` | 当前只支持该模式。 |
 | `imu.fifo_watermark_samples` | `1` | 当前固定为 `1`。 |
@@ -233,6 +233,6 @@ raw `Image` 使用 NV12。`Image.step` 保留底层 DMA buffer 的 stride；`dat
 
 compressed topic 是标准 `CompressedImage` JPEG payload，当前压缩插件使用 TurboJPEG。插件只在有 `/image_raw/compressed` 订阅者时执行 NV12 -> I420 -> JPEG 压缩，保留原始消息的 `header`。
 
-`header.stamp` 不是发布时刻。`software_gpio`/`gpio` 触发模式下，节点启动时冻结 `CLOCK_REALTIME - CLOCK_MONOTONIC_RAW` offset，并把相机 SC132 raw timestamp 映射到 system realtime/ROS stamp；其他 trigger mode 保留底层 SC132 时间域，不声明为 wall/realtime。IMU `sample_timestamp_ns` 会通过同一个冻结 offset 映射到 system realtime/ROS 时间戳；IMU 不使用 `host_timestamp_ns` 作为消息时间。
+`header.stamp` 不是发布时刻。在 V1 已验证的 `software_gpio` 模式下，节点启动时冻结 `CLOCK_REALTIME - CLOCK_MONOTONIC_RAW` offset，并把相机 SC132 raw timestamp 映射到 system realtime/ROS stamp。实验性的 `vin_lpwm` 和 `none` 保留底层 SC132 时间域，不声明为 V1 wall/realtime 合同。IMU `sample_timestamp_ns` 会通过同一个冻结 offset 映射到 system realtime/ROS 时间戳；IMU 不使用 `host_timestamp_ns` 作为消息时间。
 
 `CameraInfo` 只带当前帧宽高，畸变模型和标定矩阵为空。IMU orientation 不可用，消息设置 `orientation_covariance[0] = -1.0`；gyro/accel 协方差当前不伪造。

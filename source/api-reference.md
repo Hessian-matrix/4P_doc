@@ -2,6 +2,18 @@
 
 本页覆盖当前公开头文件中的 C ABI/API。示例只展示最小集成骨架，不复制底层 producer 源码。
 
+## 发布版本查询
+
+产品发布版本遵循SemVer，并与SO的SONAME/ABI版本相互独立。所有getter都无需初始化硬件，返回进程静态只读字符串，调用方不得修改或释放：
+
+```c
+const char *camera_version = sc132_get_version();
+const char *imu_version = icm42688_get_version();
+const char *rtsp_version = prrtsp_get_version();
+```
+
+交付可执行文件也支持`--version`。non-ROS的`cam_demo`/`sensor_demo`以及ROS2的`robobaton_sensors_node`会同时打印其实际加载的自研SO版本，从而发现不同版本程序和SO混装。ROS2 compressed image_transport插件额外导出`robobaton_nv12_compressed_image_transport_get_version()`。
+
 ## `libsc132.so`
 
 头文件：`include/sc132camera.h`。ABI：`SC132_ABI_VERSION_MAJOR=2`，`SC132_ABI_VERSION_MINOR=0`。

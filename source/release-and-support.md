@@ -6,21 +6,27 @@
 
 | 项目 | 当前记录 | 状态 |
 |---|---|---|
-| 文档版本 | 第一版可审阅用户文档 | 待产品确认版本号和发布日期 |
+| 文档版本 | `1.0.0` | 第一版候选；正式发布日期和tag待发布审批 |
 | non-ROS 示例仓 | `RoboBaton_4p_demo` | 当前推荐入口，待产品确认 release/tag |
 | non-ROS 运行包 | `demo/` + `manifest.sha256` | 当前可按 manifest 校验部署，待产品确认发布编号 |
 | X5 交叉编译包 | `x5_4cam_cross_toolchain_20260708.tar.gz` | 待产品确认包大小、SHA256 和下载保留策略 |
-| ROS2 示例仓 | `RoboBaton_4P_ROS2_demo` | 当前可用，`package.xml` 版本 `0.1.0`，正式 release/tag 待产品确认 |
+| ROS2 示例仓 | `RoboBaton_4P_ROS2_demo` | 当前候选`package.xml`版本`1.0.0`，正式release/tag待发布审批 |
+
+功能新增、问题修复和已知限制统一维护在[版本更新记录](changelog.md)。仓库、non-ROS运行包和ROS2 install中的`VERSION`必须一致；正式release不得只修改tag而不更新版本文件和更新记录。
 
 ## 已知限制
 
 - 当前不提供相机/IMU 硬同步。
 - 当前不提供公开 TF 外参、相机内参或畸变标定。
 - ROS2 示例当前可用于构建、部署和 topic 使用；正式 Git release/tag、产品发布编号和支持周期仍待产品确认。
+- V1 稳定相机功能配置为 `25/30/40/50fps`，默认 `30fps`；`60fps` 是显式 `stress-only` 压力配置，不是稳定发布 profile。
+- V1 已验证的 Trigger 模式只有 `software_gpio`；`vin_lpwm` 和 `none` 为实验性 / 未验收。
 - 相机应用需要独占 camera/VIO/编码资源。
 - `cam-service` 是相机运行依赖，不建议停止。
 - H.265 四路高帧率播放对客户端解码和渲染能力有要求。
-- 硬件电气、Pin 1、3V3 方向/电流、热插拔和散热要求待产品确认。
+- UART TX/RX 逻辑电平为 `3.3V`，公开 pinout 见硬件页；Pin 1、3V3 供电方向/电流和热插拔要求仍待产品确认。
+- V1 只交付 `serial_port_demo` 软件示例，UART 实际硬件通信未纳入 V1 验收。
+- 其他硬件电气、FPC 方向、热插拔和散热要求待产品确认。
 
 ## 授权与第三方声明
 
