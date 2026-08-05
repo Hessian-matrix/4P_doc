@@ -26,7 +26,7 @@ RoboBaton_4P_ROS2_demo
 公开 demo 仓库已经携带编译所需的公开头文件和匹配的预编译运行库：
 
 - non-ROS：`include/`、`lib/libicm42688.so*`、`lib/libsc132.so*`、`lib/libprrtsp.so*`。
-- ROS2：`include/robobaton_4p_ros2_demo/`、`lib/libicm42688.so*`、`lib/libsc132.so*`，构建时还需要 X5 交叉编译包提供目标侧 ROS2、`turbojpeg.h` 和 `libturbojpeg.so.0`。
+- ROS2：`include/robobaton_4p_ros2_demo/`、`lib/libicm42688.so*`、`lib/libsc132.so*`，构建时还需要 X5 交叉编译包提供目标侧 ROS2、`hb_media_codec.h`、`libmultimedia.so.1`、`libhbmem.so.1` 和 `libalog.so.1`。
 
 这些仓库不编译底层 ICM42688、SC132 或 PRRTSP producer 源码。如果没有 X5 交叉编译工具链，不能重新编译源码，只能直接使用仓库里的 `demo/` 或已生成的 install 包部署运行。
 
@@ -39,7 +39,18 @@ RoboBaton_4P_ROS2_demo
 - `python3`
 - `readelf` / `file` 等 ELF 检查工具
 
-X5 交叉编译包需要提供 aarch64 工具链、sysroot、X5 平台头文件和运行库。配套工具包：[X5 交叉编译包下载](https://www.hessian-matrix.com/wp-content/uploads/2026/automaticupdates/x5_4cam_cross_toolchain_20260708.tar.gz)。
+### 下载 X5 交叉编译包
+
+下载 [x5_4cam_cross_toolchain_20260708.tar.gz](https://www.hessian-matrix.com/wp-content/uploads/2026/automaticupdates/x5_4cam_cross_toolchain_20260708.tar.gz)，大小为 `2,044,412,424 bytes`（约 `1.90 GiB`）。该包提供编译公开 demo 所需的 X5 aarch64 工具链、sysroot、平台头文件和运行库。
+
+Linux 下载和可读性检查示例：
+
+```bash
+curl -fL --retry 3 -O \
+  "https://www.hessian-matrix.com/wp-content/uploads/2026/automaticupdates/x5_4cam_cross_toolchain_20260708.tar.gz"
+test "$(stat -c %s x5_4cam_cross_toolchain_20260708.tar.gz)" -eq 2044412424
+tar -tzf x5_4cam_cross_toolchain_20260708.tar.gz >/dev/null
+```
 
 示例解压和环境变量：
 
@@ -134,7 +145,7 @@ TOOLCHAIN_FILE="$TOOLCHAIN_FILE" scripts/package_runtime.sh
 python3 scripts/verify_runtime_package.py demo
 ```
 
-部署到 X5 时复制 `demo/` 目录里的内容到 `/root/demo/`，不要复制成 `/root/demo/demo/`：
+部署到 X5 时复制 `demo/` 目录里的内容到 `/root/demo/`，不要复制成 `/root/demo/demo/`；切换前确认旧 demo 已经退出：
 
 ```bash
 ssh root@<x5-ip> "rm -rf /root/demo.new && mkdir -p /root/demo.new"
@@ -142,11 +153,16 @@ tar -C demo -cf - . | ssh root@<x5-ip> "tar -xf - -C /root/demo.new"
 ssh root@<x5-ip> "cd /root/demo.new && sha256sum -c manifest.sha256"
 ssh root@<x5-ip> "\
   set -e; \
+  if pgrep -af 'sensor_demo|cam_demo|imu_reader_demo|serial_port_demo'; then \
+    echo 'old non-ROS demo process is still running; exit it before switching'; \
+    exit 2; \
+  fi; \
   ts=\$(date +%Y%m%d-%H%M%S); \
   if [ -d /root/demo ]; then mv /root/demo /root/demo.bak.\$ts; fi; \
   mv /root/demo.new /root/demo; \
   chmod +x /root/demo/cam_demo /root/demo/sensor_demo /root/demo/imu_reader_demo /root/demo/serial_port_demo /root/demo/bin/*"
 ```
+
 
 更完整的失败回滚步骤见 [部署、升级与回滚](deployment-and-upgrade.md)。
 

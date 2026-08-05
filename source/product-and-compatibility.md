@@ -1,36 +1,50 @@
 # 产品版本与兼容性
 
-本页用于记录 RoboBaton 4P 文档、硬件、系统、运行包和示例代码之间的兼容关系。没有公开权威值的项目均标记为“待产品确认”；确认前不要用 `latest`、仓库默认分支或单次本地构建结果替代兼容性证明。
+本页说明 RoboBaton 4P 第一版文档、non-ROS demo、ROS2 demo 和 X5 运行环境之间的匹配关系。技术事实以公开仓、公开头文件、默认配置、`VERSION` 和运行包 manifest 为准。
 
-## 兼容性表
+## 当前 v1.0.0 发布组成
 
-| 项目 | 当前公开状态 | 兼容性/约束 | 待确认项 |
+| 交付物 | 当前版本 | 用户入口 |
+|---|---|---|
+| 文档 | `1.0.0` | 本站与 `4P_doc` 仓库。 |
+| non-ROS demo/运行包 | `1.0.0` | `/root/demo`，来自 `RoboBaton_4p_demo` 的 `demo/`。 |
+| ROS2 package/install | `1.0.0` | `/root/ros2_demo/install`，包名 `robobaton_4p_ros2_demo`。 |
+
+
+## 功能与运行目录
+
+| 路径 | 主要能力 | 运行目录 | 备注 |
 |---|---|---|---|
-| RoboBaton 4P 硬件版本 | 待产品确认 | 文档仅按“RoboBaton 4P”公开名称描述，不区分硬件批次。 | 硬件版本号、丝印、BOM/批次边界。 |
-| X5 系统版本 | 待产品确认 | 相机 demo 依赖 X5 板端 camera/vpf/hbmem/multimedia/FFmpeg/OpenSSL 等系统运行库。 | 可支持的系统镜像版本、内核版本、板端预装库版本。 |
-| non-ROS 示例仓 | `RoboBaton_4p_demo` | 当前推荐入口；提供四目 RTSP、IMU 和 UART 示例、公开头文件与预编译 `.so`。 | 对外发布 tag、release 编号。 |
-| non-ROS 运行包 | `demo/` | 可部署到 X5 `/root/demo`；包含启动脚本、`env.sh`、`config/`、`bin/`、`lib/`、`manifest.sha256`。 | 对外发布包名和下载位置。 |
-| 运行包 manifest | `demo/manifest.sha256` | 部署前必须在临时目录执行 `sha256sum -c manifest.sha256`。 | manifest 所属发布版本号。 |
-| X5 交叉编译包 | `x5_4cam_cross_toolchain_20260708.tar.gz` | 用于开发机交叉编译公开 demo；不建议在 X5 板端原生编译。 | 包大小、SHA256、正式下载页和保留策略。 |
-| 文档版本 | 待产品确认 | 本站是第一版可审阅用户文档；内容以当前公开 demo 仓和公开头文件为准。 | 文档版本号、发布日期、对应产品发布版本。 |
-| ROS2 示例仓 | `RoboBaton_4P_ROS2_demo` | 当前可用；包名 `robobaton_4p_ros2_demo`，`package.xml` 版本 `1.0.0`，提供 ROS2 构建、install 部署、raw/compressed 图像、CameraInfo、IMU 和温度 topic。 | 对外 release/tag、正式发布编号和支持周期。 |
-| ROS2 install 包 | `1.ros2_build/install` | 可部署到 X5 `/root/ros2_demo/install`；推荐入口为 install 根目录 `robobaton_ros2_env.bash`，runtime 文件位于 `lib/robobaton_4p_ros2_demo/`，使用 `abi_manifest.sha256` 校验。 | install 包名、下载位置、发布编号。 |
+| non-ROS | 四路 RTSP、IMU、UART 示例、公开 C ABI | `/root/demo` | RTSP 端口 `554..557`，path `/PRR`；H.264 默认，H.265 可选。 |
+| ROS2 | raw/compressed 图像、CameraInfo、IMU、温度 topic | `/root/ros2_demo/install` | ROS2 Humble；compressed 使用 X5 `MEDIA_CODEC_ID_JPEG` 硬件编码；不提供 RTSP。 |
 
-## 运行包 manifest 摘要
+两条路径不要混用目录、头文件或 `.so`，同一时间只运行一个占用 camera/VIO/编码资源的应用。
 
-当前 non-ROS `demo/manifest.sha256` 覆盖以下文件类别：
+## 运行要求
 
-| 类别 | 文件 |
+| 项目 | 要求 |
 |---|---|
-| 启动脚本 | `cam_demo`、`sensor_demo`、`imu_reader_demo`、`serial_port_demo` |
-| ELF 程序 | `bin/cam_demo`、`bin/sensor_demo`、`bin/imu_reader_demo`、`bin/serial_port_demo` |
-| 配置 | `config/sensor_config.yaml`、`env.sh` |
-| 动态库 | `lib/libsc132.so*`、`lib/libicm42688.so*`、`lib/libprrtsp.so*` |
+| 板端平台 | X5；相机运行依赖 `cam-service`，不建议停止或重配该服务。 |
+| ROS2 | Humble underlay；通过 `robobaton_ros2_env.bash` 加载环境。 |
+| 交叉编译 | 只在开发机使用 X5 交叉编译包；不建议在 X5 板端原生编译。 |
+| 相机配置 | 默认 `1280x1088@30fps`；`25/30/40/50fps` 为稳定配置，`60fps` 为 stress-only。 |
+| Trigger | `software_gpio` 是 V1 唯一稳定 trigger；`vin_lpwm` 和 `none` 为实验性。 |
 
-部署时必须整包更新，禁止只替换单个可执行文件或单个 `.so`。如果 manifest 校验失败，停止本次更新并保留旧 `/root/demo`。
+ROS2 路径不提供 RTSP；需要 RTSP 时使用 non-ROS 路径。当前不提供相机/IMU 硬同步、TF、外参、相机内参或畸变标定；CameraInfo 只有宽高，IMU orientation 不可用。
 
-## 确认前处理规则
+## 出厂系统镜像版本
 
-- 硬件、电气、系统镜像、授权和支持渠道未确认前，只能写“待产品确认”。
-- ROS2 当前可作为用户构建、部署和运行路径；正式 Git release/tag 和产品发布编号未确认前，不声称已经发布正式版本。
-- 公开文档只引用用户可见仓库、公开头文件、默认配置和运行包 manifest，不引用内部测试报告、板卡地址、账号或长测日志。
+```{note}
+出厂系统镜像版本标识、兼容范围和只读查询命令将在产品版本方法定版后补充。本文档、non-ROS demo 和 ROS2 package 的 `v1.0.0` 不单独代表出厂系统镜像版本。
+```
+
+## 版本查询与整包匹配
+
+```bash
+/root/demo/cam_demo --version
+/root/demo/sensor_demo --version
+/root/ros2_demo/install/lib/robobaton_4p_ros2_demo/robobaton_sensors_node --version
+/root/ros2_demo/install/lib/robobaton_4p_ros2_demo/robobaton_imu_rate_monitor --version
+```
+
+部署时按整包更新和校验：non-ROS 使用 `manifest.sha256`，ROS2 install 使用 archive checksum 和 runtime `abi_manifest.sha256`。不要只替换单个可执行文件或单个 `.so`；文档、运行包和 ROS2 package 的 `1.0.0` 应作为同一 v1.0.0 发布集合使用。

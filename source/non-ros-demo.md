@@ -111,22 +111,24 @@ pgrep -a cam-service
 
 Trigger 模式状态：
 
-| 模式 | V1 状态 |
+| 模式 | 当前状态 |
 |---|---|
-| `software_gpio` | 默认且唯一已验证的 V1 稳定模式。 |
-| `vin_lpwm` | 实验性参数，未验收，不属于 V1 稳定合同。 |
-| `none` | 实验性参数，未验收，不属于 V1 稳定合同。 |
+| `software_gpio` | 默认且唯一已验证的稳定模式。 |
+| `vin_lpwm` | 实验性，不属于 V1 稳定配置。 |
+| `none` | 实验性，不属于 V1 稳定配置。 |
 
 限制：`--rotate 180` 只支持 `30fps`，不支持 `25/40/50/60fps`。`60fps` 必须显式指定，仅用于压力测试。
 
 默认四路 RTSP：
 
 ```text
-cam0 -> rtsp://<x5-ip>:554/PRR
-cam1 -> rtsp://<x5-ip>:555/PRR
-cam2 -> rtsp://<x5-ip>:556/PRR
-cam3 -> rtsp://<x5-ip>:557/PRR
+CAM1 / cam0 -> rtsp://<x5-ip>:554/PRR
+CAM2 / cam1 -> rtsp://<x5-ip>:555/PRR
+CAM3 / cam2 -> rtsp://<x5-ip>:556/PRR
+CAM4 / cam3 -> rtsp://<x5-ip>:557/PRR
 ```
+
+其中 CAM1/CAM2/CAM3/CAM4 是板上物理丝印，cam0/cam1/cam2/cam3 是软件相机 ID。
 
 单颗 sensor 诊断：
 
@@ -162,11 +164,15 @@ cd /root/demo
 - `gyro_rps`：角速度，单位 `rad/s`。
 - `uncertainty_us`、`gpio_gap_count`、`fifo_overflow_count`、`mapper_failure_count`：时间戳映射和采集链路诊断。
 
+`accel_mps2` 按 `[X, Y, Z]` 顺序输出，符号以[硬件连接与安全](hardware-and-safety.md#uart)中的板卡顶视图为参考：设备静止且水平放置时约为 `[0, 0, -9.8] m/s^2`；向图片左侧加速时 X 为负；向图片顶部/产品前方加速时 Y 为负。该参考只用于 IMU 读数理解，不定义 IMU 与相机、base、optical frame 或其他坐标系之间的变换。
+
 IMU 路径使用 GPIO395 DRDY + sensor timestamp FIFO，不使用 GPIO397、FSYNC 或 `icm42688_pulse_fsync()`。
 
 ## 6. 串口 Demo
 
-V1 只交付 `serial_port_demo` 软件示例；UART 实际硬件通信尚未纳入 V1 验收。UART TX/RX 使用 `3.3V` 逻辑电平，接线必须共地，禁止 5V TTL、RS-232 和 USB-UART VCC。板卡顶视图 pinout、Pin 1 限制和 3V3 供电边界见[硬件连接与安全](hardware-and-safety.md#uart-pinout-与-v1-边界)。
+UART1/UART7 3.3V 硬件通信已通过 V1 验收；`serial_port_demo` 是 UART1/UART7 的公开用户示例，不适用于 DEBUG_UART。UART1 是 `/dev/ttyS1`，GH1.25-4P；UART7 是 `/dev/ttyS7`，GH1.25-4P。两者均为用户可编程 `3.3V` UART。
+
+接线时板端 TX 接适配器 RX，板端 RX 接适配器 TX，并始终共地；禁止 5V TTL、RS-232 和 USB-UART 适配器 VCC 反灌。DEBUG_UART 是 `1.8V` 系统控制台/调试口，禁止接入 `3.3V` 或 `5V` 逻辑。UART1/UART7 两个 3.3V 供电脚对外设供电合计额定边界为 `500 mA`，超过时使用独立电源并防止反灌；板卡顶视图接口位置和完整 3V3 供电边界见[硬件连接与安全](hardware-and-safety.md#uart)。
 
 ```bash
 cd /root/demo

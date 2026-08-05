@@ -194,8 +194,9 @@ int open_rtsp(prrtsp_stream_t **stream) {
   config.flags = PRRTSP_STREAM_FLAG_EXTERNAL_NV12;
   config.width = 1280;
   config.height = 1088;
-  config.fps_num = 60;
+  config.fps_num = 30;
   config.fps_den = 1;
+
   config.bitrate_kbps = 4000;
   config.port = 554;
   config.codec = PRRTSP_CODEC_H264;

@@ -3,8 +3,8 @@
 project = "4P_doc"
 author = "4P_doc contributors"
 copyright = "2026, 4P_doc contributors"
-# 正式产品/文档版本尚待确认，避免把浮动的 latest 显示成兼容性依据。
-release = "draft"
+# 2026-08-04 修改原因：仓库根 VERSION 已固定为 1.0.0，Sphinx release 与公开 v1.0.0 发布版本保持一致。
+release = "1.0.0"
 
 # 2026-07-31：使用 MyST 支持 Markdown，原因是后续章节更容易直接用 .md 编写。
 extensions = [
@@ -29,8 +29,10 @@ html_static_path = ["_static"]
 # 2026-07-31：为 Markdown 标题生成锚点，原因是在线文档内部跳转和外链引用更稳定。
 myst_heading_anchors = 3
 
-# 2026-08-01：保留用户可点击的公开仓链接，原因是 GitHub 自动检查可能返回 403/断连，不应阻塞内部链接检查。
+# 2026-08-04 修改原因：保留用户可点击的公开仓和大体积工具链链接；GitHub 可能返回 403，工具链直链不应在 linkcheck 中下载或阻塞发布门禁。
 linkcheck_ignore = [
     r"https://github\.com/Hessian-matrix/RoboBaton_4p_demo/?$",
     r"https://github\.com/Hessian-matrix/RoboBaton_4P_ROS2_demo/?$",
+    r"https://github\.com/Hessian-matrix/4P_doc/?$",
+    r"https://www\.hessian-matrix\.com/wp-content/uploads/2026/automaticupdates/x5_4cam_cross_toolchain_20260708\.tar\.gz$",
 ]

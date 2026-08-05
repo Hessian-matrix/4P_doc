@@ -163,13 +163,14 @@ ssh root@<x5-ip> "rm -rf /root/ros2_demo.new"
 ```bash
 ssh root@<x5-ip> "\
   set -e; \
-  if pgrep -af 'robobaton_sensors_node|robobaton_imu_rate_monitor'; then \
+  if pgrep -af 'robobaton_sensors_node|robobaton_imu_rate_monitor|ros2 launch|ros2 run'; then \
     echo 'old ROS2 demo process is still running; exit it before switching'; \
     exit 2; \
   fi; \
   ts=\$(date +%Y%m%d-%H%M%S); \
   if [ -d /root/ros2_demo ]; then mv /root/ros2_demo /root/ros2_demo.bak.\$ts; fi; \
   mv /root/ros2_demo.new /root/ros2_demo"
+
 ```
 
 ## 8. ROS2 最小验证

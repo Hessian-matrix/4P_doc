@@ -1,17 +1,12 @@
-示例代码与接口
-================
+进阶使用与开发
+==============
 
-本层收录公开 demo 代码仓库、运行入口、配置边界和接口语义。这里解释的是用户可见的示例代码与公开接口，不解释底层驱动实现。
-
-代码仓库：
-
-- non-ROS Demo：`RoboBaton_4p_demo <https://github.com/Hessian-matrix/RoboBaton_4p_demo>`_
-- ROS2 Demo：`RoboBaton_4P_ROS2_demo <https://github.com/Hessian-matrix/RoboBaton_4P_ROS2_demo>`_，提供 ROS2 构建、install 部署、运行和 topic 使用入口。
+本层收录部署升级、源码编译、数据合同和公开 API。普通用户完成首次上电、快速运行、non-ROS/ROS2 使用和故障排查时通常不需要阅读本层；需要二次开发、整包升级、接口语义或 ABI 细节时再进入。
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
 
+   deployment-and-upgrade
    open-source-build
-   non-ros-demo
+   data-contracts
    api-reference
-   ros2-demo

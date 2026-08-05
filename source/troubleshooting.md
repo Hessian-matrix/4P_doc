@@ -1,7 +1,5 @@
 # 故障排查
 
-本页按“现象 -> 检查 -> 正常结果 -> 常见原因 -> 恢复/需收集信息”组织。所有命令都使用 `<x5-ip>` 占位符；不要在公开问题单中附带真实板卡地址、账号或内部日志路径。
-
 ## SSH 无法连接
 
 | 项目 | 内容 |
@@ -78,7 +76,8 @@
 |---|---|
 | 现象 | `/robobaton/cam0/image_raw/compressed` 没有持续消息。 |
 | 检查 | 确认节点参数 `camera.publish_compressed_image:=true`；启动 `ros2 topic hz /robobaton/cam0/image_raw/compressed` 形成 compressed 订阅者。 |
-| 正常结果 | 有 compressed 订阅者时才执行 NV12 -> I420 -> TurboJPEG 压缩并发布 JPEG payload。 |
+| 正常结果 | 有 compressed 订阅者时才执行 X5 media-codec 硬件 JPEG 压缩并发布 JPEG payload。 |
+
 | 常见原因 | compressed 发布关闭、没有订阅者、节点未启动相机、相机资源被其他应用占用。 |
 | 恢复/需收集信息 | 确认参数和订阅者；收集 launch 命令、topic list、节点日志。 |
 
@@ -117,10 +116,10 @@
 | 项目 | 内容 |
 |---|---|
 | 现象 | 只有某个 camera ID 无图或单颗诊断失败。 |
-| 检查 | `./cam_demo --camera-id <0|1|2|3> --diagnostics`；开发机拉对应端口 RTSP。 |
+| 检查 | `./cam_demo --camera-id <0|1|2|3> --diagnostics`；开发机拉对应端口 RTSP。物理丝印映射为 CAM1 -> cam0、CAM2 -> cam1、CAM3 -> cam2、CAM4 -> cam3。 |
 | 正常结果 | 对应 camera ID 单独启动并能在端口 `554/555/556/557` 中的对应端口出流。 |
 | 常见原因 | 对应 FPC、供电、I2C、MIPI/VIN 链路异常。 |
-| 恢复/需收集信息 | 记录失败 camera ID、端口、demo 日志；硬件方向/FPC 方向待产品确认前不要自行推断。 |
+| 恢复/需收集信息 | 记录失败 camera ID、端口、demo 日志。 |
 
 ## 四路 RTSP 无法拉流
 
@@ -157,10 +156,10 @@
 | 项目 | 内容 |
 |---|---|
 | 现象 | `serial_port_demo` 发送或接收无数据。 |
-| 检查 | `ls -l /dev/ttyS1 /dev/ttyS7`；按公开板卡顶视图 pinout 核对，双方 TX/RX 必须为 `3.3V` 逻辑并共地；禁止接 USB-UART VCC、5V TTL 或 RS-232。 |
-| 软件示例预期 | 设备节点存在，双方 8N1/raw/no-flow-control 参数一致；这不代表 UART 硬件通信已纳入 V1 验收。 |
-| 常见原因 | 端口选错、波特率不一致、TX/RX 线序错误、对端未发送。 |
-| 恢复/需收集信息 | 收集端口、baud、mode、3.3V 对端和接线方向；V1 只交付软件示例，不把实际 UART 收发作为已验收功能。 |
+| 检查 | `ls -l /dev/ttyS1 /dev/ttyS7`；按公开板卡顶视图核对 UART1/UART7接口位置。板端 TX 接适配器 RX，板端 RX 接适配器 TX，并始终共地；双方 TX/RX 必须为 `3.3V` 逻辑。 |
+| 软件示例预期 | 设备节点存在，双方 8N1/raw/no-flow-control 参数一致；`serial_port_demo` 只适用于 UART1/UART7，不适用于 DEBUG_UART。 |
+| 常见原因 | 端口选错、波特率不一致、TX/RX 未交叉或接线错误、对端未发送。 |
+| 恢复/需收集信息 | 收集端口、baud、mode、`3.3V` 对端和接线方向；UART1/UART7 3.3V 硬件通信已通过 V1 验收，`serial_port_demo` 是公开用户示例且不适用于 DEBUG_UART。禁止把 `3.3V` 或 `5V` 逻辑接到 DEBUG_UART；DEBUG_UART 仅使用 `1.8V` USB-UART 适配器。 |
 
 ## 退出后资源未释放
 
