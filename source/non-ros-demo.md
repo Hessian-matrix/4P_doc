@@ -52,6 +52,7 @@ cd /root/demo
 ```text
 SENSOR_IMU_RESULT samples=... invalid=... timestamp_duplicates=... timestamp_regressions=... effective_hz=...
 ```
+`effective_hz`按相对1000Hz目标的ppm误差验收；V1门限为绝对误差`<=12000ppm`，等价稳定窗口约`988.0–1012.0Hz`。
 
 `timestamp_duplicates=0`、`timestamp_regressions=0` 是时间戳单调性的关键观察项。
 
