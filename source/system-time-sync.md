@@ -1,6 +1,7 @@
 # 系统时间同步
 
 本页说明 X5 的系统时间同步。默认方法是 NTP，只适合板卡已经能访问网络或 Internet 的场景；建议在启动 demo、ROS2 节点或任何时间戳敏感采集前先执行。时间戳域和同步边界见 [数据合同](data-contracts.md)。
+如果你需要让 X5 作为 PTP master，请看 [X5 PTP 主时钟配置指南](x5-ptp-master-sync.md)。
 
 ## 前提条件
 

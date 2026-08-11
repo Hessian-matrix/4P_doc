@@ -24,6 +24,7 @@ RoboBaton 4P 产品文档
    hardware-and-safety
    first-boot
    system-time-sync
+   x5-ptp-master-sync
    quick-start
    non-ros-demo
    ros2-demo
