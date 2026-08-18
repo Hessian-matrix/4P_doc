@@ -131,6 +131,16 @@
 | 常见原因 | 网络端口不可达、path 写错、demo 已退出、端口会话被其他客户端占用。 |
 | 恢复/需收集信息 | 关闭多余客户端，重新启动单个 demo；收集 ffprobe 命令输出和板端日志。 |
 
+## 保存输出不完整或无法提取
+
+| 项目 | 内容 |
+|---|---|
+| 现象 | MP4/rosbag 保存后没有预期 final 输出，或离线提取脚本拒绝输入。 |
+| 检查 | 查看 `SENSOR_MP4_RESULT` 或 `SENSOR_BAG_RESULT`；确认 `outcome`、`data_complete`、`path` 和 `configured_path`。MP4 complete 还需要 `session_status.json`、`publication_receipt.json`、四路 MP4 和四路 timestamp CSV。 |
+| 正常结果 | complete 运行退出码为 `0`，`data_complete=yes`，且 `path` 是真实输出。若配置目录已存在，MP4 会自动写入同级时间戳目录。 |
+| 常见原因 | 配置路径已存在导致输出切到时间戳目录；输入是 `.partial` recovery 数据；MP4 使用了 H.265、非四路或 frame-skip；Host 缺少完整 `ffmpeg`/`ffprobe`。 |
+| 恢复/需收集信息 | 使用 `SENSOR_MP4_RESULT path=` 指向的真实目录重新提取；`.partial` 只作为 recovery 数据；收集退出摘要、session 目录文件列表和提取脚本错误文本。 |
+
 ## H.265 客户端卡顿
 
 | 项目 | 内容 |
@@ -138,7 +148,7 @@
 | 现象 | `--codec h265` 能出流但播放卡顿。 |
 | 检查 | 用 `ffprobe` 确认能持续接收 `hevc`；观察板端日志中的 fps 和队列指标。 |
 | 正常结果 | 板端持续送帧，客户端具备 H.265 硬件解码能力。 |
-| 常见原因 | 客户端软件解码或渲染吞吐不足；显式 `stress-only` 的四路 `1280x1088@60fps` 对客户端压力较高。 |
+| 常见原因 | 客户端软件解码或渲染吞吐不足；四路`1280x1088@60fps`高吞吐配置对客户端能力要求较高，但该配置本身不是全局stress-only。 |
 | 恢复/需收集信息 | 更换支持 H.265 硬解的播放器，或回到 V1 稳定的 `25/30/40/50fps` 配置并减少播放路数；收集客户端型号、播放器、codec 和帧率。 |
 
 ## IMU 无数据或异常

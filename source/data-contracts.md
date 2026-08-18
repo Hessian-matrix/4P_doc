@@ -9,7 +9,7 @@
 | `libsc132.so` / camera callback 原始帧 | 标准方向 NV12 `1280x1088` |
 | RTSP 对外流 | H.264 默认；支持 H.265 |
 | FOV | 水平 `148.4°`、垂直 `126.6°`、对角 `193.8°` |
-| camera FPS | V1 稳定功能配置为 `25/30/40/50fps`，默认 `30fps`；`60fps` 是显式 `stress-only` 压力配置，不是稳定发布 profile |
+| camera FPS | 默认`30fps`，`25/30/40/50/60fps`均为受支持配置；60fps的stress-only标签仅属于ROS1 bag全量JPEG保存，H.264 MP4为稳定发布矩阵 |
 | RTSP path | `/PRR` |
 | 端口映射 | CAM1/CAM2/CAM3/CAM4 -> cam0/cam1/cam2/cam3 -> `554/555/556/557` |
 
@@ -66,6 +66,17 @@
 IMU 是独立连续采样路径。当前公开交付不提供相机/IMU 硬同步、公开 TF 外参或公开标定。
 
 IMU 加速度 `accel_mps2` 按 `[X, Y, Z]` 顺序输出，符号以 [硬件连接与安全](hardware-and-safety.md#uart) 中当前板卡顶视图为物理参考：设备静止且水平放置时，`accel_mps2` 约为 `[0, 0, -9.8] m/s^2`；向图片左侧加速时 X 为负；向图片顶部/产品前方加速时 Y 为负。该说明不定义 IMU 到相机、base、optical frame 或其他坐标系的关系，也不提供 TF 或外参。
+
+## non-ROS 保存输出
+
+| 输出 | 合同 |
+|---|---|
+| ROS bag | `sensor_demo --record-bag <absolute .bag>` 保存四路 JPEG 图像、相机参数和 IMU 数据；不完整压力/异常运行使用显式 `.partial.bag` recovery 文件。 |
+| MP4 session | `sensor_demo --record-mp4-dir <absolute directory>` 保存四路 H.264 MP4、四路 timestamp CSV、`imu.csv`、`camera_params.yaml`、`session_status.json` 和 `publication_receipt.json`。 |
+| MP4 路径冲突 | 配置的 final 目录或同名 `.partial` 已存在时，实际输出自动切到同级 `<name>-YYYYMMDDTHHMMSSZ[-NNNN]`；以 `SENSOR_MP4_RESULT path=` 为准。 |
+| `.partial` | 保留 recovery namespace；`.partial` MP4 session 可提取排查，但不声明为 complete。 |
+
+MP4 模式只支持 H.264 和完整四路 camera mask `0x0f`，不能与 bag 保存或 frame-skip 同时启用。MP4 文件的帧时序是容器名义 timing；精确纳秒相机时间戳以同 session 的 `cameraN_timestamps.csv` 为准，按 `frame_index` 与 MP4 metadata 对齐。`published_complete` 源必须带有匹配的 `publication_receipt.json`，并且四路 MP4/index inventory 完整。
 
 ## ROS2 topics
 

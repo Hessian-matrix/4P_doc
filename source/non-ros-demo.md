@@ -76,17 +76,56 @@ imu:
   sample_rate_hz: 1000
   print_rate_hz: 10
   print_metrics: false
+save_data:
+  save: false
+  format: rosbag
+  save_path: /root/save_demo/record.bag
+  skip: false
 ```
 
 边界：
 
 - `camera.width` / `camera.height` 固定为 `1280` / `1088`，修改会被拒绝。
 - 完整四目路径固定为四路；单颗 sensor 诊断使用 `cam_demo --camera-id`。
-- `camera.fps` 默认 `30`；`25/30/40/50` 是 V1 稳定功能配置；`60` 是显式 `stress-only` 压力配置，不是稳定发布 profile。
+- `camera.fps`默认`30`；`25/30/40/50/60`均为受支持配置。仅ROS1 bag全量JPEG保存把60fps归为stress档，H.264 MP4的60fps属于稳定发布矩阵。
 - `rtsp.codec` 支持 `h264` 和 `h265`。
 - IMU 采样率支持 `25/50/100/200/500/1000/2000Hz`。
+- `save_data.format` 支持 `rosbag` 和 `mp4`；保存路径必须是绝对路径。
 
-## 4. 单独运行相机 RTSP
+(non-ros-save)=
+
+## 4. 保存四路图像与 IMU
+
+完整的整包校验、ROS1 bag/MP4互斥配置、优雅退出、结果验收、离线转换和恢复流程见 [保存数据应用说明](save-data-application-guide.md)。
+
+ROS bag 保存适合保留 JPEG 图像帧、相机参数和 IMU 数据：
+
+```bash
+cd /root/demo
+./sensor_demo --record-bag /root/save_demo/record.bag
+```
+
+MP4 保存复用 RTSP 已编码的 H.264 访问单元，适合长时间保存四路视频和 IMU CSV：
+
+```bash
+cd /root/demo
+./sensor_demo --record-mp4-dir /root/save_demo/mp4_session
+```
+
+MP4 模式要求 `rtsp.codec: h264`、完整四路 camera mask `0x0f`，且不能同时启用 `--record-bag` 或 `record-frame-skip`。配置的 final 输出目录不得以 `.partial` 结尾；如果目标目录或同名 `.partial` 已存在，程序会自动写入同级 `<目录名>-YYYYMMDDTHHMMSSZ[-NNNN]`，退出摘要 `SENSOR_MP4_RESULT path=` 给出真实目录。
+
+完整 MP4 session 包含 `camera0.mp4` 到 `camera3.mp4`、`camera0_timestamps.csv` 到 `camera3_timestamps.csv`、`imu.csv`、`camera_params.yaml`、`session_status.json` 和 `publication_receipt.json`。MP4 文件使用名义 H.264 frame timing；精确纳秒相机时间戳以同目录 `cameraN_timestamps.csv` 为准。不完整运行会保留为 `.partial` recovery 目录，不能当作 complete 数据源。
+
+离线转换 JPEG 数据集时，在开发机使用公开 demo 仓中的脚本：
+
+```bash
+python3 scripts/rosbag_extract.py /root/save_demo/record.bag /data/record_dataset
+python3 scripts/mp4_extract.py /root/save_demo/mp4_session /data/mp4_dataset
+```
+
+`published_complete` MP4 源必须有匹配的 `publication_receipt.json`；`.partial` 源可以转换用于恢复排查，但转换摘要会标记为非 complete。
+
+## 5. 单独运行相机 RTSP
 
 ```bash
 cd /root/demo
@@ -118,7 +157,7 @@ Trigger 模式状态：
 | `vin_lpwm` | 实验性，不属于 V1 稳定配置。 |
 | `none` | 实验性，不属于 V1 稳定配置。 |
 
-限制：`--rotate 180` 只支持 `30fps`，不支持 `25/40/50/60fps`。`60fps` 必须显式指定，仅用于压力测试。
+限制：`--rotate 180`只支持`30fps`，不支持`25/40/50/60fps`。`60fps`必须显式指定；它是受支持高帧率配置，只有ROS1 bag全量JPEG保存按stress策略验收。
 
 默认四路 RTSP：
 
@@ -144,7 +183,8 @@ CAM4 / cam3 -> rtsp://<x5-ip>:557/PRR
 
 `cam-service` 是相机运行依赖，保持其运行。切换 `sensor_demo`、`cam_demo` 或用户自研相机应用前，先正常退出旧相机应用，避免 camera/VIO/编码资源冲突。
 
-## 5. 单独运行 IMU
+## 6. 单独运行 IMU
+
 
 ```bash
 cd /root/demo
@@ -169,7 +209,8 @@ cd /root/demo
 
 IMU 路径使用 GPIO395 DRDY + sensor timestamp FIFO，不使用 GPIO397、FSYNC 或 `icm42688_pulse_fsync()`。
 
-## 6. 串口 Demo
+## 7. 串口 Demo
+
 
 UART1/UART7 3.3V 硬件通信已通过 V1 验收；`serial_port_demo` 是 UART1/UART7 的公开用户示例，不适用于 DEBUG_UART。UART1 是 `/dev/ttyS1`，GH1.25-4P；UART7 是 `/dev/ttyS7`，GH1.25-4P。两者均为用户可编程 `3.3V` UART。
 
@@ -189,7 +230,8 @@ cd /root/demo
 ./serial_port_demo --port /dev/ttyS7 --mode echo --baud 115200
 ```
 
-## 7. 验证建议
+## 8. 验证建议
+
 
 - 相机：用 `ffprobe` 或播放器拉取四路 RTSP，并确认 codec、分辨率和帧率。
 - IMU：观察 `SENSOR_IMU_RESULT` 和 `timestamp_duplicates` / `timestamp_regressions`。

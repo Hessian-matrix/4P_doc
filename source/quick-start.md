@@ -20,7 +20,7 @@ cd /root/demo
 ./sensor_demo
 ```
 
-`sensor_demo` 默认运行四路 SC132 相机、PRRTSP v2 H.264 RTSP 推流和 ICM-42688 IMU 采集。默认图像为 `1280x1088@30fps`；`25/30/40/50fps` 为稳定配置，`60fps` 仅为 stress-only。
+`sensor_demo`默认运行四路SC132相机、PRRTSP v2 H.264 RTSP推流和ICM-42688 IMU采集。默认图像为`1280x1088@30fps`；`25/30/40/50/60fps`均为受支持配置。仅ROS1 bag全量JPEG保存把60fps归为stress档，MP4 60fps属于稳定发布矩阵。
 
 四路 RTSP URL：
 
@@ -52,6 +52,8 @@ ffprobe -v error -rtsp_transport tcp \
 ```
 
 期望看到 `codec_name=h264`、`width=1280`、`height=1088` 和接近目标的帧率。使用 H.265 配置时，codec 期望为 `hevc`。
+
+需要保存四路图像与 IMU 时，继续阅读 {ref}`non-ROS Demo 使用：保存四路图像与 IMU <non-ros-save>`。MP4 保存使用 `./sensor_demo --record-mp4-dir <absolute-directory>`，实际输出目录以 `SENSOR_MP4_RESULT path=` 为准。
 
 ## 3. ROS2 最短运行
 
