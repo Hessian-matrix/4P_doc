@@ -31,6 +31,7 @@
 产品版本与兼容性
 硬件连接与安全
 首次上电与开机使用
+板载 Wi-Fi 配置
 系统时间同步
 快速开始
 non-ROS Demo 使用
@@ -59,6 +60,7 @@ source/
 ├── product-and-compatibility.md
 ├── hardware-and-safety.md
 ├── first-boot.md
+├── wifi-configuration.md
 ├── system-time-sync.md
 ├── quick-start.md
 ├── non-ros-demo.md

@@ -10,6 +10,18 @@
 | 常见原因 | IP 配置错误、网线/交换机问题、目标板未启动完成、SSH 服务未就绪。 |
 | 恢复/需收集信息 | 收集开发机 IP、X5 IP、网络拓扑、ping/ssh 错误文本。 |
 
+## 板载 Wi-Fi 配置失败
+
+完整上传、交互配置和日志路径见 [板载 Wi-Fi 配置](wifi-configuration.md)。
+
+| 项目 | 内容 |
+|---|---|
+| 现象 | `/userdata/wifi_setup.sh` 提示缺少命令、扫描不到 SSID、认证失败、DHCP 失败、AP 无法启动，或开机后没有恢复 Wi-Fi。 |
+| 检查 | 使用有线网络或 `1.8V` DEBUG_UART 登录；执行 `/userdata/wifi_setup.sh --status`；检查 `ip link show wlan0`、`iw dev wlan0 info`、`/userdata/wifi/logs/` 和 `/userdata/wifi/boot.log`。 |
+| 正常结果 | AP 模式显示 hostapd `ENABLED`，客户端能获得配置网段地址；STA 模式显示已关联并获得 DHCP 地址；启用开机恢复时 `/userdata/startup.sh` 和 `current.conf` 存在。 |
+| 常见原因 | Wi-Fi 用户态工具缺失、天线或信号问题、SSID/密码错误、隐藏 SSID、路由器 DHCP 异常、AP 信道/IP/DHCP 网段配置错误，或已有非本脚本管理的 `/userdata/startup.sh`。 |
+| 恢复/需收集信息 | 不要在同一条 Wi-Fi SSH 会话中切换模式；通过有线入口重新配置。需要停用时执行 `/userdata/wifi_setup.sh --disable`；收集脚本完整错误、接口状态和去除凭据后的日志。 |
+
 ## 运行包校验失败
 
 | 项目 | 内容 |

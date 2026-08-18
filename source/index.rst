@@ -23,6 +23,7 @@ RoboBaton 4P 产品文档
    product-and-compatibility
    hardware-and-safety
    first-boot
+   wifi-configuration
    system-time-sync
    x5-ptp-master-sync
    quick-start
