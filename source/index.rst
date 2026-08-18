@@ -31,6 +31,7 @@ RoboBaton 4P 产品文档
    save-data-application-guide
    ros2-demo
    troubleshooting
+   x5-tf-card-field-fix
    code-and-interfaces
    changelog
    release-and-support
