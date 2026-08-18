@@ -27,7 +27,7 @@
 | 板端平台 | X5；相机运行依赖 `cam-service`，不建议停止或重配该服务。 |
 | ROS2 | Humble underlay；通过 `robobaton_ros2_env.bash` 加载环境。 |
 | 交叉编译 | 只在开发机使用 X5 交叉编译包；不建议在 X5 板端原生编译。 |
-| 相机配置 | 默认 `1280x1088@30fps`；`25/30/40/50fps` 为稳定配置，`60fps` 为 stress-only。 |
+| 相机配置 | 默认`1280x1088@30fps`；`25/30/40/50/60fps`均为受支持配置。ROS1 bag 60fps单独按stress管理，MP4 60fps属于稳定发布。 |
 | Trigger | `software_gpio` 是 V1 唯一稳定 trigger；`vin_lpwm` 和 `none` 为实验性。 |
 
 ROS2 路径不提供 RTSP；需要 RTSP 时使用 non-ROS 路径。当前不提供相机/IMU 硬同步、TF、外参、相机内参或畸变标定；CameraInfo 只有宽高，IMU orientation 不可用。

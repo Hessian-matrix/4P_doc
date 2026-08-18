@@ -157,7 +157,7 @@ FastDDS SHM 和环境变量检查：
 | `enable_camera` | `true` | 是否启动相机 publisher。 |
 | `enable_imu` | `true` | 是否启动 IMU publisher。 |
 | `camera.camera_mask` | `15` | bit0..bit3 对应软件 cam0..cam3，即物理 CAM1..CAM4；只支持单颗或完整四路，不支持 2/3 路。 |
-| `camera.fps` | `30` | `25/30/40/50fps` 为 V1 稳定功能配置；`60fps` 是显式 `stress-only` 压力配置，不是稳定发布 profile。 |
+| `camera.fps` | `30` | 支持`25/30/40/50/60fps`；ROS1 bag专属的60fps stress策略不适用于ROS2。 |
 | `camera.rotate_degrees` | `0` | 支持 `0/90/180/270`；`180` 只允许 `30fps`，`25/40/50/60fps`均拒绝。 |
 | `camera.frame_set_max_skew_ns` | `2000000` | 帧组放行上限，单位 ns。 |
 | `camera.frame_set_timeout_ms` | `100` | 帧组等待超时，单位 ms。 |

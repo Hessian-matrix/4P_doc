@@ -10,6 +10,18 @@
 | 常见原因 | IP 配置错误、网线/交换机问题、目标板未启动完成、SSH 服务未就绪。 |
 | 恢复/需收集信息 | 收集开发机 IP、X5 IP、网络拓扑、ping/ssh 错误文本。 |
 
+## 板载 Wi-Fi 配置失败
+
+完整上传、交互配置和日志路径见 [板载 Wi-Fi 配置](wifi-configuration.md)。
+
+| 项目 | 内容 |
+|---|---|
+| 现象 | `/userdata/wifi_setup.sh` 提示缺少命令、扫描不到 SSID、认证失败、DHCP 失败、AP 无法启动，或开机后没有恢复 Wi-Fi。 |
+| 检查 | 使用有线网络或 `1.8V` DEBUG_UART 登录；执行 `/userdata/wifi_setup.sh --status`；检查 `ip link show wlan0`、`iw dev wlan0 info`、`/userdata/wifi/logs/` 和 `/userdata/wifi/boot.log`。 |
+| 正常结果 | AP 模式显示 hostapd `ENABLED`，客户端能获得配置网段地址；STA 模式显示已关联并获得 DHCP 地址；启用开机恢复时 `/userdata/startup.sh` 和 `current.conf` 存在。 |
+| 常见原因 | Wi-Fi 用户态工具缺失、天线或信号问题、SSID/密码错误、隐藏 SSID、路由器 DHCP 异常、AP 信道/IP/DHCP 网段配置错误，或已有非本脚本管理的 `/userdata/startup.sh`。 |
+| 恢复/需收集信息 | 不要在同一条 Wi-Fi SSH 会话中切换模式；通过有线入口重新配置。需要停用时执行 `/userdata/wifi_setup.sh --disable`；收集脚本完整错误、接口状态和去除凭据后的日志。 |
+
 ## 运行包校验失败
 
 | 项目 | 内容 |
@@ -131,6 +143,16 @@
 | 常见原因 | 网络端口不可达、path 写错、demo 已退出、端口会话被其他客户端占用。 |
 | 恢复/需收集信息 | 关闭多余客户端，重新启动单个 demo；收集 ffprobe 命令输出和板端日志。 |
 
+## 保存输出不完整或无法提取
+
+| 项目 | 内容 |
+|---|---|
+| 现象 | MP4/rosbag 保存后没有预期 final 输出，或离线提取脚本拒绝输入。 |
+| 检查 | 查看 `SENSOR_MP4_RESULT` 或 `SENSOR_BAG_RESULT`；确认 `outcome`、`data_complete`、`path` 和 `configured_path`。MP4 complete 还需要 `session_status.json`、`publication_receipt.json`、四路 MP4 和四路 timestamp CSV。 |
+| 正常结果 | complete 运行退出码为 `0`，`data_complete=yes`，且 `path` 是真实输出。若配置目录已存在，MP4 会自动写入同级时间戳目录。 |
+| 常见原因 | 配置路径已存在导致输出切到时间戳目录；输入是 `.partial` recovery 数据；MP4 使用了 H.265、非四路或 frame-skip；Host 缺少完整 `ffmpeg`/`ffprobe`。 |
+| 恢复/需收集信息 | 使用 `SENSOR_MP4_RESULT path=` 指向的真实目录重新提取；`.partial` 只作为 recovery 数据；收集退出摘要、session 目录文件列表和提取脚本错误文本。 |
+
 ## H.265 客户端卡顿
 
 | 项目 | 内容 |
@@ -138,7 +160,7 @@
 | 现象 | `--codec h265` 能出流但播放卡顿。 |
 | 检查 | 用 `ffprobe` 确认能持续接收 `hevc`；观察板端日志中的 fps 和队列指标。 |
 | 正常结果 | 板端持续送帧，客户端具备 H.265 硬件解码能力。 |
-| 常见原因 | 客户端软件解码或渲染吞吐不足；显式 `stress-only` 的四路 `1280x1088@60fps` 对客户端压力较高。 |
+| 常见原因 | 客户端软件解码或渲染吞吐不足；四路`1280x1088@60fps`高吞吐配置对客户端能力要求较高，但该配置本身不是全局stress-only。 |
 | 恢复/需收集信息 | 更换支持 H.265 硬解的播放器，或回到 V1 稳定的 `25/30/40/50fps` 配置并减少播放路数；收集客户端型号、播放器、codec 和帧率。 |
 
 ## IMU 无数据或异常
