@@ -144,7 +144,7 @@ ROS2 `/root/ros2_demo/install`：
 /root/ros2_demo/install/lib/robobaton_4p_ros2_demo/robobaton_imu_rate_monitor --version
 ```
 
-当前发布集合为文档 `v1.0.0`、non-ROS `v1.0.0`、ROS2/package `v1.0.0`；文件和包版本查询结果可能显示不带 `v` 前缀的 `1.0.0`。
+当前发布候选集合为文档`v1.1.0`、non-ROS`v1.1.0`、ROS2/package`v1.1.0`；文件和包版本查询结果可能显示不带`v`前缀的`1.1.0`。
 
 ## 6. 选择 non-ROS 或 ROS2
 

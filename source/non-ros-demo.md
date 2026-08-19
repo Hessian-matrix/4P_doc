@@ -52,7 +52,7 @@ cd /root/demo
 ```text
 SENSOR_IMU_RESULT samples=... invalid=... timestamp_duplicates=... timestamp_regressions=... effective_hz=...
 ```
-`effective_hz`按相对1000Hz目标的ppm误差验收；V1门限为绝对误差`<=12000ppm`，等价稳定窗口约`988.0–1012.0Hz`。
+`effective_hz`按相对配置目标的ppm误差验收；V1门限为绝对误差`<=12000ppm`。
 
 `timestamp_duplicates=0`、`timestamp_regressions=0` 是时间戳单调性的关键观察项。
 
@@ -73,7 +73,7 @@ rtsp:
   codec: h264
   url: /PRR
 imu:
-  sample_rate_hz: 1000
+  sample_rate_hz: 30
   print_rate_hz: 10
   print_metrics: false
 save_data:
@@ -87,9 +87,9 @@ save_data:
 
 - `camera.width` / `camera.height` 固定为 `1280` / `1088`，修改会被拒绝。
 - 完整四目路径固定为四路；单颗 sensor 诊断使用 `cam_demo --camera-id`。
-- `camera.fps`默认`30`；`25/30/40/50/60`均为受支持配置。仅ROS1 bag全量JPEG保存把60fps归为stress档，H.264 MP4的60fps属于稳定发布矩阵。
+- `camera.fps`默认`30`，仅支持`25`或`30`；其他值在启动相机前拒绝。
 - `rtsp.codec` 支持 `h264` 和 `h265`。
-- IMU 采样率支持 `25/50/100/200/500/1000/2000Hz`。
+- IMU采样率支持`25/30Hz`，默认`30Hz`。
 - `save_data.format` 支持 `rosbag` 和 `mp4`；保存路径必须是绝对路径。
 
 (non-ros-save)=
@@ -123,7 +123,7 @@ python3 scripts/rosbag_extract.py /root/save_demo/record.bag /data/record_datase
 python3 scripts/mp4_extract.py /root/save_demo/mp4_session /data/mp4_dataset
 ```
 
-`published_complete` MP4 源必须有匹配的 `publication_receipt.json`；`.partial` 源可以转换用于恢复排查，但转换摘要会标记为非 complete。
+| `imu.sample_rate_hz` | `30` | `25`或`30`。 |
 
 ## 5. 单独运行相机 RTSP
 
@@ -138,7 +138,7 @@ pgrep -a cam-service
 常用参数：
 
 ```text
---fps <25|30|40|50|60>
+--fps <25|30>
 --codec <h264|h265>
 --rotate <0|90|180|270>
 --bps <kbps>
@@ -157,7 +157,7 @@ Trigger 模式状态：
 | `vin_lpwm` | 实验性，不属于 V1 稳定配置。 |
 | `none` | 实验性，不属于 V1 稳定配置。 |
 
-限制：`--rotate 180`只支持`30fps`，不支持`25/40/50/60fps`。`60fps`必须显式指定；它是受支持高帧率配置，只有ROS1 bag全量JPEG保存按stress策略验收。
+限制：`--rotate 180`只支持`30fps`，不支持`25fps`。相机、RTSP、ROS1 bag和H.264 MP4使用同一`25/30fps`公开帧率集合。
 
 默认四路 RTSP：
 

@@ -93,15 +93,15 @@
 | 常见原因 | compressed 发布关闭、没有订阅者、节点未启动相机、相机资源被其他应用占用。 |
 | 恢复/需收集信息 | 确认参数和订阅者；收集 launch 命令、topic list、节点日志。 |
 
-## ROS2 IMU 1000Hz CLI 低估
+## ROS2 IMU 频率与配置不符
 
 | 项目 | 内容 |
 |---|---|
-| 现象 | `ros2 topic hz /robobaton/imu/data` 显示明显低于 1000Hz。 |
-| 检查 | 使用 `ros2 run robobaton_4p_ros2_demo robobaton_imu_rate_monitor`。 |
-| 正常结果 | C++ monitor 每秒输出 `ROB2_IMU_RATE topic=/robobaton/imu/data hz=...`，稳定频率看启动后的连续多行。 |
-| 常见原因 | Python `ros2 topic hz` 对 1000Hz `sensor_msgs/msg/Imu` 有消息构造、回调和统计开销。 |
-| 恢复/需收集信息 | 用 C++ monitor 作为 IMU 频率检查工具；`ros2 topic hz` 仅作为低频 topic 快速诊断参考。 |
+| 现象 | `/robobaton/imu/data`的统计频率明显偏离配置的`25Hz`或`30Hz`。 |
+| 检查 | 使用`ros2 run robobaton_4p_ros2_demo robobaton_imu_rate_monitor`并查看启动后的连续统计窗口。 |
+| 正常结果 | C++ monitor每秒输出`ROB2_IMU_RATE topic=/robobaton/imu/data hz=...`，稳定值接近配置目标。 |
+| 常见原因 | YAML未生效、DDS接收链路丢样、进程资源争用或仍在观察首个不完整统计窗口。 |
+| 恢复/需收集信息 | 确认`imu.sample_rate_hz`为`25`或`30`，收集node参数、连续monitor输出和进程日志。 |
 
 ## ROS2 topic 无数据或资源冲突
 
@@ -160,15 +160,15 @@
 | 现象 | `--codec h265` 能出流但播放卡顿。 |
 | 检查 | 用 `ffprobe` 确认能持续接收 `hevc`；观察板端日志中的 fps 和队列指标。 |
 | 正常结果 | 板端持续送帧，客户端具备 H.265 硬件解码能力。 |
-| 常见原因 | 客户端软件解码或渲染吞吐不足；四路`1280x1088@60fps`高吞吐配置对客户端能力要求较高，但该配置本身不是全局stress-only。 |
-| 恢复/需收集信息 | 更换支持 H.265 硬解的播放器，或回到 V1 稳定的 `25/30/40/50fps` 配置并减少播放路数；收集客户端型号、播放器、codec 和帧率。 |
+| 常见原因 | 客户端软件解码或渲染吞吐不足；四路H.265仍可能超过客户端能力。 |
+| 恢复/需收集信息 | 更换支持H.265硬解的播放器，或从`30fps`降到`25fps`并减少播放路数；收集客户端型号、播放器、codec 和帧率。 |
 
 ## IMU 无数据或异常
 
 | 项目 | 内容 |
 |---|---|
 | 现象 | `imu_reader_demo` 无输出、启动失败或 timestamp duplicate/regression 非零。 |
-| 检查 | `ls -l /dev/spidev2.0`；`./imu_reader_demo --sample-rate-hz 1000 --print-metrics`。 |
+| 检查 | `ls -l /dev/spidev2.0`；`./imu_reader_demo --sample-rate-hz 30 --print-metrics`。 |
 | 正常结果 | 能持续输出样本；`timestamp_duplicates=0`、`timestamp_regressions=0`。 |
 | 常见原因 | SPI 设备不存在、IMU 供电/焊接/设备树异常、采样率参数不在支持列表。 |
 | 恢复/需收集信息 | 收集启动日志、`SENSOR_IMU_RESULT` 或 demo 退出摘要、`/dev/spidev2.0` 状态。 |

@@ -26,9 +26,9 @@ RoboBaton 4P 是面向 X5 平台的四目相机产品，提供 non-ROS RTSP/IMU/
 | 存储 | 32 GB |
 | 相机数量 | 4 路：CAM1、CAM2、CAM3、CAM4 |
 | 图像标准输出 | NV12 `1280x1088` |
-| 帧率 | 默认`30fps`；`25/30/40/50/60fps`均为受支持配置；仅ROS1 bag全量JPEG保存把60fps归为stress档，H.264 MP4的60fps属于稳定发布矩阵 |
+| 帧率 | 默认`30fps`；仅支持`25fps`和`30fps` |
 | FOV | H `148.4°` / V `126.6°` / D `193.8°` |
-| IMU | TDK ICM-42688-P，默认 1 kHz 输出 |
+| IMU | TDK ICM-42688-P，支持 `25/30Hz` 输出，默认 `30Hz` |
 | non-ROS | RTSP 端口 `554..557`，path `/PRR`，H.264 默认、H.265 可选；同时提供 IMU/UART 示例 |
 | ROS2 | raw/compressed 图像、CameraInfo、IMU、温度 topic；compressed 使用 X5 硬件 JPEG；ROS2 路径不提供 RTSP |
 

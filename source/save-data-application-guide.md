@@ -152,7 +152,7 @@ save_data:
 cd <完整demo运行包目录>
 ./sensor_demo \
   --fps 30 \
-  --sample-rate-hz 1000 \
+  --sample-rate-hz 30 \
   --print-rate-hz 0 \
   --record-bag /data/robobaton/run_30fps.bag \
   --record-frame-skip 0
@@ -182,7 +182,7 @@ rtsp:
   codec: h264
   url: /PRR
 imu:
-  sample_rate_hz: 1000
+  sample_rate_hz: 30
   print_rate_hz: 0
   print_metrics: false
 save_data:
@@ -258,7 +258,7 @@ cd <完整demo运行包目录>
 ./sensor_demo \
   --fps 30 \
   --codec h264 \
-  --sample-rate-hz 1000 \
+  --sample-rate-hz 30 \
   --print-rate-hz 0 \
   --record-mp4-dir /data/robobaton/run_30fps_mp4
 ```
@@ -286,7 +286,7 @@ rtsp:
   codec: h264
   url: /PRR
 imu:
-  sample_rate_hz: 1000
+  sample_rate_hz: 30
   print_rate_hz: 0
   print_metrics: false
 save_data:
@@ -371,9 +371,9 @@ python3 scripts/mp4_extract.py \
 
 保存模式必须分开判定：
 
-- ROS1 bag：30fps是完整保存硬门，40fps是扩展目标；50/60fps在高CPU或存储压力下允许明确、可计数、整组的partial，其中60fps是bag的stress档。
-- H.264 MP4：25/30/40/50/60fps均属于稳定发布矩阵；正常运行必须exit 0、`published_complete`、零recorder drop并通过四路MP4/CSV/JPEG/IMU readback，不能把partial计为发布PASS。
-- 两种模式在任何帧率都不允许崩溃、死锁、UAF、静默丢失后仍报告complete。显式故障注入可产生受控partial用于验证恢复，但不改变MP4稳定发布门。
+- ROS1 bag：仅支持25fps和30fps；正常case必须完整发布或明确失败，不能把partial计为发布PASS。
+- H.264 MP4：仅支持25fps和30fps；正常case必须exit 0、`published_complete`、零recorder drop并通过四路MP4/CSV/JPEG/IMU readback。
+- 两种模式都不允许崩溃、死锁、UAF、静默丢失后仍报告complete。显式故障注入可产生受控partial用于验证恢复，但不能计入正常发布矩阵。
 
 Host/package GO不能替代板端验收。正式宣称某一帧率完整前，必须完成目标板持续运行、CPU压力、存储压力、SIGINT/SIGTERM、真实输出readback和服务恢复检查。
 

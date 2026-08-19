@@ -3,8 +3,8 @@
 project = "4P_doc"
 author = "4P_doc contributors"
 copyright = "2026, 4P_doc contributors"
-# 2026-08-04 修改原因：仓库根 VERSION 已固定为 1.0.0，Sphinx release 与公开 v1.0.0 发布版本保持一致。
-release = "1.0.0"
+# 2026-08-19 修改原因：Sphinx版本必须与当前四仓1.1.0发布候选一致。
+release = "1.1.0"
 
 # 2026-07-31：使用 MyST 支持 Markdown，原因是后续章节更容易直接用 .md 编写。
 extensions = [

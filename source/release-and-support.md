@@ -6,9 +6,9 @@
 
 | 项目 | 当前记录 | 状态 |
 |---|---|---|
-| 文档 | `v1.0.0` | 已发布 |
-| non-ROS demo/运行包 | `v1.0.0` | 已发布；部署到 `/root/demo`，按 `manifest.sha256` 整包校验。 |
-| ROS2 package/install | `v1.0.0` | 已发布；部署到 `/root/ros2_demo/install`，包名 `robobaton_4p_ros2_demo`。 |
+| 文档 | `v1.1.0` | 发布候选；通过最终门禁后发布。 |
+| non-ROS demo/运行包 | `v1.1.0` | 发布候选；部署到`/root/demo`，按`manifest.sha256`整包校验。 |
+| ROS2 package/install | `v1.1.0` | 发布候选；部署到`/root/ros2_demo/install`，包名`robobaton_4p_ros2_demo`。 |
 
 功能新增、修复和兼容性变化见 [版本更新记录](changelog.md)。正式 release 不应只修改 tag；公开仓、运行包、ROS2 install、`VERSION` 和发布说明需要保持一致。
 
@@ -19,7 +19,7 @@
 - 当前不提供相机/IMU 硬同步、TF 外参、相机内参或畸变标定。
 - ROS2 不提供 RTSP；需要 RTSP 时使用 non-ROS `/root/demo`。
 - 相机应用独占 camera/VIO/编码资源；切换前先退出旧应用，并保持 `cam-service` 运行。
-- 相机/RTSP支持`25/30/40/50/60fps`，默认`30fps`；仅ROS1 bag全量JPEG保存的60fps为stress档，H.264 MP4 60fps按稳定发布门验收。
+- 相机、RTSP、ROS2、ROS1 bag和H.264 MP4仅支持`25fps`和`30fps`，默认`30fps`。
 - `software_gpio` 是 V1 唯一稳定 trigger；`vin_lpwm` 和 `none` 为实验性。
 - CameraInfo 只有宽高，IMU orientation 不可用。
 - H.265 或四路高帧率播放依赖客户端解码和渲染能力。

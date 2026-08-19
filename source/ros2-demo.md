@@ -8,7 +8,7 @@ ROS2 与 non-ROS RTSP 是两条独立使用路径。ROS2 demo 不提供 RTSP；n
 
 ## 功能边界
 
-ROS2 包名为 `robobaton_4p_ros2_demo`，版本 `1.0.0`。主要产物：
+ROS2包名为`robobaton_4p_ros2_demo`，版本`1.1.0`。主要产物：
 
 - 节点：`robobaton_sensors_node`
 - IMU 频率检查工具：`robobaton_imu_rate_monitor`
@@ -112,7 +112,7 @@ ros2 launch robobaton_4p_ros2_demo robobaton_sensors.launch.py
 /root/ros2_demo/install/robobaton_ros2_env.bash ros2 topic list --include-hidden-topics
 ```
 
-IMU 1000Hz 频率优先用包内 C++ monitor：
+IMU频率优先用包内 C++ monitor：
 
 ```bash
 /root/ros2_demo/install/robobaton_ros2_env.bash ros2 run robobaton_4p_ros2_demo robobaton_imu_rate_monitor
@@ -148,7 +148,7 @@ FastDDS SHM 和环境变量检查：
 /root/ros2_demo/install/robobaton_ros2_env.bash --clean-shm
 ```
 
-`ros2 topic hz` 可用于低频 topic 快速诊断；在 X5 Cortex-A55 上，它可能因 Python 消息构造、回调和统计开销低估 1000Hz IMU topic，不作为本包 IMU 1000Hz 发布率门禁。
+`ros2 topic hz`可用于交互诊断；正式证据统一使用包内C++ monitor，避免不同客户端实现造成统计口径漂移。
 
 ## YAML 参数
 
@@ -157,8 +157,8 @@ FastDDS SHM 和环境变量检查：
 | `enable_camera` | `true` | 是否启动相机 publisher。 |
 | `enable_imu` | `true` | 是否启动 IMU publisher。 |
 | `camera.camera_mask` | `15` | bit0..bit3 对应软件 cam0..cam3，即物理 CAM1..CAM4；只支持单颗或完整四路，不支持 2/3 路。 |
-| `camera.fps` | `30` | 支持`25/30/40/50/60fps`；ROS1 bag专属的60fps stress策略不适用于ROS2。 |
-| `camera.rotate_degrees` | `0` | 支持 `0/90/180/270`；`180` 只允许 `30fps`，`25/40/50/60fps`均拒绝。 |
+| `camera.fps` | `30` | 仅支持`25fps`和`30fps`；其他值在启动相机前拒绝。 |
+| `camera.rotate_degrees` | `0` | 支持 `0/90/180/270`；`180` 只允许 `30fps`，`25fps`拒绝。 |
 | `camera.frame_set_max_skew_ns` | `2000000` | 帧组放行上限，单位 ns。 |
 | `camera.frame_set_timeout_ms` | `100` | 帧组等待超时，单位 ms。 |
 | `camera.queue_capacity` | `4` | 每路 ROS 发布队列容量，必须大于 0。 |
@@ -169,7 +169,7 @@ FastDDS SHM 和环境变量检查：
 | `camera.compressed_jpeg_quality` | `80` | JPEG quality，范围 `1..100`。 |
 | `camera.frame_id_prefix` | `robobaton_cam` | 生成 `robobaton_cam0_optical_frame` 等 frame_id。 |
 | `camera.trigger_mode` | `software_gpio` | 只有 `software_gpio` 是 V1 已验证模式；`vin_lpwm`、`none` 为实验性 / 未验收参数。 |
-| `imu.sample_rate_hz` | `1000` | ICM-42688 sample rate，建议使用公开支持档位。 |
+| `imu.sample_rate_hz` | `30` | 只接受`25`或`30`。 |
 | `imu.read_mode` | `sensor_timestamp_fifo` | 当前只支持该模式。 |
 | `imu.fifo_watermark_samples` | `1` | 当前固定为 `1`。 |
 | `imu.frame_id` | `robobaton_imu_link` | IMU frame_id；完整加速度符号约定见[数据合同](data-contracts.md#imu)。 |

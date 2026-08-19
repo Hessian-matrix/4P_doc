@@ -98,8 +98,8 @@ int run_camera(void) {
 
 核心结构与约束：
 
-- `icm42688_config_t` 默认 `sample_rate_hz=1000`、`fifo_watermark_samples=1`、`read_mode=ICM42688_READ_MODE_SENSOR_TIMESTAMP_FIFO`。
-- 当前只接受 sensor timestamp FIFO 读取模式。
+- `icm42688_config_t` 默认 `sample_rate_hz=30`、`fifo_watermark_samples=1`、`read_mode=ICM42688_READ_MODE_SENSOR_TIMESTAMP_FIFO`。
+- `sample_rate_hz`只接受`25`或`30`；当前只接受 sensor timestamp FIFO 读取模式。
 - callback 由采集线程串行调用；`sample` 是借用引用。
 - `stop/destroy` 会等待采集线程，不得从 callback 中调用。
 - `user_data` 必须保持有效直到 `icm42688_stop()` 返回。
@@ -118,7 +118,7 @@ static void on_imu_sample(const icm42688_sample_t *sample, void *user_data) {
 
 int run_imu(void) {
   icm42688_config_t config = ICM42688_CONFIG_INIT;
-  config.sample_rate_hz = 1000;
+  config.sample_rate_hz = 30;
   config.fifo_watermark_samples = 1;
 
   icm42688_handle_t *handle = 0;
