@@ -20,7 +20,7 @@
 - ROS2 不提供 RTSP；需要 RTSP 时使用 non-ROS `/root/demo`。
 - 相机应用独占 camera/VIO/编码资源；切换前先退出旧应用，并保持 `cam-service` 运行。
 - 相机、RTSP、ROS2、ROS1 bag和H.264 MP4仅支持`25fps`和`30fps`，默认`30fps`。
-- `software_gpio` 是 V1 唯一稳定 trigger；`vin_lpwm` 和 `none` 为实验性。
+- `software_gpio` 是 V1 唯一稳定 trigger；`none` 仅用于显式 free-run 诊断。
 - CameraInfo 只有宽高，IMU orientation 不可用。
 - H.265 或四路高帧率播放依赖客户端解码和渲染能力。
 - DEBUG_UART 是 `1.8V` 系统控制台/调试口；用户可编程 UART1/UART7 使用 `3.3V` TX/RX/GND 并共地，3.3V 硬件通信已通过 V1 验收，两个 UART 3.3V 供电脚对外设供电合计额定边界为 `500 mA`，`serial_port_demo` 只适用于 UART1/UART7。

@@ -143,7 +143,7 @@ pgrep -a cam-service
 --rotate <0|90|180|270>
 --bps <kbps>
 --url <path>
---trigger-mode <software_gpio|vin_lpwm|none>
+--trigger-mode <software_gpio|none>
 --diagnostics
 --max-skew-ns <ns>
 --frame-timeout-ms <ms>
@@ -154,7 +154,6 @@ Trigger 模式状态：
 | 模式 | 当前状态 |
 |---|---|
 | `software_gpio` | 默认且唯一已验证的稳定模式。 |
-| `vin_lpwm` | 实验性，不属于 V1 稳定配置。 |
 | `none` | 实验性，不属于 V1 稳定配置。 |
 
 限制：`--rotate 180`只支持`30fps`，不支持`25fps`。相机、RTSP、ROS1 bag和H.264 MP4使用同一`25/30fps`公开帧率集合。

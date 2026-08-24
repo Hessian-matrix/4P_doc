@@ -168,7 +168,7 @@ FastDDS SHM 和环境变量检查：
 | `camera.publish_compressed_image` | `true` | 是否注册 raw 与 compressed image_transport 发布插件。 |
 | `camera.compressed_jpeg_quality` | `80` | JPEG quality，范围 `1..100`。 |
 | `camera.frame_id_prefix` | `robobaton_cam` | 生成 `robobaton_cam0_optical_frame` 等 frame_id。 |
-| `camera.trigger_mode` | `software_gpio` | 只有 `software_gpio` 是 V1 已验证模式；`vin_lpwm`、`none` 为实验性 / 未验收参数。 |
+| `camera.trigger_mode` | `software_gpio` | 只有 `software_gpio` 是 V1 已验证模式；`none` 仅用于显式 free-run 诊断。 |
 | `imu.sample_rate_hz` | `30` | 只接受`25`或`30`。 |
 | `imu.read_mode` | `sensor_timestamp_fifo` | 当前只支持该模式。 |
 | `imu.fifo_watermark_samples` | `1` | 当前固定为 `1`。 |
@@ -182,6 +182,6 @@ raw `Image` 使用 NV12。`Image.step` 保留底层 DMA buffer 的 stride；`dat
 compressed topic 是标准 `CompressedImage` JPEG payload。插件只在有 `/image_raw/compressed` 订阅者时执行压缩：它按 `Image.step` 和 `data.size()` 校验 NV12 布局，把有效 Y/UV 行复制到 X5 media-codec 输入 buffer，并通过 `MEDIA_CODEC_ID_JPEG` 生成 JPEG，保留原始消息的 `header`。
 
 
-`header.stamp` 不是发布时刻。在 V1 已验证的 `software_gpio` 模式下，节点启动时冻结 `CLOCK_REALTIME - CLOCK_MONOTONIC_RAW` offset，并把相机 SC132 raw timestamp 映射到 system realtime/ROS stamp。实验性的 `vin_lpwm` 和 `none` 保留底层 SC132 时间域，不声明为 V1 wall/realtime 合同。IMU `sample_timestamp_ns` 会通过同一个冻结 offset 映射到 system realtime/ROS 时间戳；IMU 不使用 `host_timestamp_ns` 作为消息时间。
+`header.stamp` 不是发布时刻。在 V1 已验证的 `software_gpio` 模式下，节点启动时冻结 `CLOCK_REALTIME - CLOCK_MONOTONIC_RAW` offset，并把相机 SC132 raw timestamp 映射到 system realtime/ROS stamp。显式 `none` 诊断模式保留底层 SC132 时间域，不声明为 V1 wall/realtime 合同。IMU `sample_timestamp_ns` 会通过同一个冻结 offset 映射到 system realtime/ROS 时间戳；IMU 不使用 `host_timestamp_ns` 作为消息时间。
 
 `CameraInfo` 只带当前帧宽高，畸变模型和标定矩阵为空。IMU orientation 不可用，消息设置 `orientation_covariance[0] = -1.0`；gyro/accel 协方差当前不伪造。`robobaton_imu_link` 只标识 IMU 消息来源；它不建立到相机、base、optical frame 或其他坐标系的变换，也不声明 TF 或外参。

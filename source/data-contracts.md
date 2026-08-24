@@ -34,10 +34,9 @@
 | 模式 | V1 状态 | 公开合同 |
 |---|---|---|
 | `software_gpio` | 已验证；V1 唯一稳定模式 | 默认模式，使用 GPIO417 软件触发。 |
-| `vin_lpwm` | 实验性，不属于 V1 稳定配置。 | CLI/配置仍接受该值，但不属于 V1 稳定发布合同。 |
 | `none` | 实验性，不属于 V1 稳定配置。 | CLI/配置仍接受该值，但不属于 V1 稳定发布合同。 |
 
-在 V1 已验证的 `software_gpio` 模式下，demo 对外诊断的 `camera_ts_ns` 和 RTSP PTS 会映射到启动时冻结 offset 对应的 `system_realtime` epoch。显式使用实验性的 `vin_lpwm` 或 `none` 时，时间戳保留 SC132 原生时间域，不声明为 V1 wall/realtime 合同。底层 C API 头文件中的 `timestamp_ns` 不保证与墙上时钟同域；不要把 demo 打印时间和底层原始时间域混写。
+在 V1 已验证的 `software_gpio` 模式下，demo 对外诊断的 `camera_ts_ns` 和 RTSP PTS 会映射到启动时冻结 offset 对应的 `system_realtime` epoch。显式使用 `none` 诊断模式时，时间戳保留 SC132 原生时间域，不声明为 V1 wall/realtime 合同。底层 C API 头文件中的 `timestamp_ns` 不保证与墙上时钟同域；不要把 demo 打印时间和底层原始时间域混写。
 
 ## IMU
 
@@ -100,7 +99,7 @@ ROS2 QoS：
 
 ROS2 raw `Image.step` 使用底层 DMA buffer 的 stride；`data.size()` 使用底层 Y/UV buffer size，可能大于紧凑 `width * height * 3 / 2`。订阅端不得按紧凑 NV12 假设直接索引 UV 平面。
 
-ROS2 `header.stamp` 不是发布时刻。在 V1 已验证的 `software_gpio` 模式下，节点启动时冻结 `CLOCK_REALTIME - CLOCK_MONOTONIC_RAW` offset，并把相机 SC132 raw timestamp 映射到 system realtime/ROS stamp。实验性的 `vin_lpwm` 和 `none` 保留底层 SC132 时间域，不声明为 V1 wall/realtime 合同。IMU `sample_timestamp_ns` 会通过同一个冻结 offset 映射到 system realtime/ROS 时间戳；IMU 不使用 `host_timestamp_ns` 作为消息时间。
+ROS2 `header.stamp` 不是发布时刻。在 V1 已验证的 `software_gpio` 模式下，节点启动时冻结 `CLOCK_REALTIME - CLOCK_MONOTONIC_RAW` offset，并把相机 SC132 raw timestamp 映射到 system realtime/ROS stamp。显式 `none` 诊断模式保留底层 SC132 时间域，不声明为 V1 wall/realtime 合同。IMU `sample_timestamp_ns` 会通过同一个冻结 offset 映射到 system realtime/ROS 时间戳；IMU 不使用 `host_timestamp_ns` 作为消息时间。
 
 ROS2 当前不发布 RTSP、TF 外参或标定；相机/IMU 硬同步仍不提供。需要通用可视化时优先订阅 `/image_raw/compressed`，不要假设 raw NV12 可被普通 RGB/BGR 工具直接显示。
 
