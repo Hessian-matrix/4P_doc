@@ -45,7 +45,7 @@ cat VERSION
 
 `VERSION`、程序 `--version`、实际加载的 `libsc132`、`libprrtsp`、`libicm42688` 产品版本及 ABI 信息必须属于同一份包。不要混用系统目录、旧部署或其他工程中的同名动态库。
 
-当前开发候选已统一使用产品版本`1.1.0`，公开changelog仍标记为“未发布”。正式创建`v1.1.0` tag前，必须使用同一组AArch64 ELF、`runtime-provenance.json`和`manifest.sha256`重新通过Host与目标板门禁。使用时以部署包内实际`VERSION`为准，不以文档标题推断版本。
+当前开发候选已统一使用产品版本`1.1.1`，公开changelog仍标记为“未发布”。正式创建`v1.1.1` tag前，必须使用同一组AArch64 ELF、`runtime-provenance.json`和`manifest.sha256`重新通过Host与目标板门禁。使用时以部署包内实际`VERSION`为准，不以文档标题推断版本。
 
 ## 3. 板端运行前检查
 
@@ -152,7 +152,7 @@ save_data:
 cd <完整demo运行包目录>
 ./sensor_demo \
   --fps 30 \
-  --sample-rate-hz 30 \
+  --sample-rate-hz 1000 \
   --print-rate-hz 0 \
   --record-bag /data/robobaton/run_30fps.bag \
   --record-frame-skip 0
@@ -182,7 +182,8 @@ rtsp:
   codec: h264
   url: /PRR
 imu:
-  sample_rate_hz: 30
+  sample_rate_hz: 1000
+
   print_rate_hz: 0
   print_metrics: false
 save_data:
@@ -258,7 +259,7 @@ cd <完整demo运行包目录>
 ./sensor_demo \
   --fps 30 \
   --codec h264 \
-  --sample-rate-hz 30 \
+  --sample-rate-hz 1000 \
   --print-rate-hz 0 \
   --record-mp4-dir /data/robobaton/run_30fps_mp4
 ```
@@ -286,7 +287,8 @@ rtsp:
   codec: h264
   url: /PRR
 imu:
-  sample_rate_hz: 30
+  sample_rate_hz: 1000
+
   print_rate_hz: 0
   print_metrics: false
 save_data:
@@ -371,8 +373,8 @@ python3 scripts/mp4_extract.py \
 
 保存模式必须分开判定：
 
-- ROS1 bag：仅支持25fps和30fps；正常case必须完整发布或明确失败，不能把partial计为发布PASS。
-- H.264 MP4：仅支持25fps和30fps；正常case必须exit 0、`published_complete`、零recorder drop并通过四路MP4/CSV/JPEG/IMU readback。
+- ROS1 bag：支持25/30/40/50/60fps；正常case必须完整发布或明确失败，不能把partial计为发布PASS。
+- H.264 MP4：支持25/30/40/50/60fps；正常case必须exit 0、`published_complete`、零recorder drop并通过四路MP4/CSV/JPEG/IMU readback。
 - 两种模式都不允许崩溃、死锁、UAF、静默丢失后仍报告complete。显式故障注入可产生受控partial用于验证恢复，但不能计入正常发布矩阵。
 
 Host/package GO不能替代板端验收。正式宣称某一帧率完整前，必须完成目标板持续运行、CPU压力、存储压力、SIGINT/SIGTERM、真实输出readback和服务恢复检查。

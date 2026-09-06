@@ -9,7 +9,7 @@
 | `libsc132.so` / camera callback 原始帧 | 标准方向 NV12 `1280x1088` |
 | RTSP 对外流 | H.264 默认；支持 H.265 |
 | FOV | 水平 `148.4°`、垂直 `126.6°`、对角 `193.8°` |
-| camera FPS | 默认`30fps`，仅支持`25fps`和`30fps`；其他值在启动副作用前拒绝 |
+| camera FPS | 默认`30fps`，支持`25fps`、`30fps`、`40fps`、`50fps`和`60fps`；其他值在启动副作用前拒绝 |
 | RTSP path | `/PRR` |
 | 端口映射 | CAM1/CAM2/CAM3/CAM4 -> cam0/cam1/cam2/cam3 -> `554/555/556/557` |
 
@@ -27,7 +27,7 @@
 | `items[i].frame_id` | 归一化后的帧 ID。 |
 | `items[i].timestamp_ns` | 单路帧时间戳，单位 `ns`。 |
 
-`sc132_frame_set_config_t.max_skew_ns` 才是配组放行上限；默认值为 `2000000 ns`。
+`sc132_frame_set_config_t.max_skew_ns` 才是配组放行上限；默认值为 `10000000 ns（10ms）`，用于覆盖四路曝光时间差。
 
 ## Trigger 模式
 
@@ -47,7 +47,7 @@
 | DRDY | GPIO395 |
 | 读取模式 | sensor timestamp FIFO |
 | FIFO watermark | `1` |
-| ODR | `25/30Hz`，默认`30Hz` |
+| ODR | `25/50/100/200/500/1000/2000Hz`，默认`1000Hz` |
 | 不使用 | GPIO397、FSYNC、`icm42688_pulse_fsync()` |
 
 字段语义：

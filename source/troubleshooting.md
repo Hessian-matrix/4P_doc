@@ -97,11 +97,11 @@
 
 | 项目 | 内容 |
 |---|---|
-| 现象 | `/robobaton/imu/data`的统计频率明显偏离配置的`25Hz`或`30Hz`。 |
+| 现象 | `/robobaton/imu/data`的统计频率明显偏离配置的`25/50/100/200/500/1000/2000Hz`目标。 |
 | 检查 | 使用`ros2 run robobaton_4p_ros2_demo robobaton_imu_rate_monitor`并查看启动后的连续统计窗口。 |
 | 正常结果 | C++ monitor每秒输出`ROB2_IMU_RATE topic=/robobaton/imu/data hz=...`，稳定值接近配置目标。 |
 | 常见原因 | YAML未生效、DDS接收链路丢样、进程资源争用或仍在观察首个不完整统计窗口。 |
-| 恢复/需收集信息 | 确认`imu.sample_rate_hz`为`25`或`30`，收集node参数、连续monitor输出和进程日志。 |
+| 恢复/需收集信息 | 确认`imu.sample_rate_hz`为`25/50/100/200/500/1000/2000`中之一，收集node参数、连续monitor输出和进程日志。 |
 
 ## ROS2 topic 无数据或资源冲突
 
@@ -168,7 +168,7 @@
 | 项目 | 内容 |
 |---|---|
 | 现象 | `imu_reader_demo` 无输出、启动失败或 timestamp duplicate/regression 非零。 |
-| 检查 | `ls -l /dev/spidev2.0`；`./imu_reader_demo --sample-rate-hz 30 --print-metrics`。 |
+| 检查 | `ls -l /dev/spidev2.0`；`./imu_reader_demo --sample-rate-hz 1000 --print-metrics`。 |
 | 正常结果 | 能持续输出样本；`timestamp_duplicates=0`、`timestamp_regressions=0`。 |
 | 常见原因 | SPI 设备不存在、IMU 供电/焊接/设备树异常、采样率参数不在支持列表。 |
 | 恢复/需收集信息 | 收集启动日志、`SENSOR_IMU_RESULT` 或 demo 退出摘要、`/dev/spidev2.0` 状态。 |

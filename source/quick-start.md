@@ -20,7 +20,7 @@ cd /root/demo
 ./sensor_demo
 ```
 
-`sensor_demo`默认运行四路SC132相机、PRRTSP v2 H.264 RTSP推流和ICM-42688 IMU采集。默认图像为`1280x1088@30fps`，也支持`25fps`；其他帧率值在启动相机前拒绝。
+`sensor_demo`默认运行四路SC132相机、PRRTSP v2 H.264 RTSP推流和ICM-42688 IMU采集。默认图像为`1280x1088@30fps`，支持`25/30/40/50/60fps`；其他帧率值在启动相机前拒绝。
 
 四路 RTSP URL：
 

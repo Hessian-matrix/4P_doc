@@ -8,7 +8,7 @@ ROS2 与 non-ROS RTSP 是两条独立使用路径。ROS2 demo 不提供 RTSP；n
 
 ## 功能边界
 
-ROS2包名为`robobaton_4p_ros2_demo`，版本`1.1.0`。主要产物：
+ROS2包名为`robobaton_4p_ros2_demo`，版本`1.1.1`。主要产物：
 
 - 节点：`robobaton_sensors_node`
 - IMU 频率检查工具：`robobaton_imu_rate_monitor`
@@ -159,7 +159,7 @@ FastDDS SHM 和环境变量检查：
 | `camera.camera_mask` | `15` | bit0..bit3 对应软件 cam0..cam3，即物理 CAM1..CAM4；只支持单颗或完整四路，不支持 2/3 路。 |
 | `camera.fps` | `30` | 仅支持`25fps`和`30fps`；其他值在启动相机前拒绝。 |
 | `camera.rotate_degrees` | `0` | 支持 `0/90/180/270`；`180` 只允许 `30fps`，`25fps`拒绝。 |
-| `camera.frame_set_max_skew_ns` | `2000000` | 帧组放行上限，单位 ns。 |
+| `camera.frame_set_max_skew_ns` | `10000000` | 帧组放行上限，单位 ns；默认覆盖四路曝光上限10ms。 |
 | `camera.frame_set_timeout_ms` | `100` | 帧组等待超时，单位 ms。 |
 | `camera.queue_capacity` | `4` | 每路 ROS 发布队列容量，必须大于 0。 |
 | `camera.queue_policy` | `block` | 支持 `block`、`drop_newest`；`drop_newest` 不保证完整四帧组。 |
@@ -169,7 +169,7 @@ FastDDS SHM 和环境变量检查：
 | `camera.compressed_jpeg_quality` | `80` | JPEG quality，范围 `1..100`。 |
 | `camera.frame_id_prefix` | `robobaton_cam` | 生成 `robobaton_cam0_optical_frame` 等 frame_id。 |
 | `camera.trigger_mode` | `software_gpio` | 只有 `software_gpio` 是 V1 已验证模式；`none` 仅用于显式 free-run 诊断。 |
-| `imu.sample_rate_hz` | `30` | 只接受`25`或`30`。 |
+| `imu.sample_rate_hz` | `1000` | 只接受`25/50/100/200/500/1000/2000`。 |
 | `imu.read_mode` | `sensor_timestamp_fifo` | 当前只支持该模式。 |
 | `imu.fifo_watermark_samples` | `1` | 当前固定为 `1`。 |
 | `imu.frame_id` | `robobaton_imu_link` | IMU frame_id；完整加速度符号约定见[数据合同](data-contracts.md#imu)。 |
