@@ -2,9 +2,8 @@
 
 本文件记录 RoboBaton 4P 公开交付的用户可见更新。版本号遵循 [Semantic Versioning 2.0.0](https://semver.org/)；SO 的 SONAME/ABI 版本与产品发布版本独立，例如 `libicm42688.so.2` 中的 `2` 表示 ABI major，不等于产品版本。
 
-## 1.1.1 - 未发布
+## 1.1.1 - 2026-09-08
 
-> 本节是当前发布候选，不代表已正式发布。合并正式版本前必须同步四仓`VERSION`、重新构建运行包，并通过Host与目标板发布门。
 
 ### 新增
 

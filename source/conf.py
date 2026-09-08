@@ -3,7 +3,7 @@
 project = "4P_doc"
 author = "4P_doc contributors"
 copyright = "2026, 4P_doc contributors"
-# 2026-09-04 修改原因：Sphinx 版本必须与当前四仓 1.1.1 发布候选一致。
+# 2026-09-08 修改原因：Sphinx 版本必须与当前四仓 1.1.1 正式发布版本一致。
 release = "1.1.1"
 
 # 2026-07-31：使用 MyST 支持 Markdown，原因是后续章节更容易直接用 .md 编写。
