@@ -6,9 +6,9 @@
 
 | 项目 | 当前记录 | 状态 |
 |---|---|---|
-| 文档 | `v1.1.1` | 已于 2026-09-08 正式发布。 |
-| non-ROS demo/运行包 | `v1.1.1` | 已于 2026-09-08 正式发布；部署到`/root/demo`，按`manifest.sha256`整包校验。 |
-| ROS2 package/install | `v1.1.1` | 已于 2026-09-08 正式发布；部署到`/root/ros2_demo/install`，包名`robobaton_4p_ros2_demo`。 |
+| 文档 | `v1.2.0` | 已于 2026-09-09 正式发布。 |
+| non-ROS demo/运行包 | `v1.2.0` | 已于 2026-09-09 正式发布；部署到`/root/demo`，按`manifest.sha256`整包校验。 |
+| ROS2 package/install | `v1.2.0` | 已于 2026-09-09 正式发布；部署到`/root/ros2_demo/install`，包名`robobaton_4p_ros2_demo`。 |
 
 功能新增、修复和兼容性变化见 [版本更新记录](changelog.md)。正式 release 不应只修改 tag；公开仓、运行包、ROS2 install、`VERSION` 和发布说明需要保持一致。
 

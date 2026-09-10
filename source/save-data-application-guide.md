@@ -45,7 +45,7 @@ cat VERSION
 
 `VERSION`、程序 `--version`、实际加载的 `libsc132`、`libprrtsp`、`libicm42688` 产品版本及 ABI 信息必须属于同一份包。不要混用系统目录、旧部署或其他工程中的同名动态库。
 
-`v1.1.1`已于 2026-09-08 正式发布。该发布使用同一组AArch64 ELF、`runtime-provenance.json`和`manifest.sha256`；使用时以部署包内实际`VERSION`为准，不以文档标题推断版本。
+`v1.2.0`已于 2026-09-09 正式发布。该发布使用同一组AArch64 ELF、`runtime-provenance.json`和`manifest.sha256`；使用时以部署包内实际`VERSION`为准，不以文档标题推断版本。
 
 ## 3. 板端运行前检查
 

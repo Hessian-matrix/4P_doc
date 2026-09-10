@@ -2,6 +2,14 @@
 
 本文件记录 RoboBaton 4P 公开交付的用户可见更新。版本号遵循 [Semantic Versioning 2.0.0](https://semver.org/)；SO 的 SONAME/ABI 版本与产品发布版本独立，例如 `libicm42688.so.2` 中的 `2` 表示 ABI major，不等于产品版本。
 
+## 1.2.0 - 2026-09-09
+
+### 变更
+
+- 统一主仓、non-ROS、ROS2 和公开文档的产品版本为 `1.2.0`，并重新生成对应的运行包版本信息。
+- 重新构建并同步 ICM42688、SC132、PRRTSP AArch64 发布库；ICM ABI 2.1、SC132 ABI 2.0、PRRTSP ABI 2.0 及各自 SONAME 保持不变。
+- 运行包、程序 `--version` 输出和版本匹配说明同步更新为 `1.2.0`。
+
 ## 1.1.1 - 2026-09-08
 
 

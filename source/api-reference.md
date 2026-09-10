@@ -16,7 +16,7 @@ const char *rtsp_version = prrtsp_get_version();
 
 ## `libsc132.so`
 
-头文件：`include/sc132camera.h`。ABI：`SC132_ABI_VERSION_MAJOR=2`，`SC132_ABI_VERSION_MINOR=0`。
+头文件：`include/sc132camera.h`。ABI 仍为 2.0（`SC132_ABI_VERSION_MAJOR=2`、`SC132_ABI_VERSION_MINOR=0`）；结构布局、导出符号、SONAME 和 `libsc132.so.2.1.0` 文件名保持不变。`SC132_FRAME_TIMESTAMP_SEMANTICS_VERSION=2` 明确表示 `software_gpio` 下逐路 `timestamp_ns` 已由触发时刻升级为触发参考下的曝光中值；依赖旧语义的 consumer 必须随产品 `1.2.0` 同步升级。
 
 状态码：
 
@@ -33,7 +33,7 @@ const char *rtsp_version = prrtsp_get_version();
 |---|---|
 | `sc132_frame_info_t` | 单帧 NV12 地址、物理地址、尺寸、stride/vstride、时间戳。 |
 | `sc132_frame_set_item_t` | 帧组中的单路条目。 |
-| `sc132_frame_set_t` | 同一组四路帧、`group_id`、`group_timestamp_ns` 和实际观测到的 `max_skew_ns`。 |
+| `sc132_frame_set_t` | 同一组四路帧、`group_id`、`group_timestamp_ns` 和公开 `items[].timestamp_ns` 的 `max_skew_ns`。 |
 | `sc132_frame_set_config_t` | frame-set callback、相机数量、尺寸、超时和配组放行 skew 上限。 |
 
 生命周期和所有权：
