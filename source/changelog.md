@@ -28,7 +28,6 @@
 - `libsc132` real SO 从 `libsc132.so.2.0.0` 升级为 `libsc132.so.2.0.1`；SONAME 仍为 `libsc132.so.2`，ABI 节点 `LIBSC132_2.0` 不变。
 - 文档增加 NTP、PPS 输入/UART7 IO 复用及 X5 master + Mid-360 slave 的 PTP 参考配置；PPS 固定使用当前产品组合中的 `/dev/pps2`。
 - 更新部署校验、公开 API、版本兼容入口和时间同步边界。保存模式逐帧率的完整性与压力（stress）边界统一以{ref}`数据保存：帧率与压力边界 <persistence-fps-boundary>`为准。
-
 ## 1.1.1 - 2026-09-08
 
 

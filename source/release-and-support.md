@@ -9,7 +9,6 @@
 | 文档 | `v1.3.1` | 随 v1.3.1 四仓发布；发布日期以仓库 tag 为准。 |
 | non-ROS demo/运行包 | `v1.3.1` | 部署到`/root/demo`，按`manifest.sha256`整包校验。 |
 | ROS2 package/install | `v1.3.1` | 软件包部署到`/root/ros2_demo/install`，包名`robobaton_4p_ros2_demo`。目标板使用前应按 [ROS2 Demo 使用](ros2-demo.md)、[non-ROS Demo 使用](non-ros-demo.md) 和 [保存数据](save-data-guide.md) 完成对应路径的实际检查；软件包发布不替代目标板运行检查。 |
-
 功能新增、修复和兼容性变化见 [版本更新记录](changelog.md)。
 
 在线文档会根据用户反馈继续更新；当前没有单独固定的 `stable` 文档版本。代码和包版本识别仍以仓库 tag、`VERSION`、package version 和 changelog 为准。这里的“正式发布”表示版本化文档/仓库/包已经发布，不等同于跳过目标板运行检查。相机参数集合公开支持 `25/30/40/50/60fps`，默认 `30fps`；保存和 ROS2 路径应以实际结果、退出码、manifest 和目标板环境检查判定。

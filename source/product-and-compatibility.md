@@ -10,7 +10,6 @@
 | non-ROS demo/运行包 | `1.3.0` | `/root/demo`，来自 `RoboBaton_4p_demo` 的 `demo/`。 |
 | ROS2 package/install | `1.3.0` | `/root/ros2_demo/install`，包名 `robobaton_4p_ros2_demo`。 |
 
-
 ## 功能与运行目录
 
 | 路径 | 主要能力 | 运行目录 | 备注 |
@@ -35,7 +34,6 @@ ROS2 路径不提供 RTSP；需要 RTSP 时使用 non-ROS 路径。当前不提�
 ## 出厂系统镜像与目标板兼容性
 
 板端软件 `v1.3.0` 提供配套的出厂系统镜像和烧录工具。镜像只适用于原产品原板，不保证其他目标板的兼容性；镜像获取与烧录步骤见 [系统烧录](system-flashing.md)。
-
 ## 版本查询与整包匹配
 
 ```bash
