@@ -16,7 +16,7 @@ const char *rtsp_version = prrtsp_get_version();
 
 ## `libsc132.so`
 
-头文件：`include/sc132camera.h`。ABI：`SC132_ABI_VERSION_MAJOR=2`，`SC132_ABI_VERSION_MINOR=0`。
+头文件：`include/sc132camera.h`。ABI：`SC132_ABI_VERSION_MAJOR=2`，`SC132_ABI_VERSION_MINOR=0`；real SO 为 `libsc132.so.2.0.1`，SONAME 仍为 `libsc132.so.2`。
 
 状态码：
 
@@ -41,9 +41,9 @@ const char *rtsp_version = prrtsp_get_version();
 | 函数 | 合同 |
 |---|---|
 | `sc132_set_fps(uint32_t fps)` | 在启动前设置相机帧率；当前公开值为 `25/30/40/50/60`。运行中或停止未完成时不得重新配置。 |
-| `sc132_set_output_rotation(uint32_t rotate_clockwise_degrees)` | 在启动前设置顺时针旋转，接受 `0/90/180/270`；`0/180` 输出 `1280x1088`，`90/270` 输出 `1088x1280`。产品 demo 还限制 `180` 仅用于 `30fps`。 |
+| `sc132_set_output_rotation(uint32_t rotate_clockwise_degrees)` | 在启动前设置顺时针旋转，接受 `0/90/180/270`；`0/180` 交付画布不交换宽高，`90/270` 交换宽高。软件旋转（180/270）在缩放之后由 Nano2D 完成。产品 demo 还限制 `180` 仅用于 `30fps`。 |
 
-`sc132_frame_set_config_t.width/height` 使用原生输入 `1280/1088`，当前公开 producer 不提供任意尺寸缩放。
+`sc132_frame_set_config_t.width/height` 声明交付画布尺寸；公开支持原生 `1280x1088` 与 VSE 硬件整幅缩放的 `640x480`、`720x480`、`1280x720`，两种轴向写法均合法，其余组合拒绝。缩放不改变 FOV：整幅拉伸到目标尺寸，横纵比相对原生画布改变。交付帧尺寸恒等于 frame-set config。
 
 生命周期和所有权：
 

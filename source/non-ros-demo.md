@@ -62,6 +62,7 @@ SENSOR_IMU_RESULT samples=... invalid=... timestamp_duplicates=... timestamp_reg
 
 ```yaml
 camera:
+  # width/height: 1280x1088（默认）、640x480、720x480 或 1280x720，任一轴向
   width: 1280
   height: 1088
   fps: 30
@@ -83,7 +84,7 @@ save_data:
 
 边界：
 
-- `camera.width` / `camera.height` 固定为 `1280` / `1088`，修改会被拒绝。
+- `camera.width` / `camera.height` 支持 `1280x1088`（默认）、`640x480`、`720x480`、`1280x720`，两种轴向写法均合法，其余值在启动相机前拒绝。
 - 完整四目路径固定为四路；单颗 sensor 诊断使用 `cam_demo --camera-id`。
 - non-ROS公开帧率集合为25/30/40/50/60fps；默认`30`，其他值在启动相机前拒绝。
 - `rtsp.codec` 支持 `h264` 和 `h265`。
@@ -154,7 +155,7 @@ Trigger 模式状态：
 | `software_gpio` | 默认且唯一已验证的稳定模式。 |
 | `none` | 实验性，不属于 V1 稳定配置。 |
 
-限制：`--width/--height` 只接受原生输入 `1280/1088`，不提供任意尺寸缩放；`--rotate 180`只支持`30fps`，不支持`25fps`、`40fps`、`50fps`和`60fps`。对外 NV12/RTSP 画布在旋转 `0/180` 时为 `1280x1088`，旋转 `90/270` 时为 `1088x1280`。相机、RTSP、ROS1 bag和H.264 MP4使用同一`25/30/40/50/60fps`公开帧率集合。
+限制：`--width/--height` 接受 `1280x1088`（默认）、`640x480`、`720x480`、`1280x720`，两种轴向写法均合法，其余组合拒绝；缩放由 `libsc132` VSE 硬件整幅拉伸完成，不改变 FOV。`--rotate 180`只支持`30fps`，不支持`25fps`、`40fps`、`50fps`和`60fps`。对外 NV12/RTSP 画布在旋转 `0/180` 时宽高不变（如 `1280x1088`、`640x480`），旋转 `90/270` 时宽高交换（如 `1088x1280`、`480x640`）。相机、RTSP、ROS1 bag和H.264 MP4使用同一`25/30/40/50/60fps`公开帧率集合。
 
 默认四路 RTSP：
 

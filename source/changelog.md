@@ -2,15 +2,15 @@
 
 本文件记录 RoboBaton 4P 公开交付的用户可见更新。版本号遵循 [Semantic Versioning 2.0.0](https://semver.org/)；SO 的 SONAME/ABI 版本与产品发布版本独立，例如 `libicm42688.so.2` 中的 `2` 表示 ABI major，不等于产品版本。
 
-## Unreleased
+## 1.2.0 - 2026-09-14
 
-当前内容属于下一版本的开发中间状态，尚未形成新的正式版本号，也不属于既有 `v1.1.1` tag。合并主分支前还会统一审查、构建和确定最终发布身份。
+### 新增
 
-### 开发中变更
-
+- non-ROS `cam_demo`/`sensor_demo` 支持 VSE 硬件整幅缩放输出画布：`640x480`、`720x480`、`1280x720`，两种轴向写法均合法；缩放不改变 FOV，软件旋转（180/270）在缩放之后由 Nano2D 完成，外部旋转 `90/270` 的交付画布宽高交换。
+- ROS2 图像节点帧率扩展到 `25/30/40/50/60fps`（默认 `30fps`），与 non-ROS/RTSP 公开集合对齐。
+- `libsc132` real SO 从 `libsc132.so.2.0.0` 升级为 `libsc132.so.2.0.1`；SONAME 仍为 `libsc132.so.2`，ABI 节点 `LIBSC132_2.0` 不变。
 - 文档增加 NTP、PPS 输入/UART7 IO 复用及 X5 master + Mid-360 slave 的 PTP 参考配置；PPS 固定使用当前产品组合中的 `/dev/pps2`。
-- non-ROS CLI 将相机输入尺寸收紧为原生 `1280x1088`；旋转 `90/270` 的对外画布为 `1088x1280`。
-- 更新部署校验、公开 API、版本兼容入口和时间同步边界。保存模式逐帧率的完整性边界统一以{ref}`数据保存：帧率与压力边界 <persistence-fps-boundary>`为准。
+- 更新部署校验、公开 API、版本兼容入口和时间同步边界。保存模式逐帧率的完整性与压力（stress）边界统一以{ref}`数据保存：帧率与压力边界 <persistence-fps-boundary>`为准。
 
 ## 1.1.1 - 2026-09-08
 
@@ -34,7 +34,7 @@
 
 - ROS1 bag与MP4当前只能选择一种保存模式，不能在同一进程同时开启。
 - MP4只支持H.264完整四路，不支持frame skip；板端需要`ffmpeg`，离线提取需要Host完整`ffmpeg`/`ffprobe`。
-- v1.1.1相机、RTSP和ROS2图像节点的公开帧率集合为`25/30/40/50/60fps`，默认`30fps`；IMU支持`25/50/100/200/500/1000/2000Hz`。保存后端的参数接受、完整性和压力边界见{ref}`数据保存：帧率与压力边界 <persistence-fps-boundary>`。
+- v1.1.1 non-ROS相机与RTSP的公开帧率集合为`25/30/40/50/60fps`，默认`30fps`；ROS2图像节点为`25/30fps`。IMU支持`25/50/100/200/500/1000/2000Hz`。保存后端的参数接受、完整性和压力边界见{ref}`数据保存：帧率与压力边界 <persistence-fps-boundary>`。
 - `trigger_mode=none` 仅用于显式 free-run 诊断，不属于 V1 稳定发布合同；V1 验证模式为 `software_gpio`。
 - non-ROS ROS1 bag 与 H.264 MP4 的完整保存判据和逐帧率边界见[保存数据](save-data-guide.md)；历史证据仍按原始帧率保留，不替代当前发布门。
 

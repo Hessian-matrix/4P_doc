@@ -104,7 +104,7 @@ passwd
 
 `passwd` 是交互式命令，按提示输入新密码。建议到最后生产流程再统一修改root密码，测试过程保持出厂密码即可。
 
-如果用户修改过 IP 且需要通过调试口进入系统查看地址，只能使用 DEBUG_UART：`1.8V` 逻辑，调试终端波特率设置为 `115200`，板端 TX 接适配器 RX，板端 RX 接适配器 TX，并共地。禁止在 DEBUG_UART 使用 `3.3V` 或 `5V` USB-UART。
+如果用户修改过 IP 且需要通过调试口进入系统查看地址，只能使用 DEBUG_UART：`1.8V` 逻辑，调试终端波特率设置为 `921600`，板端 TX 接适配器 RX，板端 RX 接适配器 TX，并共地。禁止在 DEBUG_UART 使用 `3.3V` 或 `5V` USB-UART。
 
 ```{note}
 忘记密码、系统无法启动和出厂系统镜像恢复步骤暂未公开。恢复介质、恢复范围和凭据重置行为将在产品流程定版后补充；在此之前请联系 [发布、授权与支持](release-and-support.md)，不要刷写未经确认的系统镜像。
@@ -143,7 +143,7 @@ ROS2 `/root/ros2_demo/install`：
 /root/ros2_demo/install/lib/robobaton_4p_ros2_demo/robobaton_imu_rate_monitor --version
 ```
 
-最近正式发布基线为文档`v1.1.1`、non-ROS`v1.1.1`、ROS2/package`v1.1.1`；文件和包版本查询结果可能显示不带`v`前缀的`1.1.1`。
+最近正式发布基线为文档`v1.2.0`、non-ROS`v1.2.0`、ROS2/package`v1.2.0`；文件和包版本查询结果可能显示不带`v`前缀的`1.2.0`。
 
 ## 6. 选择 non-ROS 或 ROS2
 

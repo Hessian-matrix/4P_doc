@@ -6,14 +6,14 @@
 
 | 项目 | 合同 |
 |---|---|
-| `libsc132.so` / camera callback 原始帧 | NV12；旋转 `0/180` 为 `1280x1088`，旋转 `90/270` 为 `1088x1280` |
+| `libsc132.so` / camera callback 原始帧 | NV12；native `1280x1088` 或 VSE 缩放 `640x480`/`720x480`/`1280x720`；旋转 `0/180` 宽高不变，`90/270` 宽高交换 |
 | RTSP 对外流 | H.264 默认；支持 H.265 |
 | FOV | A 形态：水平 `148.4°`、垂直 `126.6°`、对角 `193.8°`；B 形态：水平 `115.6°`、垂直 `96.8°`、对角 `157.2°` |
 | camera FPS | 默认`30fps`，支持`25fps`、`30fps`、`40fps`、`50fps`和`60fps`；其他值在启动副作用前拒绝 |
 | RTSP path | `/PRR` |
 | 端口映射 | CAM1/CAM2/CAM3/CAM4 -> cam0/cam1/cam2/cam3 -> `554/555/556/557` |
 
-`libsc132.so` 的 callback 暴露 NV12 原始帧；RTSP 客户端接收 H.264/H.265 编码流，RTSP 不直接承载 NV12 原始帧。帧信息包含 `width`、`height`、`stride`、`vstride`、Y/UV 虚拟地址、Y/UV 物理地址和 Y/UV size。旋转 `90/270` 会交换对外宽高，消费端必须读取每帧元数据，不能固定假设 `1280x1088`。NV12 消费端也不得假设 buffer 一定紧凑；应使用 `stride`、`vstride` 和 size 字段处理对齐。A/B 是仅 FOV 不同的产品形态版本，按产品标识选择对应 FOV。
+`libsc132.so` 的 callback 暴露 NV12 原始帧；RTSP 客户端接收 H.264/H.265 编码流，RTSP 不直接承载 NV12 原始帧。帧信息包含 `width`、`height`、`stride`、`vstride`、Y/UV 虚拟地址、Y/UV 物理地址和 Y/UV size。旋转 `90/270` 会交换对外宽高，输出画布可为 `640x480`/`720x480`/`1280x720`，消费端必须读取每帧元数据，不能固定假设 `1280x1088`。NV12 消费端也不得假设 buffer 一定紧凑；应使用 `stride`、`vstride` 和 size 字段处理对齐。A/B 是仅 FOV 不同的产品形态版本，按产品标识选择对应 FOV。
 
 ## Frame Set 字段
 
@@ -109,7 +109,7 @@ ROS2 当前不发布 RTSP、TF 外参或标定；相机/IMU 硬同步仍不提�
 |---|---|
 | 默认设备 | `/dev/ttyS1` |
 | 可示例切换 | `/dev/ttyS7` 或其他现场设备 |
-| 波特率 | `serial_port_demo` 默认 `115200`；DEBUG_UART 控制台使用 `115200` |
+| 波特率 | `serial_port_demo` 默认 `115200`；DEBUG_UART 控制台使用 `921600` |
 | serial_port_demo 数据格式 | 8N1、raw、无 flow control |
 | demo 模式 | `tx`、`rx`、`txrx`、`echo` |
 | UART1/UART7 TX/RX 信号逻辑电平 | `3.3V` |

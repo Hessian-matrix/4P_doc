@@ -47,7 +47,7 @@ cat VERSION
 
 `VERSION`、程序 `--version`、实际加载的 `libsc132`、`libprrtsp`、`libicm42688` 产品版本及 ABI 信息必须属于同一份包。不要混用系统目录、旧部署或其他工程中的同名动态库。
 
-`v1.1.1`已于 2026-09-08 正式发布。该发布使用同一组AArch64 ELF、`runtime-provenance.json`和`manifest.sha256`；使用时以部署包内实际`VERSION`为准，不以文档标题推断版本。
+`v1.2.0`已于 2026-09-14 正式发布。该发布使用同一组AArch64 ELF、`runtime-provenance.json`和`manifest.sha256`；使用时以部署包内实际`VERSION`为准，不以文档标题推断版本。
 
 ## 3. 板端运行前检查
 
@@ -378,6 +378,8 @@ python3 scripts/mp4_extract.py \
 默认要求四路 `0,1,2,3`。不得通过 `--expected-cameras` 只选子集来把不完整源伪装为完整；完整源必须与 status/receipt 中的四路 MP4 和 timestamp inventory 精确一致。
 
 输出目录必须不存在。最终发布使用原子 no-replace，不覆盖并发创建的目录。
+
+(persistence-fps-boundary)=
 
 ## 9. 帧率与压力边界
 
