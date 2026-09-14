@@ -6,14 +6,14 @@
 
 | 项目 | 合同 |
 |---|---|
-| `libsc132.so` / camera callback 原始帧 | 标准方向 NV12 `1280x1088` |
+| `libsc132.so` / camera callback 原始帧 | NV12；旋转 `0/180` 为 `1280x1088`，旋转 `90/270` 为 `1088x1280` |
 | RTSP 对外流 | H.264 默认；支持 H.265 |
-| FOV | 水平 `148.4°`、垂直 `126.6°`、对角 `193.8°` |
+| FOV | A 形态：水平 `148.4°`、垂直 `126.6°`、对角 `193.8°`；B 形态：水平 `115.6°`、垂直 `96.8°`、对角 `157.2°` |
 | camera FPS | 默认`30fps`，支持`25fps`、`30fps`、`40fps`、`50fps`和`60fps`；其他值在启动副作用前拒绝 |
 | RTSP path | `/PRR` |
 | 端口映射 | CAM1/CAM2/CAM3/CAM4 -> cam0/cam1/cam2/cam3 -> `554/555/556/557` |
 
-`libsc132.so` 的 callback 暴露 NV12 原始帧；RTSP 客户端接收 H.264/H.265 编码流，RTSP 不直接承载 NV12 原始帧。帧信息包含 `width`、`height`、`stride`、`vstride`、Y/UV 虚拟地址、Y/UV 物理地址和 Y/UV size。NV12 消费端不得假设 buffer 一定紧凑；应使用 `stride`、`vstride` 和 size 字段处理对齐。
+`libsc132.so` 的 callback 暴露 NV12 原始帧；RTSP 客户端接收 H.264/H.265 编码流，RTSP 不直接承载 NV12 原始帧。帧信息包含 `width`、`height`、`stride`、`vstride`、Y/UV 虚拟地址、Y/UV 物理地址和 Y/UV size。旋转 `90/270` 会交换对外宽高，消费端必须读取每帧元数据，不能固定假设 `1280x1088`。NV12 消费端也不得假设 buffer 一定紧凑；应使用 `stride`、`vstride` 和 size 字段处理对齐。A/B 是仅 FOV 不同的产品形态版本，按产品标识选择对应 FOV。
 
 ## Frame Set 字段
 
@@ -109,13 +109,13 @@ ROS2 当前不发布 RTSP、TF 外参或标定；相机/IMU 硬同步仍不提�
 |---|---|
 | 默认设备 | `/dev/ttyS1` |
 | 可示例切换 | `/dev/ttyS7` 或其他现场设备 |
-| 默认波特率 | `115200` |
-| 数据格式 | 8N1、raw、无 flow control |
+| 波特率 | `serial_port_demo` 默认 `115200`；DEBUG_UART 控制台使用 `115200` |
+| serial_port_demo 数据格式 | 8N1、raw、无 flow control |
 | demo 模式 | `tx`、`rx`、`txrx`、`echo` |
 | UART1/UART7 TX/RX 信号逻辑电平 | `3.3V` |
-| UART1/UART7 3.3V 供电脚 | 两个供电脚共享 `VCC3V3_SYS`；V1 对外设供电额定边界为合计 `500 mA` |
-| V1 交付边界 | UART1/UART7 3.3V 硬件通信已通过 V1 验收；`serial_port_demo` 是公开用户示例 |
+| UART1/UART7 3.3V 供电脚 | 两个供电脚共享 `VCC3V3_SYS`；支持输入/输出和外设供电；正式产品限制为合计 `500 mA`，支持热插拔 |
+| V1 交付边界 | UART1/UART7 普通 3.3V 硬件通信已通过 V1 验收；`serial_port_demo` 是公开用户示例；DEBUG_UART 为 1.8V；PPS 模式另占用 UART7 RX 并释放 UART7 TX GPIO/IO |
 
-UART1/UART7 为 `3.3V` 用户可编程 UART，分别对应 `/dev/ttyS1` 和 `/dev/ttyS7`，连接器为 GH1.25-4P；`serial_port_demo` 只适用于 UART1/UART7。DEBUG_UART 是 `1.8V` 系统调试 UART，连接器为 GH1.25-3P，不支持 `serial_port_demo`。接口位置、电平和供电边界见 [硬件连接与安全](hardware-and-safety.md#uart)。
+UART1/UART7 为 `3.3V` 用户可编程 UART，分别对应 `/dev/ttyS1` 和 `/dev/ttyS7`，连接器为 GH1.25-4P；`serial_port_demo` 只适用于普通 UART 模式。PPS 模式通过 [PPS 同步](pps-sync.md) 占用 UART7 RX，固定注册 `/dev/pps2`，并把 UART7 TX 释放为 GPIO/IO；PPS 模式下不要运行 `serial_port_demo`。DEBUG_UART 是 `1.8V` 系统调试 UART，连接器为 GH1.25-3P，不支持 `serial_port_demo`。接口位置、电平和供电边界见 [硬件连接与安全](hardware-and-safety.md#uart)。
 
-连接时板端 TX 接适配器 RX，板端 RX 接适配器 TX，并始终共地。禁止把 `3.3V` 或 `5V` 逻辑接到 DEBUG_UART。连接通用 USB-UART 到 UART1/UART7 时，默认只连接匹配的 `3.3V` TX/RX/GND 信号，并断开适配器 VCC。若 UART1/UART7 外设总电流超过合计 `500 mA`，必须使用独立电源；独立电源需与板端共地，且不得反向灌入板端 3.3V 电源轨。
+连接时板端 TX 接对端 RX，板端 RX 接对端 TX，并始终共地。DEBUG_UART 只能接 `1.8V` 逻辑；UART1/UART7 使用 `3.3V` 逻辑。UART1/UART7 的 `3V3` 脚支持输入/输出并可为外设供电，两个接口共享合计 `500 mA` 限制并支持热插拔；超过合计限制时使用独立电源并保持共地，且不得反向灌入板端 3.3V 电源轨。

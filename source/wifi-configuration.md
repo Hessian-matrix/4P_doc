@@ -1,4 +1,4 @@
-# 板载 Wi-Fi 配置
+# Wi-Fi 配置
 
 本页说明如何把 non-ROS 公开仓库中的 `scripts/wifi_setup.sh` 上传到 X5 板端，并通过终端交互配置板载 Wi-Fi。脚本支持：
 
@@ -23,7 +23,8 @@
 先确认脚本存在：
 
 ```bash
-cd <non-ros-demo-root>
+NON_ROS_ROOT="$HOME/RoboBaton_4p_demo"  # 改成实际仓库目录
+cd ${NON_ROS_ROOT}
 test -f scripts/wifi_setup.sh
 ```
 
@@ -32,15 +33,18 @@ test -f scripts/wifi_setup.sh
 在开发机执行：
 
 ```bash
-cd <non-ros-demo-root>
-scp scripts/wifi_setup.sh root@<x5-ip>:/userdata/wifi_setup.sh
-ssh root@<x5-ip> "chmod 700 /userdata/wifi_setup.sh"
+X5_IP=192.168.1.12  # 改成实际板卡地址
+NON_ROS_ROOT="$HOME/RoboBaton_4p_demo"  # 改成实际仓库目录
+cd ${NON_ROS_ROOT}
+scp scripts/wifi_setup.sh root@${X5_IP}:/userdata/wifi_setup.sh
+ssh root@${X5_IP} "chmod 700 /userdata/wifi_setup.sh"
 ```
 
 检查文件：
 
 ```bash
-ssh root@<x5-ip> "ls -l /userdata/wifi_setup.sh"
+X5_IP=192.168.1.12  # 改成实际板卡地址
+ssh root@${X5_IP} "ls -l /userdata/wifi_setup.sh"
 ```
 
 脚本固定把运行配置、状态和日志放在 `/userdata/wifi/`；不要只把脚本放到临时目录后启用开机启动。
@@ -50,13 +54,15 @@ ssh root@<x5-ip> "ls -l /userdata/wifi_setup.sh"
 需要保留交互式终端，因此推荐使用 `ssh -t`：
 
 ```bash
-ssh -t root@<x5-ip> "/userdata/wifi_setup.sh"
+X5_IP=192.168.1.12  # 改成实际板卡地址
+ssh -t root@${X5_IP} "/userdata/wifi_setup.sh"
 ```
 
 也可以先登录板端再运行：
 
 ```bash
-ssh root@<x5-ip>
+X5_IP=192.168.1.12  # 改成实际板卡地址
+ssh root@${X5_IP}
 /userdata/wifi_setup.sh
 ```
 

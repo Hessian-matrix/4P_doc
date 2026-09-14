@@ -1,6 +1,8 @@
-# X5 PTP Master 配置指南（Mid-360 示例）
+# PTP 同步
 
-> Scope: 本文档的主体是 X5 作为 LinuxPTP IEEE1588v2 UDP/IP master 的配置、启动和验证。Mid-360 仅作为示例 slave 用来验证 master 侧配置。
+> **示例说明：** 本页是**X5 master + Mid-360 slave** 配置示例，用于说明 LinuxPTP master 的配置、启动和验证。其他支持 IEEE 1588v2 UDP/IP 的 PTP 设备可以参考该流程，但必须按实际网口、地址、slave、配置文件和设备侧验证方法适当修改。
+>
+> 本文档的主体是 X5 作为 LinuxPTP IEEE1588v2 UDP/IP master 的配置、启动和验证。Mid-360 仅作为示例 slave 用来验证 master 侧配置。
 >
 > 示例板端：X5 板端，默认 PTP 网段地址为 `192.168.1.12/24`。
 >
@@ -48,15 +50,17 @@ X5 eth0  <---- 非 PoE 网线/普通交换机 ---->  Mid-360 RJ45
 脚本位于 `RoboBaton_4p_demo/scripts/env_setup/configure_x5_ptp_master.sh`。如果你已经有这个公开仓库，直接复制脚本到板端即可：
 
 ```bash
+X5_IP=192.168.1.12  # 改成实际板卡地址
 git clone https://github.com/Hessian-matrix/RoboBaton_4p_demo.git
 cd RoboBaton_4p_demo
-scp scripts/env_setup/configure_x5_ptp_master.sh root@<x5-ip>:/root/configure_x5_ptp_master.sh
+scp scripts/env_setup/configure_x5_ptp_master.sh root@${X5_IP}:/root/configure_x5_ptp_master.sh
 ```
 
 然后登录 X5，在板端执行：
 
 ```sh
-ssh root@<x5-ip>
+X5_IP=192.168.1.12  # 改成实际板卡地址
+ssh root@${X5_IP}
 chmod 755 /root/configure_x5_ptp_master.sh
 sh /root/configure_x5_ptp_master.sh \
   --interface eth0 \
@@ -73,15 +77,17 @@ sh /root/configure_x5_ptp_master.sh \
 RESULT=PASS
 ```
 
-`RESULT=PASS` 代表：
+`RESULT=PASS` 只代表 X5 master 配置和 PTP 报文连通性检查通过：
 
 1. `eth0` 支持 PTP 硬件 TX/RX/raw timestamp。
 2. X5 已确认或追加 PTP 网段地址 `192.168.1.12/24`。
 3. `ptp4l` 已按 master 配置启动。
 4. `phc2sys` 已启动，使 `eth0` PHC 跟随 `CLOCK_REALTIME`。
 5. `pmc` 看到了 `portState MASTER`。
-6. `tcpdump` 捕获到了 PTP 报文。
-7. Mid-360 侧报文中的 `timestamp_type` 表示 PTP 同步。
+6. `tcpdump` 捕获到了 PTP UDP 319/320 报文。
+7. `tcpdump` 捕获到了涉及目标 slave IP 的 PTP UDP 319/320 报文。
+
+它不证明 Mid-360 或其他 slave 已锁定，也不证明 slave offset、同步精度或点云包 `timestamp_type` 已达到预期。slave 状态和业务数据时间类型必须按第 6 节在设备侧独立验证。
 
 如果没有 Mid-360 接入，或 Mid-360 IP 不匹配，脚本会配置服务但最终可能返回 `RESULT=FAIL`，常见失败点是 `PTP_LIDAR_PACKET=FAIL`。
 
@@ -186,10 +192,11 @@ Mid-360 侧最终确认方式：
 手工回滚示例：
 
 ```sh
-cp -p /etc/default/ptp4l.bak.<run-id> /etc/default/ptp4l
-cp -p /etc/default/phc2sys.bak.<run-id> /etc/default/phc2sys
-[ -f /etc/linuxptp-mid360-master.cfg.bak.<run-id> ] && \
-  cp -p /etc/linuxptp-mid360-master.cfg.bak.<run-id> /etc/linuxptp-mid360-master.cfg
+RUN_ID=20260910_120000_1234  # 改成脚本输出中的实际备份 run id
+cp -p /etc/default/ptp4l.bak.${RUN_ID} /etc/default/ptp4l
+cp -p /etc/default/phc2sys.bak.${RUN_ID} /etc/default/phc2sys
+[ -f /etc/linuxptp-mid360-master.cfg.bak.${RUN_ID} ] && \
+  cp -p /etc/linuxptp-mid360-master.cfg.bak.${RUN_ID} /etc/linuxptp-mid360-master.cfg
 rm -f /etc/network/if-up.d/mid360-ptp-alias /etc/network/if-down.d/mid360-ptp-alias
 ip addr del 192.168.1.12/24 dev eth0 2>/dev/null || true
 /etc/init.d/S65ptp4l restart

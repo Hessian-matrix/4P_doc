@@ -4,8 +4,8 @@
 
 | 项目 | 内容 |
 |---|---|
-| 现象 | `ssh root@<x5-ip>` 超时或拒绝连接。 |
-| 检查 | `ping <x5-ip>`；确认开发机和 X5 在同一网络；确认 SSH 服务由产品系统提供。 |
+| 现象 | `ssh root@192.168.1.12`（按实际板卡地址修改）超时或拒绝连接。 |
+| 检查 | `ping 192.168.1.12`（按实际板卡地址修改）；确认开发机和 X5 在同一网络；确认 SSH 服务由产品系统提供。 |
 | 正常结果 | 能 ping 通，SSH 能进入板端 shell。 |
 | 常见原因 | IP 配置错误、网线/交换机问题、目标板未启动完成、SSH 服务未就绪。 |
 | 恢复/需收集信息 | 收集开发机 IP、X5 IP、网络拓扑、ping/ssh 错误文本。 |
@@ -26,11 +26,11 @@
 
 | 项目 | 内容 |
 |---|---|
-| 现象 | `/root/demo.new` 中 `sha256sum -c manifest.sha256` 报失败或缺文件。 |
-| 检查 | 开发机确认 `demo/manifest.sha256` 存在；重新上传到 `/root/demo.new` 后校验。 |
+| 现象 | 本次部署生成的唯一临时目录 `${REMOTE_NEW}` 中 `sha256sum -c manifest.sha256` 报失败或缺文件。 |
+| 检查 | 以部署命令中本次 `RUN_ID` 计算出的 `${REMOTE_NEW}` 为准；确认开发机 `demo/manifest.sha256` 存在并重新上传到同一个临时目录后校验。 |
 | 正常结果 | manifest 中所有文件均输出 `OK`。 |
-| 常见原因 | 上传中断、只复制了部分文件、把外层 `demo/` 复制成 `/root/demo.new/demo/`。 |
-| 恢复/需收集信息 | 删除 `/root/demo.new`，保留旧 `/root/demo`；收集失败文件名和上传命令。 |
+| 常见原因 | 上传中断、只复制了部分文件、把外层 `demo/` 复制成 `${REMOTE_NEW}/demo/`。 |
+| 恢复/需收集信息 | 只删除本次部署对应的 `${REMOTE_NEW}`，保留旧 `/root/demo`；收集失败文件名、`RUN_ID` 和上传命令。 |
 
 ## 找不到动态库
 
@@ -137,8 +137,8 @@
 
 | 项目 | 内容 |
 |---|---|
-| 现象 | 四路启动后客户端打不开 `rtsp://<x5-ip>:554/PRR` 等 URL。 |
-| 检查 | `ffprobe -v error -rtsp_transport tcp ... rtsp://<x5-ip>:554/PRR`；确认端口 `554/555/556/557` 和 path `/PRR`。 |
+| 现象 | 四路启动后客户端打不开 `rtsp://192.168.1.12:554/PRR`（按实际板卡地址修改）等 URL。 |
+| 检查 | `ffprobe -v error -rtsp_transport tcp ... rtsp://192.168.1.12:554/PRR`；确认端口 `554/555/556/557` 和 path `/PRR`。 |
 | 正常结果 | `codec_name=h264` 或 `codec_name=hevc`，`width=1280`，`height=1088`。 |
 | 常见原因 | 网络端口不可达、path 写错、demo 已退出、端口会话被其他客户端占用。 |
 | 恢复/需收集信息 | 关闭多余客户端，重新启动单个 demo；收集 ffprobe 命令输出和板端日志。 |
@@ -178,7 +178,7 @@
 | 项目 | 内容 |
 |---|---|
 | 现象 | `serial_port_demo` 发送或接收无数据。 |
-| 检查 | `ls -l /dev/ttyS1 /dev/ttyS7`；按公开板卡顶视图核对 UART1/UART7接口位置。板端 TX 接适配器 RX，板端 RX 接适配器 TX，并始终共地；双方 TX/RX 必须为 `3.3V` 逻辑。 |
+| 检查 | `ls -l /dev/ttyS1 /dev/ttyS7`；仅对 UART1/UART7 按正式线束/产品 pinout 核对接口。板端 TX 接对端 RX，板端 RX 接对端 TX，并始终共地；UART1/UART7 双方 TX/RX 必须为 `3.3V` 逻辑，DEBUG_UART 不属于该 demo 路径。 |
 | 软件示例预期 | 设备节点存在，双方 8N1/raw/no-flow-control 参数一致；`serial_port_demo` 只适用于 UART1/UART7，不适用于 DEBUG_UART。 |
 | 常见原因 | 端口选错、波特率不一致、TX/RX 未交叉或接线错误、对端未发送。 |
 | 恢复/需收集信息 | 收集端口、baud、mode、`3.3V` 对端和接线方向；UART1/UART7 3.3V 硬件通信已通过 V1 验收，`serial_port_demo` 是公开用户示例且不适用于 DEBUG_UART。禁止把 `3.3V` 或 `5V` 逻辑接到 DEBUG_UART；DEBUG_UART 仅使用 `1.8V` USB-UART 适配器。 |

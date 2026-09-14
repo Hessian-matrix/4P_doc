@@ -1,10 +1,10 @@
 # API 参考
 
-本页覆盖当前公开头文件中的 C ABI/API。示例只展示最小集成骨架，不复制底层 producer 源码。
+本页覆盖当前公开头文件中的 C ABI/API。示例只展示最小集成骨架，不复制底层 producer 源码。版本字符串 getter 不需要初始化硬件；运行健康快照 getter 只在最近一次采集成功 stop 后有效。
 
 ## 发布版本查询
 
-产品发布版本遵循SemVer，并与SO的SONAME/ABI版本相互独立。所有getter都无需初始化硬件，返回进程静态只读字符串，调用方不得修改或释放：
+产品发布版本遵循SemVer，并与SO的SONAME/ABI版本相互独立。版本字符串 getter 无需初始化硬件，返回进程静态只读字符串，调用方不得修改或释放：
 
 ```c
 const char *camera_version = sc132_get_version();
@@ -36,13 +36,25 @@ const char *rtsp_version = prrtsp_get_version();
 | `sc132_frame_set_t` | 同一组四路帧、`group_id`、`group_timestamp_ns` 和实际观测到的 `max_skew_ns`。 |
 | `sc132_frame_set_config_t` | frame-set callback、相机数量、尺寸、超时和配组放行 skew 上限。 |
 
+配置函数：
+
+| 函数 | 合同 |
+|---|---|
+| `sc132_set_fps(uint32_t fps)` | 在启动前设置相机帧率；当前公开值为 `25/30/40/50/60`。运行中或停止未完成时不得重新配置。 |
+| `sc132_set_output_rotation(uint32_t rotate_clockwise_degrees)` | 在启动前设置顺时针旋转，接受 `0/90/180/270`；`0/180` 输出 `1280x1088`，`90/270` 输出 `1088x1280`。产品 demo 还限制 `180` 仅用于 `30fps`。 |
+
+`sc132_frame_set_config_t.width/height` 使用原生输入 `1280/1088`，当前公开 producer 不提供任意尺寸缩放。
+
 生命周期和所有权：
 
 - `sc132_start_frame_set()` 启动 frame-set callback。
 - callback 中的 `frame_set`、`items[]` 和 `items[i].frame` 都是借用引用，仅在 callback 期间有效。
 - 需要跨 callback 保存帧时，必须先 `sc132_frame_retain()`，使用完成后 `sc132_frame_release()`。
-- `sc132_request_stop()` 只请求停止；普通 owner 线程随后调用 blocking `sc132_stop()` 完成 drain/join。
-- `sc132_stop()` 不应被当作“立刻返回”的 API；真实清理完成前不要卸载库或重新 start。
+- `sc132_request_stop()` 只线性化停止、禁止新的采集/callback admission 并唤醒等待者；它不 drain frame、不调用 vendor API、不 join 线程，也不表示 callback 已退出。
+- idle 状态调用 `sc132_request_stop()` 也会进入 STOPPING；必须再由非 callback 线程调用 blocking `sc132_stop()` 完成本次 stop generation，之后才能重新配置或启动。
+- `sc132_start_frame_set()` 返回 `SC132_STATUS_STARTUP_FAILED` 后，也必须由外部非 callback 线程调用 `sc132_stop()` 完成 quiescence；在此之前不得重新 start/config 或卸载库。
+- `sc132_stop()` 负责 drain pending/queued frame、等待 inflight callback、join 库线程并关闭 I2C，不能当作立即返回 API。若 internal join 失败，它会保持 STOPPING 和资源所有权；外部非 callback 线程必须重试，成功前禁止 restart 或 `dlclose`。
+- 从 dispatcher callback 线程调用 `sc132_stop()` 时只会发布 stop request 并立即返回；必须由外部非 callback owner 再调用一次完成 drain/join，避免 self-deadlock。
 
 最小骨架：
 
@@ -84,7 +96,7 @@ int run_camera(void) {
 
 ## `libicm42688.so`
 
-头文件：`include/icm42688_driver.h`。ABI：`ICM42688_ABI_VERSION_MAJOR=2`，`ICM42688_ABI_VERSION_MINOR=0`。
+头文件：`include/icm42688_driver.h`。ABI：`ICM42688_ABI_VERSION_MAJOR=2`，`ICM42688_ABI_VERSION_MINOR=1`；real SO 为 `libicm42688.so.2.1.0`，SONAME 仍为 `libicm42688.so.2`。
 
 状态码：
 
@@ -103,6 +115,20 @@ int run_camera(void) {
 - callback 由采集线程串行调用；`sample` 是借用引用。
 - `stop/destroy` 会等待采集线程，不得从 callback 中调用。
 - `user_data` 必须保持有效直到 `icm42688_stop()` 返回。
+- `icm42688_get_runtime_health()` 只在最近一次 start generation 成功 stop 后读取；未成功 stop 时不应把输出结构当作有效快照。
+- `icm42688_is_running()` 返回当前 handle 是否处于运行状态，可用于状态查询；它不替代 `icm42688_stop()`/`destroy()` 的生命周期顺序。
+- `icm42688_status_message(status)` 把状态码映射为进程静态只读文本；返回指针不得修改或释放。
+
+`icm42688_runtime_health_t` 使用 `ICM42688_RUNTIME_HEALTH_INIT` 初始化。字段含义为：`session_generation`（最近一次 start generation）、`published_samples`（producer 发布样本数）、`gpio_event_gap_count`（GPIO 边沿缺口）、`fifo_overflow_count`（FIFO 溢出）、`mapper_failure_count`（时间映射失败）、`uncertainty_over_200_drop_count`（不确定度超过 200 us 而丢弃的样本数）和 `max_consecutive_timing_drop_count`（连续 timing drop 最大值）。调用返回非 `ICM42688_STATUS_OK` 时，不要读取输出结构作为有效快照。
+
+```c
+icm42688_runtime_health_t health = ICM42688_RUNTIME_HEALTH_INIT;
+int health_ret = icm42688_get_runtime_health(handle, &health);
+if (health_ret != ICM42688_STATUS_OK) {
+  /* 只有最近一次 start 已成功且 stop 已完成后，快照才有效。 */
+  return health_ret;
+}
+```
 
 最小骨架：
 
@@ -172,6 +198,22 @@ int run_imu(void) {
 | `prrtsp_stream_config_v2` | 宽高、fps、码率、旋转、端口、path、codec。 |
 | `prrtsp_nv12_frame_v2` | NV12 Y/UV 地址、物理地址、stride/vstride、size、时间戳。 |
 | `prrtsp_stream_status_v2` | stream 状态、错误和计数。 |
+
+配置结构按 `struct_size` 向后兼容：
+
+| 版本 | `struct_size` | 新增能力 |
+|---|---:|---|
+| V2.0 | `PRRTSP_STREAM_CONFIG_V2_0_SIZE` (`232`) | 基础 stream 配置；`PRRTSP_CODEC_DEFAULT` 为 H.264。 |
+| V2.1 | `PRRTSP_STREAM_CONFIG_V2_1_SIZE` (`240`) | 增加显式 `codec`，并允许 `PRRTSP_STREAM_FLAG_EXTERNAL_NV12`。 |
+| V2.2 | `PRRTSP_STREAM_CONFIG_V2_2_SIZE` (`256`) | 增加 `encoded_frame_callback` 和 `encoded_frame_user`。 |
+
+调用方必须把 `struct_size` 设置为自己实际提供的版本大小；不得用较小结构声明较新字段，也不得假设旧库识别 V2.2 扩展。
+
+V2.2 encoded callback：
+
+- `prrtsp_encoded_frame_v2` 描述编码后的一个 access unit，`codec` 指明 H.264/H.265，`PRRTSP_ENCODED_FRAME_FLAG_KEY_FRAME` 标识关键帧；
+- `data_address` 只借用到 callback 返回，callback 不得保存该地址、长时间阻塞或重入同一 stream；需要异步持有时必须在 callback 内复制；
+- `timestamp_ns` 保留对应输入 NV12 帧的原始 ns 值，不使用编码器微秒 PTS 反推，也不自动改变时间域。
 
 外部 NV12：
 

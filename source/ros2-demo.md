@@ -1,6 +1,6 @@
 # ROS2 Demo 使用
 
-本页说明 `RoboBaton_4P_ROS2_demo` 运行和 topic 检查方式。当前 ROS2 路径已完成构建、安装包、板端相机/IMU topic 和 compressed 图像验证。
+当前 `v1.1.1` ROS2 软件包已完成构建和安装包验证；部署到目标板后仍须实际检查 topic、compressed 图像和所需帧率，不能仅凭 install verifier 推断运行结果。
 
 ```{important}
 ROS2 与 non-ROS RTSP 是两条独立使用路径。ROS2 demo 不提供 RTSP；non-ROS `/root/demo` 运行包和 ROS2 `/root/ros2_demo` install 包不要混用目录、头文件或 `.so`。
@@ -157,8 +157,8 @@ FastDDS SHM 和环境变量检查：
 | `enable_camera` | `true` | 是否启动相机 publisher。 |
 | `enable_imu` | `true` | 是否启动 IMU publisher。 |
 | `camera.camera_mask` | `15` | bit0..bit3 对应软件 cam0..cam3，即物理 CAM1..CAM4；只支持单颗或完整四路，不支持 2/3 路。 |
-| `camera.fps` | `30` | 仅支持`25fps`和`30fps`；其他值在启动相机前拒绝。 |
-| `camera.rotate_degrees` | `0` | 支持 `0/90/180/270`；`180` 只允许 `30fps`，`25fps`拒绝。 |
+| `camera.fps` | `30` | 支持`25/30/40/50/60fps`；其他值在启动相机前拒绝。 |
+| `camera.rotate_degrees` | `0` | 支持 `0/90/180/270`；`180` 只允许 `30fps`，`25/40/50/60fps`拒绝；`0/180` 输出 `1280x1088`，`90/270` 输出 `1088x1280`。 |
 | `camera.frame_set_max_skew_ns` | `10000000` | 帧组放行上限，单位 ns；默认覆盖四路曝光上限10ms。 |
 | `camera.frame_set_timeout_ms` | `100` | 帧组等待超时，单位 ms。 |
 | `camera.queue_capacity` | `4` | 每路 ROS 发布队列容量，必须大于 0。 |

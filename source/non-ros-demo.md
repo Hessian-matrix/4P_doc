@@ -1,6 +1,6 @@
 # non-ROS Demo 使用
 
-[`RoboBaton_4p_demo`](https://github.com/Hessian-matrix/RoboBaton_4p_demo) 是面向用户的最小 non-ROS 公开交付仓库，提供四目 SC132 RTSP、ICM-42688 IMU 和 UART 示例。底层实现细节和未公开验证资料不属于公开交付内容。
+[`RoboBaton_4p_demo`](https://github.com/Hessian-matrix/RoboBaton_4p_demo) 是面向用户的最小 non-ROS 公开交付仓库，提供四目 SC132 RTSP、ICM-42688 IMU 和 UART 示例。
 
 ## 1. 目录和运行包
 
@@ -52,8 +52,6 @@ cd /root/demo
 ```text
 SENSOR_IMU_RESULT samples=... invalid=... timestamp_duplicates=... timestamp_regressions=... effective_hz=...
 ```
-`effective_hz`按相对配置目标的ppm误差验收；V1门限为绝对误差`<=12000ppm`。
-
 `timestamp_duplicates=0`、`timestamp_regressions=0` 是时间戳单调性的关键观察项。
 
 ## 3. YAML 配置
@@ -78,8 +76,8 @@ imu:
   print_metrics: false
 save_data:
   save: false
-  format: rosbag
-  save_path: /root/save_demo/record.bag
+  format: mp4
+  save_path: /root/demo/save_mp4/
   skip: false
 ```
 
@@ -90,13 +88,13 @@ save_data:
 - non-ROS公开帧率集合为25/30/40/50/60fps；默认`30`，其他值在启动相机前拒绝。
 - `rtsp.codec` 支持 `h264` 和 `h265`。
 - IMU采样率支持`25/50/100/200/500/1000/2000Hz`，默认`1000Hz`。
-- `save_data.format` 支持 `rosbag` 和 `mp4`；保存路径必须是绝对路径。
+- `save_data.format` 默认是 `mp4`，同时支持 `rosbag`；保存路径必须是绝对路径。
 
 (non-ros-save)=
 
 ## 4. 保存四路图像与 IMU
 
-完整的整包校验、ROS1 bag/MP4互斥配置、优雅退出、结果验收、离线转换和恢复流程见 [保存数据应用说明](save-data-application-guide.md)。
+完整的整包校验、ROS1 bag/MP4互斥配置、优雅退出、结果验收、离线转换和恢复流程见 [保存数据](save-data-guide.md)。
 
 ROS bag 保存适合保留 JPEG 图像帧、相机参数和 IMU 数据：
 
@@ -156,18 +154,19 @@ Trigger 模式状态：
 | `software_gpio` | 默认且唯一已验证的稳定模式。 |
 | `none` | 实验性，不属于 V1 稳定配置。 |
 
-限制：`--rotate 180`只支持`30fps`，不支持`25fps`、`40fps`、`50fps`和`60fps`。相机、RTSP、ROS1 bag和H.264 MP4使用同一`25/30/40/50/60fps`公开帧率集合。
+限制：`--width/--height` 只接受原生输入 `1280/1088`，不提供任意尺寸缩放；`--rotate 180`只支持`30fps`，不支持`25fps`、`40fps`、`50fps`和`60fps`。对外 NV12/RTSP 画布在旋转 `0/180` 时为 `1280x1088`，旋转 `90/270` 时为 `1088x1280`。相机、RTSP、ROS1 bag和H.264 MP4使用同一`25/30/40/50/60fps`公开帧率集合。
 
 默认四路 RTSP：
 
 ```text
-CAM1 / cam0 -> rtsp://<x5-ip>:554/PRR
-CAM2 / cam1 -> rtsp://<x5-ip>:555/PRR
-CAM3 / cam2 -> rtsp://<x5-ip>:556/PRR
-CAM4 / cam3 -> rtsp://<x5-ip>:557/PRR
+CAM1 / cam0 -> rtsp://192.168.1.12:554/PRR
+CAM2 / cam1 -> rtsp://192.168.1.12:555/PRR
+CAM3 / cam2 -> rtsp://192.168.1.12:556/PRR
+CAM4 / cam3 -> rtsp://192.168.1.12:557/PRR
 ```
 
 其中 CAM1/CAM2/CAM3/CAM4 是板上物理丝印，cam0/cam1/cam2/cam3 是软件相机 ID。
+以上使用出厂默认 IP；板卡地址已修改时替换 URL 中的地址。
 
 单颗 sensor 诊断：
 
@@ -211,9 +210,9 @@ IMU 路径使用 GPIO395 DRDY + sensor timestamp FIFO，不使用 GPIO397、FSYN
 ## 7. 串口 Demo
 
 
-UART1/UART7 3.3V 硬件通信已通过 V1 验收；`serial_port_demo` 是 UART1/UART7 的公开用户示例，不适用于 DEBUG_UART。UART1 是 `/dev/ttyS1`，GH1.25-4P；UART7 是 `/dev/ttyS7`，GH1.25-4P。两者均为用户可编程 `3.3V` UART。
+UART1/UART7 普通 3.3V 硬件通信已通过 V1 验收；`serial_port_demo` 是普通 UART 模式下的公开用户示例，不适用于 DEBUG_UART。PPS 模式下 UART7 RX 切换为 `/dev/pps2`，UART7 TX 释放为 GPIO/IO；该模式下不要运行 `serial_port_demo`。DEBUG_UART 为 `1.8V`；UART1 是 `/dev/ttyS1`、UART7 是 `/dev/ttyS7`，两者均为 `3.3V` 用户 UART，接口为 GH1.25-4P。UART1/UART7 的 `3V3` 脚支持输入/输出并可为外设供电，两个接口共享合计 `500 mA` 限制并支持热插拔。
 
-接线时板端 TX 接适配器 RX，板端 RX 接适配器 TX，并始终共地；禁止 5V TTL、RS-232 和 USB-UART 适配器 VCC 反灌。DEBUG_UART 是 `1.8V` 系统控制台/调试口，禁止接入 `3.3V` 或 `5V` 逻辑。UART1/UART7 两个 3.3V 供电脚对外设供电合计额定边界为 `500 mA`，超过时使用独立电源并防止反灌；板卡顶视图接口位置和完整 3V3 供电边界见[硬件连接与安全](hardware-and-safety.md#uart)。
+接线时板端 TX 接对端 RX，板端 RX 接对端 TX，并始终共地；禁止 5V TTL、RS-232 和 USB-UART 适配器 VCC 反灌。DEBUG_UART 只能接 `1.8V` 逻辑；UART1/UART7 使用 `3.3V` 逻辑。UART1/UART7 的 `3V3` 脚支持输入/输出并可为外设供电，两个接口共享合计 `500 mA` 限制并支持热插拔；板卡顶视图接口位置和完整供电边界见[硬件连接与安全](hardware-and-safety.md#uart)。
 
 ```bash
 cd /root/demo

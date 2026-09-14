@@ -53,7 +53,7 @@ ffprobe -v error -rtsp_transport tcp \
 
 期望看到 `codec_name=h264`、`width=1280`、`height=1088` 和接近目标的帧率。使用 H.265 配置时，codec 期望为 `hevc`。
 
-需要保存四路图像与 IMU 时，继续阅读 {ref}`non-ROS Demo 使用：保存四路图像与 IMU <non-ros-save>`。MP4 保存使用 `./sensor_demo --record-mp4-dir <absolute-directory>`，实际输出目录以 `SENSOR_MP4_RESULT path=` 为准。
+需要保存四路图像与 IMU 时，继续阅读 {ref}`non-ROS Demo 使用：保存四路图像与 IMU <non-ros-save>`。MP4 保存示例为 `./sensor_demo --record-mp4-dir /data/robobaton/mp4_session`，实际输出目录以 `SENSOR_MP4_RESULT path=` 为准。
 
 ## 3. ROS2 最短运行
 
@@ -86,3 +86,13 @@ pgrep -af 'sensor_demo|cam_demo|robobaton_sensors_node|ros2 launch|ros2 run' || 
 ```
 
 不要通过停止 `cam-service` 来切换 demo。若命令无输出、topic 无数据或 RTSP 无法拉流，先看 [故障排查](troubleshooting.md)；需要单颗相机、IMU、UART 或 YAML 参数细节时，再进入 [non-ROS Demo 使用](non-ros-demo.md) 或 [ROS2 Demo 使用](ros2-demo.md)。
+
+## 具体使用
+
+```{toctree}
+:maxdepth: 1
+
+non-ros-demo
+save-data-guide
+ros2-demo
+```

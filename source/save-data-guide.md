@@ -1,4 +1,4 @@
-# 四目相机保存数据应用说明
+# 数据保存
 
 ## 1. 适用范围
 
@@ -30,14 +30,16 @@ ROS1 bag 与 MP4 是两种互斥的保存模式，当前不能在同一个进程
 在开发机的公开 non-ROS 仓库中验证运行包：
 
 ```bash
-cd <RoboBaton_4p_demo仓库>
+NON_ROS_ROOT="$HOME/RoboBaton_4p_demo"  # 改成实际仓库目录
+cd ${NON_ROS_ROOT}
 python3 scripts/verify_runtime_package.py demo
 ```
 
 在板端进入本次部署目录后验证：
 
 ```bash
-cd <完整demo运行包目录>
+DEMO_DIR=/root/demo  # 改成实际完整运行包目录
+cd ${DEMO_DIR}
 sha256sum -c manifest.sha256
 cat VERSION
 ./sensor_demo --version
@@ -70,7 +72,7 @@ pgrep -a -f '(^|/)(cam_demo|sensor_demo)( |$)' || true
 
 ### 3.2 存储目录
 
-保存路径必须是绝对路径，且父目录必须存在并可写：
+保存路径必须是绝对路径。程序会尝试创建缺失的父目录，但最终路径及父目录必须可写；ROS1 bag 的父目录还不能通过符号链接绕过路径约束：
 
 ```bash
 mkdir -p /data/robobaton
@@ -79,14 +81,15 @@ df -h /data/robobaton
 df -i /data/robobaton
 ```
 
-不要把正式输出写入运行包目录。开始前应为视频、临时 staging、最终 publication 和故障保留空间预留足够容量。
+开始前应为视频、临时 staging、最终 publication 和故障保留空间预留足够容量。
 
 ### 3.3 环境与外部工具
 
 优先运行包顶层 launcher；它会设置 `LD_LIBRARY_PATH` 和 `PATH`：
 
 ```bash
-cd <完整demo运行包目录>
+DEMO_DIR=/root/demo  # 改成实际完整运行包目录
+cd ${DEMO_DIR}
 . ./env.sh
 ```
 
@@ -117,8 +120,8 @@ ${DEMO_DIR:-当前目录}/config/sensor_config.yaml
 ```yaml
 save_data:
   save: false
-  format: rosbag
-  save_path: /data/robobaton/session.bag
+  format: mp4
+  save_path: /root/demo/save_mp4/
   skip: false
 ```
 
@@ -146,10 +149,11 @@ save_data:
 
 ### 5.1 前台启动
 
-30fps 完整保存基线：
+以下以默认 `30fps` 作为完整保存示例；需要使用 `25/40/50/60fps` 时替换 `--fps`，并按对应目标板验收矩阵检查完整性：
 
 ```bash
-cd <完整demo运行包目录>
+DEMO_DIR=/root/demo  # 改成实际完整运行包目录
+cd ${DEMO_DIR}
 ./sensor_demo \
   --fps 30 \
   --sample-rate-hz 1000 \
@@ -169,7 +173,9 @@ cd <完整demo运行包目录>
 
 `record-frame-skip=1` 以完整 `group_id` 为单位保存一组、跳过一组，四颗相机共享同一个决策；它不会改变 RTSP 输出帧率。
 
-### 5.2 YAML 启动
+### 5.2 YAML 启动（更推荐）
+
+配置好yaml文件里面的参数，直接启动即可。
 
 ```yaml
 camera:
@@ -204,7 +210,9 @@ save_data:
 在前台按一次 `Ctrl+C`，或从已确认的控制终端向准确 PID 发送 `SIGINT`/`SIGTERM`：
 
 ```bash
-kill -INT <sensor_demo-pid>
+SENSOR_DEMO_PID="$(pgrep -xo sensor_demo)"
+test -n "$SENSOR_DEMO_PID"
+kill -INT "${SENSOR_DEMO_PID}"
 ```
 
 发送信号后必须等待程序完成：相机 admission 关闭、consumer join、RTSP close、SC132 blocking stop、IMU stop/join、队列 drain、writer close、文件 fsync 和原子 publication。不要立即发送 `SIGKILL`，也不要在未看到最终结果前关闭电源。
@@ -255,7 +263,8 @@ python3 scripts/rosbag_extract.py \
 ### 7.1 前台启动
 
 ```bash
-cd <完整demo运行包目录>
+DEMO_DIR=/root/demo  # 改成实际完整运行包目录
+cd ${DEMO_DIR}
 ./sensor_demo \
   --fps 30 \
   --codec h264 \
@@ -274,7 +283,9 @@ SENSOR_MP4_RESULT path=<实际路径> configured_path=<配置路径>
 
 为准。
 
-### 7.2 YAML 启动
+### 7.2 YAML 启动（更推荐）
+
+配置好yaml文件里面的参数，直接运行`sensor_demo`即可。
 
 ```yaml
 camera:
@@ -344,7 +355,8 @@ MP4 的播放时间轴使用名义帧率；`cameraN_timestamps.csv` 中的纳秒
 离线转换应在有完整 `ffmpeg` 和 `ffprobe` 的 Host 上执行。运行包内的 ffprobe helper 不能替代离线工具。
 
 ```bash
-cd <RoboBaton_4p_demo仓库>
+NON_ROS_ROOT="$HOME/RoboBaton_4p_demo"  # 改成实际仓库目录
+cd ${NON_ROS_ROOT}
 command -v ffmpeg
 command -v ffprobe
 
@@ -369,15 +381,10 @@ python3 scripts/mp4_extract.py \
 
 ## 9. 帧率与压力边界
 
-当前产品目标：
+按照保存模式分开判定：
 
-保存模式必须分开判定：
-
-- ROS1 bag：支持25/30/40/50/60fps；正常case必须完整发布或明确失败，不能把partial计为发布PASS。
-- H.264 MP4：支持25/30/40/50/60fps；正常case必须exit 0、`published_complete`、零recorder drop并通过四路MP4/CSV/JPEG/IMU readback。
-- 两种模式都不允许崩溃、死锁、UAF、静默丢失后仍报告complete。显式故障注入可产生受控partial用于验证恢复，但不能计入正常发布矩阵。
-
-Host/package GO不能替代板端验收。正式宣称某一帧率完整前，必须完成目标板持续运行、CPU压力、存储压力、SIGINT/SIGTERM、真实输出readback和服务恢复检查。
+- ROS1 bag：参数集合支持25/30/40/50/60fps；40fps以下可以完整保存，50以上会有少量丢帧情况。
+- H.264 MP4：参数集合支持25/30/40/50/60fps；所有档位均可完整保存，推荐使用。
 
 ## 10. 常见问题
 
@@ -409,19 +416,4 @@ Host/package GO不能替代板端验收。正式宣称某一帧率完整前，�
 
 ### 退出后没有最终结果行
 
-把该次运行视为失败或未证明完整。保存完整 stdout/stderr、退出码、进程和服务状态；不要仅凭 MP4 可播放或 bag 文件存在就认定成功。
-
-## 11. 应用验收清单
-
-- [ ] 整包 manifest 校验通过；
-- [ ] `VERSION` 与程序/动态库版本来自同一包；
-- [ ] `cam-service` 正常，未并发运行其他相机应用；
-- [ ] 保存路径绝对、父目录可写、空间与 inode 足够；
-- [ ] MP4 模式的 `ffmpeg`/`ffprobe` 检查通过；
-- [ ] 只开启 ROS1 bag 或 MP4 中的一种；
-- [ ] 通过一次 `SIGINT`/`SIGTERM` 正常停止并等待 finalize；
-- [ ] 进程退出码为 0；
-- [ ] 对应 `SENSOR_*_RESULT` 为 `published_complete`、`data_complete=yes`、`cleanup_complete=yes`、`success=yes`；
-- [ ] 四路数量相等、非零，IMU final health 完整；
-- [ ] 离线 readback/提取成功；
-- [ ] `.partial`、quarantine 和 recovery 数据未被误标为正式完整数据。
+把该次运行视为失败或未证明完整。保存完整 stdout/stderr、退出码、进程和服务状态。

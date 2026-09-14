@@ -20,7 +20,7 @@
 - [RoboBaton_4P_ROS2_demo](https://github.com/Hessian-matrix/RoboBaton_4P_ROS2_demo)：ROS2 四目 NV12/raw+compressed 图像、CameraInfo、IMU 和温度 topic demo，部署目录为 `/root/ros2_demo`。
 - [4P_doc](https://github.com/Hessian-matrix/4P_doc)：本公开在线文档仓。
 
-文档中的 `<x5-ip>`、`<non-ros-demo-root>` 和 `<ros2-demo-root>` 是占位符，不表示用户现场板卡地址或仓内目录。公开文档可以写明官方出厂默认地址 `192.168.1.12` 和默认账号 `root`；用户修改后的 IP、唯一设备数据和非默认凭据不得发布。
+公开 shell 示例使用合法变量和示例值，并在相邻注释中说明需要按现场环境修改。官方出厂默认地址为 `192.168.1.12`，默认账号为 `root`。
 
 ## 当前在线文档目录
 
@@ -32,7 +32,7 @@
 硬件连接与安全
 首次上电与开机使用
 板载 Wi-Fi 配置
-系统时间同步
+时间同步（NTP / PPS / PTP）
 快速开始
 non-ROS Demo 使用
 ROS2 Demo 使用
@@ -49,6 +49,7 @@ ROS2 Demo 使用
 公开 Demo 源码编译
 数据合同
 API 参考
+X5 TF 卡现场修复（需产品支持授权）
 ```
 
 源码文件保持扁平，便于维护：
@@ -62,10 +63,16 @@ source/
 ├── first-boot.md
 ├── wifi-configuration.md
 ├── system-time-sync.md
+├── ntp-sync.md
+├── pps-sync.md
+├── ptp-sync.md
 ├── quick-start.md
 ├── non-ros-demo.md
+├── save-data-guide.md
 ├── ros2-demo.md
 ├── troubleshooting.md
+├── bug-fix.rst
+├── tf-card-field-fix.md
 ├── code-and-interfaces.rst
 ├── deployment-and-upgrade.md
 ├── open-source-build.md
@@ -74,24 +81,6 @@ source/
 ├── changelog.md
 └── release-and-support.md
 ```
-
-## 维护流程
-
-更新文档时：
-
-- 只写当前公开 demo 仓、公开头文件、默认配置、`VERSION` 和运行包 manifest 可以证明的事实。
-- 未确认的硬件、电气、系统版本、授权、支持渠道和性能门限集中标记，不在每个表格字段重复占位。
-- 新增顶层页面后同步 `source/index.rst`；新增进阶页面后同步 `source/code-and-interfaces.rst`。
-- 不建议停止 `cam-service`；切换相机应用时只要求退出旧相机应用。
-- 中英文公开内容变更时保持技术信息一致。
-
-首次上电图片维护计划只在这里记录，公开页面不放编辑任务表：
-
-- 板卡接口总览；
-- 首次上电流程；
-- Camera 映射；
-- UART 接线；
-- 网络拓扑。
 
 ## 本地预览与验证
 
@@ -119,5 +108,3 @@ git diff --check
 ## Read the Docs 配置
 
 Read the Docs 会读取根目录 `.readthedocs.yaml`，使用 `source/conf.py`、`source/requirements.txt` 和 `source/index.rst` 构建公开在线文档。
-
-维护策略：在线文档当前会根据用户反馈和文档/代码更新继续滚动发布；此阶段不定义固定的 Read the Docs 文档版本，也不配置或承诺 `stable` alias。除非产品负责人变更该策略，不要对外承诺稳定快照。

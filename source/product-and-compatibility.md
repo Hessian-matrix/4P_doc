@@ -2,7 +2,7 @@
 
 本页说明 RoboBaton 4P 第一版文档、non-ROS demo、ROS2 demo 和 X5 运行环境之间的匹配关系。技术事实以公开仓、公开头文件、默认配置、`VERSION` 和运行包 manifest 为准。
 
-## 当前 v1.1.1 正式发布组成
+## 当前正式发布基线：v1.1.1
 
 | 交付物 | 当前版本 | 用户入口 |
 |---|---|---|
@@ -30,13 +30,11 @@
 | non-ROS相机配置 | 默认`1280x1088@30fps`；支持`25/30/40/50/60fps`。 |
 | Trigger | `software_gpio` 是 V1 唯一稳定 trigger；`none` 仅用于显式 free-run 诊断。 |
 
-ROS2 路径不提供 RTSP；需要 RTSP 时使用 non-ROS 路径。当前不提供相机/IMU 硬同步、TF、外参、相机内参或畸变标定；CameraInfo 只有宽高，IMU orientation 不可用。
+ROS2 路径不提供 RTSP；需要 RTSP 时使用 non-ROS 路径。当前不提供TF、外参、相机内参或畸变标定；CameraInfo 只有宽高，IMU orientation 不可用。
 
-## 出厂系统镜像版本
+## 出厂系统镜像与目标板兼容性
 
-```{note}
-出厂系统镜像版本标识、兼容范围和只读查询命令将在产品版本方法定版后补充。本文档、non-ROS demo和ROS2 package的`v1.1.1`不单独代表出厂系统镜像版本。
-```
+`v1.1.1` 暂不提供镜像文件，只适用于原产品原板，不保证其他目标板的兼容性。
 
 ## 版本查询与整包匹配
 

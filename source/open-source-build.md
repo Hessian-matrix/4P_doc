@@ -41,7 +41,7 @@ RoboBaton_4P_ROS2_demo
 
 ### 下载 X5 交叉编译包
 
-下载 [x5_4cam_cross_toolchain_20260708.tar.gz](https://www.hessian-matrix.com/wp-content/uploads/2026/automaticupdates/x5_4cam_cross_toolchain_20260708.tar.gz)，大小为 `2,044,412,424 bytes`（约 `1.90 GiB`）。该包提供编译公开 demo 所需的 X5 aarch64 工具链、sysroot、平台头文件和运行库。
+下载 [x5_4cam_cross_toolchain_20260708.tar.gz](https://www.hessian-matrix.com/wp-content/uploads/2026/automaticupdates/x5_4cam_cross_toolchain_20260708.tar.gz)，大小为 `2,044,412,424 bytes`（约 `1.90 GiB`），SHA-256 为 `4ebc9cd8e7416ed6a7ce610421fd90509f368e26a9ffedd498a52171d1d16a1d`。该包提供编译公开 demo 所需的 X5 aarch64 工具链、sysroot、平台头文件和运行库。
 
 Linux 下载和可读性检查示例：
 
@@ -49,6 +49,9 @@ Linux 下载和可读性检查示例：
 curl -fL --retry 3 -O \
   "https://www.hessian-matrix.com/wp-content/uploads/2026/automaticupdates/x5_4cam_cross_toolchain_20260708.tar.gz"
 test "$(stat -c %s x5_4cam_cross_toolchain_20260708.tar.gz)" -eq 2044412424
+printf '%s  %s\n' \
+  4ebc9cd8e7416ed6a7ce610421fd90509f368e26a9ffedd498a52171d1d16a1d \
+  x5_4cam_cross_toolchain_20260708.tar.gz | sha256sum -c -
 tar -tzf x5_4cam_cross_toolchain_20260708.tar.gz >/dev/null
 ```
 
@@ -145,26 +148,7 @@ TOOLCHAIN_FILE="$TOOLCHAIN_FILE" scripts/package_runtime.sh
 python3 scripts/verify_runtime_package.py demo
 ```
 
-部署到 X5 时复制 `demo/` 目录里的内容到 `/root/demo/`，不要复制成 `/root/demo/demo/`；切换前确认旧 demo 已经退出：
-
-```bash
-ssh root@<x5-ip> "rm -rf /root/demo.new && mkdir -p /root/demo.new"
-tar -C demo -cf - . | ssh root@<x5-ip> "tar -xf - -C /root/demo.new"
-ssh root@<x5-ip> "cd /root/demo.new && sha256sum -c manifest.sha256"
-ssh root@<x5-ip> "\
-  set -e; \
-  if pgrep -af 'sensor_demo|cam_demo|imu_reader_demo|serial_port_demo'; then \
-    echo 'old non-ROS demo process is still running; exit it before switching'; \
-    exit 2; \
-  fi; \
-  ts=\$(date +%Y%m%d-%H%M%S); \
-  if [ -d /root/demo ]; then mv /root/demo /root/demo.bak.\$ts; fi; \
-  mv /root/demo.new /root/demo; \
-  chmod +x /root/demo/cam_demo /root/demo/sensor_demo /root/demo/imu_reader_demo /root/demo/serial_port_demo /root/demo/bin/*"
-```
-
-
-更完整的失败回滚步骤见 [部署、升级与回滚](deployment-and-upgrade.md)。
+部署到 X5 时不要直接删除 `/root/demo`，也不要把外层 `demo/` 目录复制成 `/root/demo/demo/`。请统一使用 [部署、升级与回滚](deployment-and-upgrade.md) 中的安全入口：唯一临时目录、完整 `manifest.sha256` 校验、旧应用退出检查、旧目录备份、原子切换、help/smoke 验证和失败回滚。
 
 ## 5. 编译 ROS2 demo
 
