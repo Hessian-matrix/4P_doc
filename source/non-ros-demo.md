@@ -1,6 +1,6 @@
 # non-ROS Demo 使用
 
-[`RoboBaton_4p_demo`](https://github.com/Hessian-matrix/RoboBaton_4p_demo) 是面向用户的最小 non-ROS 公开交付仓库，提供四目 SC132 RTSP、ICM-42688 IMU 和 UART 示例。
+[`RoboBaton_4p_demo`](https://github.com/Hessian-matrix/RoboBaton_4p_demo) 是面向用户的最小 non-ROS 公开交付仓库，提供四目 SC132 RTSP、四路拼接 RTSP、ICM-42688 IMU 和 UART 示例。
 
 ## 1. 目录和运行包
 
@@ -11,6 +11,7 @@
 ├── demo/                    # 可直接部署到 X5 /root/demo 的运行包
 │   ├── cam_demo
 │   ├── sensor_demo
+│   ├── mosaic_rtsp_demo
 │   ├── imu_reader_demo
 │   ├── serial_port_demo
 │   ├── env.sh
@@ -24,7 +25,7 @@
 └── src/
 ```
 
-部署时完整复制 `demo/` 目录内容。顶层 `cam_demo`、`sensor_demo`、`imu_reader_demo` 和 `serial_port_demo` 是启动脚本，会设置运行所需的 `LD_LIBRARY_PATH`；真实 ELF 位于 `bin/`。
+部署时完整复制 `demo/` 目录内容。顶层 `cam_demo`、`sensor_demo`、`mosaic_rtsp_demo`、`imu_reader_demo` 和 `serial_port_demo` 是启动脚本，会设置运行所需的 `LD_LIBRARY_PATH`；真实 ELF 位于 `bin/`。
 
 ## 2. 运行联合入口 `sensor_demo`
 
@@ -182,7 +183,44 @@ CAM4 / cam3 -> rtsp://192.168.1.12:557/PRR
 
 `cam-service` 是相机运行依赖，保持其运行。切换 `sensor_demo`、`cam_demo` 或用户自研相机应用前，先正常退出旧相机应用，避免 camera/VIO/编码资源冲突。
 
-## 6. 单独运行 IMU
+(non-ros-mosaic)=
+
+## 6. 四路拼接 RTSP（mosaic_rtsp_demo）
+
+`mosaic_rtsp_demo` 把四路 SC132 `1280x1088` NV12 frame-set 在 CPU 内合成为一张 `2560x2176` 的 hbmem NV12 DMA 输出缓冲，并通过 `libprrtsp.so` 的 external NV12 输入输出固定 H.264 RTSP，避免 PRRTSP 再复制整帧。
+
+```bash
+cd /root/demo
+./mosaic_rtsp_demo
+./mosaic_rtsp_demo --fps 40
+./mosaic_rtsp_demo --fps 50
+```
+
+固定 RTSP 地址：
+
+```text
+rtsp://<x5-ip>:558/PRR
+```
+
+该程序为固定形态，不提供相机分辨率、码率、编码或 RTSP 端口/路径配置：
+
+- 固定四路、H.264、8000kbps、正装方向，输出 `2560x2176`，RTSP 端口 `558`、path `/PRR`。
+- `--fps` 支持 `25|30|40|50|60`，默认 `30`。
+
+退出时输出运行统计：
+
+```text
+queue_full_drop=... invalid_group=... copy_failure=... send_failure=...
+retain_release_balance=... copy_duration_avg_ms=... send_duration_avg_ms=...
+```
+
+- `retain_release_balance=0` 表示跨线程保留的 SC132 frame 已全部归还，无帧泄漏。
+- `queue_full_drop`、`invalid_group`、`copy_failure`、`send_failure` 为 `0` 表示运行期间无队列丢弃、无无效帧组、无合成或发送失败。
+- `copy_duration_avg_ms`、`send_duration_avg_ms` 为合成与 RTSP 发送的帧耗时均值，用于判断档位余量。
+
+与 `cam_demo`/`sensor_demo` 一样，`mosaic_rtsp_demo` 独占四路相机资源，运行前先退出其他相机应用，并保持 `cam-service` 运行。
+
+## 7. 单独运行 IMU
 
 
 ```bash
@@ -208,7 +246,7 @@ cd /root/demo
 
 IMU 路径使用 GPIO395 DRDY + sensor timestamp FIFO，不使用 GPIO397、FSYNC 或 `icm42688_pulse_fsync()`。
 
-## 7. 串口 Demo
+## 8. 串口 Demo
 
 
 UART1/UART7 普通 3.3V 硬件通信已通过 V1 验收；`serial_port_demo` 是普通 UART 模式下的公开用户示例，不适用于 DEBUG_UART。PPS 模式下 UART7 RX 切换为 `/dev/pps2`，UART7 TX 释放为 GPIO/IO；该模式下不要运行 `serial_port_demo`。DEBUG_UART 为 `1.8V`；UART1 是 `/dev/ttyS1`、UART7 是 `/dev/ttyS7`，两者均为 `3.3V` 用户 UART，接口为 GH1.25-4P。UART1/UART7 的 `3V3` 脚支持输入/输出并可为外设供电，两个接口共享合计 `500 mA` 限制并支持热插拔。
@@ -229,7 +267,7 @@ cd /root/demo
 ./serial_port_demo --port /dev/ttyS7 --mode echo --baud 115200
 ```
 
-## 8. 验证建议
+## 9. 验证建议
 
 
 - 相机：用 `ffprobe` 或播放器拉取四路 RTSP，并确认 codec、分辨率和帧率。
