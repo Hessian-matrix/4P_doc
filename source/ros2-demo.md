@@ -1,6 +1,6 @@
 # ROS2 Demo 使用
 
-当前 `v1.2.0` ROS2 软件包已完成构建和安装包验证；部署到目标板后仍须实际检查 topic、compressed 图像和所需帧率，不能仅凭 install verifier 推断运行结果。
+当前 `v1.3.0` ROS2 软件包已完成构建和安装包验证；部署到目标板后仍须实际检查 topic、compressed 图像和所需帧率，不能仅凭 install verifier 推断运行结果。
 
 ```{important}
 ROS2 与 non-ROS RTSP 是两条独立使用路径。ROS2 demo 不提供 RTSP；non-ROS `/root/demo` 运行包和 ROS2 `/root/ros2_demo` install 包不要混用目录、头文件或 `.so`。
@@ -8,7 +8,7 @@ ROS2 与 non-ROS RTSP 是两条独立使用路径。ROS2 demo 不提供 RTSP；n
 
 ## 功能边界
 
-ROS2包名为`robobaton_4p_ros2_demo`，版本`1.2.0`。主要产物：
+ROS2包名为`robobaton_4p_ros2_demo`，版本`1.3.0`。主要产物：
 
 - 节点：`robobaton_sensors_node`
 - IMU 频率检查工具：`robobaton_imu_rate_monitor`

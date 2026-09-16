@@ -7,3 +7,4 @@
    :maxdepth: 1
 
    tf-card-field-fix
+   isp-image-quality-fix
