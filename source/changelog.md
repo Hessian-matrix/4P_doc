@@ -7,10 +7,11 @@
 ### 新增
 
 - 发布 non-ROS `mosaic_rtsp_demo`：把四路 SC132 `1280x1088` NV12 帧在 CPU 内合成为 `2560x2176` 单帧，经 `libprrtsp` 输出固定 H.264 RTSP；公开帧率集合 `25/30/40/50/60fps`，默认 `30fps`，固定地址 `rtsp://<X5_IP>:558/PRR`。应用细节、退出统计与资源占用见{ref}`non-ROS Demo 使用：四路拼接 RTSP（mosaic_rtsp_demo） <non-ros-mosaic>`。
+- 发布板端软件 `v1.3.0` 配套的出厂系统镜像与烧录工具，支持出厂系统恢复和系统版本升级；镜像获取、烧录步骤与验收见{ref}`修复和升级：系统烧录 <system-flashing>`。
 
 ### 改进与修复
 
-- 发布更新版 SC132GS ISP 调优参数 `patch/sc132gs_tuning.json`，改善部分光照场景下的图像质量表现；使用方法与回滚见{ref}`故障修复：ISP 图像质量修复 <isp-image-quality-fix>`。
+- 发布更新版 SC132GS ISP 调优参数 `patch/sc132gs_tuning.json`，改善部分光照场景下的图像质量表现；使用方法与回滚见{ref}`修复和升级：ISP 图像质量修复 <isp-image-quality-fix>`。
 
 ## 1.2.0 - 2026-09-14
 

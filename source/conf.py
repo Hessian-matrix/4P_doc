@@ -35,4 +35,6 @@ linkcheck_ignore = [
     r"https://github\.com/Hessian-matrix/RoboBaton_4P_ROS2_demo/?$",
     r"https://github\.com/Hessian-matrix/4P_doc/?$",
     r"https://www\.hessian-matrix\.com/wp-content/uploads/2026/automaticupdates/x5_4cam_cross_toolchain_20260708\.tar\.gz$",
+    r"https://www\.hessian-matrix\.com/wp-content/uploads/2026/automaticupdates/product-20260918-v1\.3\.0\.tar\.gz$",
+    r"https://www\.hessian-matrix\.com/wp-content/uploads/2026/automaticupdates/xburn-gui_1\.2\.1_x64-setup\.exe$",
 ]

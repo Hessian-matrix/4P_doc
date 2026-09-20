@@ -26,6 +26,6 @@ RoboBaton 4P 产品文档
    quick-start
    code-and-interfaces
    troubleshooting
-   bug-fix
+   fix-and-upgrade
    changelog
    release-and-support

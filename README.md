@@ -38,6 +38,7 @@ non-ROS Demo 使用
 ROS2 Demo 使用
 故障排查
 进阶使用与开发
+修复和升级
 版本更新记录
 发布、授权与支持
 ```
@@ -49,7 +50,14 @@ ROS2 Demo 使用
 公开 Demo 源码编译
 数据合同
 API 参考
-X5 TF 卡现场修复（需产品支持授权）
+```
+
+“修复和升级”子页面：
+
+```text
+X5 TF 卡无法识别的内核修复（需产品支持授权）
+ISP 图像质量修复
+系统烧录
 ```
 
 源码文件保持扁平，便于维护：
@@ -71,8 +79,10 @@ source/
 ├── save-data-guide.md
 ├── ros2-demo.md
 ├── troubleshooting.md
-├── bug-fix.rst
+├── fix-and-upgrade.rst
 ├── tf-card-field-fix.md
+├── isp-image-quality-fix.md
+├── system-flashing.md
 ├── code-and-interfaces.rst
 ├── deployment-and-upgrade.md
 ├── open-source-build.md
