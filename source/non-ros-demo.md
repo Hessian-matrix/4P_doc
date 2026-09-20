@@ -14,6 +14,7 @@
 │   ├── mosaic_rtsp_demo
 │   ├── imu_reader_demo
 │   ├── serial_port_demo
+│   ├── start_sensor_demo.sh     # sensor_demo 开机自启动管理脚本
 │   ├── env.sh
 │   ├── config/sensor_config.yaml
 │   ├── bin/
@@ -274,3 +275,19 @@ cd /root/demo
 - IMU：观察 `SENSOR_IMU_RESULT` 和 `timestamp_duplicates` / `timestamp_regressions`。
 - 动态库：始终整包部署，避免混用其他工程或系统目录中的同名 `.so`。
 - 进程占用：不要同时运行多个相机应用；切换模式前先退出前一个进程。
+
+(non-ros-autostart)=
+
+## 10. 开机自启动
+
+`sensor_demo` 的开机自启动由运行包顶层脚本 `start_sensor_demo.sh` 管理：
+
+```bash
+cd /root/demo
+./start_sensor_demo.sh            # 前台启动 sensor_demo（等效 ./sensor_demo）
+./start_sensor_demo.sh enable     # 安装开机自启动（需要 root）
+./start_sensor_demo.sh disable    # 取消开机自启动（需要 root）
+./start_sensor_demo.sh status     # 查看自启动与运行状态
+```
+
+开机自启动通过板端 `/userdata/startup.sh` 实现：系统 `S99auto_startup` 在 `/userdata` 挂载后执行该文件。脚本只追加/删除自己带 `SENSOR_DEMO_AUTOSTART_MANAGED` 标记的块，不会覆盖其它脚本（如 `wifi_setup.sh`）写入的内容；取消自启动时若文件只剩余注释/空行残留会整体删除。开机自启动使用运行包内默认配置，直接修改 `config/sensor_config.yaml` 即可调整，无需重新执行 `enable`。`enable`/`disable` 需要 root 权限。

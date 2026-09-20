@@ -4,7 +4,7 @@ project = "4P_doc"
 author = "4P_doc contributors"
 copyright = "2026, 4P_doc contributors"
 # release 必须与当前四仓 VERSION 文件一致。
-release = "1.3.0"
+release = "1.3.1"
 
 # 2026-07-31：使用 MyST 支持 Markdown，原因是后续章节更容易直接用 .md 编写。
 extensions = [

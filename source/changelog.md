@@ -2,12 +2,18 @@
 
 本文件记录 RoboBaton 4P 公开交付的用户可见更新。版本号遵循 [Semantic Versioning 2.0.0](https://semver.org/)；SO 的 SONAME/ABI 版本与产品发布版本独立，例如 `libicm42688.so.2` 中的 `2` 表示 ABI major，不等于产品版本。
 
+## 1.3.1 - 2026-09-20
+
+### 新增
+
+- 运行包新增 `sensor_demo` 开机自启动脚本 `start_sensor_demo.sh`：无参数前台启动，`enable`/`disable`/`status` 管理开机自启动。自启动通过板端 `/userdata/startup.sh` 实现（系统 `S99auto_startup` 在 `/userdata` 挂载后执行），脚本只追加/删除自己带标记的块，可与 `wifi_setup.sh` 等内容共存；用法见{ref}`non-ROS Demo 使用：开机自启动 <non-ros-autostart>`。
+- 发布板端软件 `v1.3.0` 配套的出厂系统镜像与烧录工具，支持出厂系统恢复和系统版本升级；镜像获取、烧录步骤与验收见{ref}`修复和升级：系统烧录 <system-flashing>`。
+
 ## 1.3.0 - 2026-09-16
 
 ### 新增
 
 - 发布 non-ROS `mosaic_rtsp_demo`：把四路 SC132 `1280x1088` NV12 帧在 CPU 内合成为 `2560x2176` 单帧，经 `libprrtsp` 输出固定 H.264 RTSP；公开帧率集合 `25/30/40/50/60fps`，默认 `30fps`，固定地址 `rtsp://<X5_IP>:558/PRR`。应用细节、退出统计与资源占用见{ref}`non-ROS Demo 使用：四路拼接 RTSP（mosaic_rtsp_demo） <non-ros-mosaic>`。
-- 发布板端软件 `v1.3.0` 配套的出厂系统镜像与烧录工具，支持出厂系统恢复和系统版本升级；镜像获取、烧录步骤与验收见{ref}`修复和升级：系统烧录 <system-flashing>`。
 
 ### 改进与修复
 
