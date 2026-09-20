@@ -75,10 +75,10 @@ pgrep -a -f '(^|/)(cam_demo|sensor_demo)( |$)' || true
 保存路径必须是绝对路径。程序会尝试创建缺失的父目录，但最终路径及父目录必须可写；ROS1 bag 的父目录还不能通过符号链接绕过路径约束：
 
 ```bash
-mkdir -p /data/robobaton
-findmnt -T /data/robobaton
-df -h /data/robobaton
-df -i /data/robobaton
+mkdir -p /root/data/robobaton
+findmnt -T /root/data/robobaton
+df -h /root/data/robobaton
+df -i /root/data/robobaton
 ```
 
 开始前应为视频、临时 staging、最终 publication 和故障保留空间预留足够容量。
@@ -158,7 +158,7 @@ cd ${DEMO_DIR}
   --fps 30 \
   --sample-rate-hz 1000 \
   --print-rate-hz 0 \
-  --record-bag /data/robobaton/run_30fps.bag \
+  --record-bag /root/data/robobaton/run_30fps.bag \
   --record-frame-skip 0
 ```
 
@@ -167,7 +167,7 @@ cd ${DEMO_DIR}
 ```bash
 ./sensor_demo \
   --fps 30 \
-  --record-bag /data/robobaton/run_30fps_skip.bag \
+  --record-bag /root/data/robobaton/run_30fps_skip.bag \
   --record-frame-skip 1
 ```
 
@@ -195,7 +195,7 @@ imu:
 save_data:
   save: true
   format: rosbag
-  save_path: /data/robobaton/run_30fps.bag
+  save_path: /root/data/robobaton/run_30fps.bag
   skip: false
 ```
 
@@ -244,16 +244,16 @@ success=yes
 运行包不包含离线 Python 工具。将 bag 拷回含有公开源码的 Host，在 `RoboBaton_4p_demo` 仓库中执行：
 
 ```bash
-python3 scripts/rosbag_info.py /data/robobaton/run_30fps.bag
-python3 scripts/rosbag_info.py --yaml --freq /data/robobaton/run_30fps.bag
+python3 scripts/rosbag_info.py /root/data/robobaton/run_30fps.bag
+python3 scripts/rosbag_info.py --yaml --freq /root/data/robobaton/run_30fps.bag
 ```
 
 解包为 IMU CSV、相机参数和四路 JPEG：
 
 ```bash
 python3 scripts/rosbag_extract.py \
-  /data/robobaton/run_30fps.bag \
-  /data/robobaton/run_30fps_dataset
+  /root/data/robobaton/run_30fps.bag \
+  /root/data/robobaton/run_30fps_dataset
 ```
 
 输出目录必须不存在。当前工具支持未压缩、索引完整的 ROS1 bag v2.0；`.partial.bag` 可用于恢复分析，但不能因此升级为完整数据。
@@ -270,7 +270,7 @@ cd ${DEMO_DIR}
   --codec h264 \
   --sample-rate-hz 1000 \
   --print-rate-hz 0 \
-  --record-mp4-dir /data/robobaton/run_30fps_mp4
+  --record-mp4-dir /root/data/robobaton/run_30fps_mp4
 ```
 
 不要同时添加 `--record-bag` 或 `--record-frame-skip`。
@@ -305,7 +305,7 @@ imu:
 save_data:
   save: true
   format: mp4
-  save_path: /data/robobaton/run_30fps_mp4
+  save_path: /root/data/robobaton/run_30fps_mp4
   skip: false
 ```
 
@@ -361,16 +361,16 @@ command -v ffmpeg
 command -v ffprobe
 
 python3 scripts/mp4_extract.py \
-  /data/robobaton/run_30fps_mp4 \
-  /data/robobaton/run_30fps_mp4_dataset
+  /root/data/robobaton/run_30fps_mp4 \
+  /root/data/robobaton/run_30fps_mp4_dataset
 ```
 
 恢复数据也可转换：
 
 ```bash
 python3 scripts/mp4_extract.py \
-  /data/robobaton/run_30fps_mp4.partial \
-  /data/robobaton/run_30fps_mp4_recovery_dataset
+  /root/data/robobaton/run_30fps_mp4.partial \
+  /root/data/robobaton/run_30fps_mp4_recovery_dataset
 ```
 
 但 `conversion_summary.json` 会保留源 outcome，且 `source_data_complete=false`；转换成功不等于源数据完整。
