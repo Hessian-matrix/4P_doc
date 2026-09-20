@@ -16,10 +16,12 @@
 
 ROS1 bag 与 MP4 是两种互斥的保存模式，当前不能在同一个进程中同时开启。
 
+推荐优先使用 H.264 MP4 保存：四路 `cameraN.mp4` 可直接播放，公开帧率档位均可完整保存（见第 9 节）；ROS1 bag 适合需要原始消息流或后续解包分析的场景。两种模式的启动与验收分别见第 5/7 节。
+
 | 模式 | 入口 | 主要输出 | 完整保存判据 |
 |---|---|---|---|
-| ROS1 bag | `--record-bag` | 一个 `.bag` 文件 | `SENSOR_BAG_RESULT ... bag_outcome=published_complete data_complete=yes cleanup_complete=yes ... success=yes` |
 | H.264 MP4 | `--record-mp4-dir` | 一个 session 目录 | `SENSOR_MP4_RESULT ... outcome=published_complete data_complete=yes cleanup_complete=yes ... success=yes` |
+| ROS1 bag | `--record-bag` | 一个 `.bag` 文件 | `SENSOR_BAG_RESULT ... bag_outcome=published_complete data_complete=yes cleanup_complete=yes ... success=yes` |
 
 只有进程退出码为 0 且对应 `SENSOR_*_RESULT` 明确报告完整，才可把数据作为正式完整数据使用。`.partial`、非零退出码或 `data_complete=no` 只能作为恢复或诊断数据。
 
@@ -75,10 +77,10 @@ pgrep -a -f '(^|/)(cam_demo|sensor_demo)( |$)' || true
 保存路径必须是绝对路径。程序会尝试创建缺失的父目录，但最终路径及父目录必须可写；ROS1 bag 的父目录还不能通过符号链接绕过路径约束：
 
 ```bash
-mkdir -p /data/robobaton
-findmnt -T /data/robobaton
-df -h /data/robobaton
-df -i /data/robobaton
+mkdir -p /root/data/robobaton
+findmnt -T /root/data/robobaton
+df -h /root/data/robobaton
+df -i /root/data/robobaton
 ```
 
 开始前应为视频、临时 staging、最终 publication 和故障保留空间预留足够容量。
@@ -145,122 +147,9 @@ save_data:
 
 这样可避免忘记 YAML 已启用保存而产生意外数据。
 
-## 5. 保存 ROS1 bag
+## 5. 保存 H.264 MP4 session（推荐）
 
 ### 5.1 前台启动
-
-以下以默认 `30fps` 作为完整保存示例；需要使用 `25/40/50/60fps` 时替换 `--fps`，并按对应目标板验收矩阵检查完整性：
-
-```bash
-DEMO_DIR=/root/demo  # 改成实际完整运行包目录
-cd ${DEMO_DIR}
-./sensor_demo \
-  --fps 30 \
-  --sample-rate-hz 1000 \
-  --print-rate-hz 0 \
-  --record-bag /data/robobaton/run_30fps.bag \
-  --record-frame-skip 0
-```
-
-若业务明确允许每隔一个完整同步 frame-set 保存一次：
-
-```bash
-./sensor_demo \
-  --fps 30 \
-  --record-bag /data/robobaton/run_30fps_skip.bag \
-  --record-frame-skip 1
-```
-
-`record-frame-skip=1` 以完整 `group_id` 为单位保存一组、跳过一组，四颗相机共享同一个决策；它不会改变 RTSP 输出帧率。
-
-### 5.2 YAML 启动（更推荐）
-
-配置好yaml文件里面的参数，直接启动即可。
-
-```yaml
-camera:
-  width: 1280
-  height: 1088
-  fps: 30
-  rotate: 0
-rtsp:
-  bps: 4000
-  codec: h264
-  url: /PRR
-imu:
-  sample_rate_hz: 1000
-
-  print_rate_hz: 0
-  print_metrics: false
-save_data:
-  save: true
-  format: rosbag
-  save_path: /data/robobaton/run_30fps.bag
-  skip: false
-```
-
-然后运行：
-
-```bash
-./sensor_demo
-```
-
-### 5.3 正常停止
-
-在前台按一次 `Ctrl+C`，或从已确认的控制终端向准确 PID 发送 `SIGINT`/`SIGTERM`：
-
-```bash
-SENSOR_DEMO_PID="$(pgrep -xo sensor_demo)"
-test -n "$SENSOR_DEMO_PID"
-kill -INT "${SENSOR_DEMO_PID}"
-```
-
-发送信号后必须等待程序完成：相机 admission 关闭、consumer join、RTSP close、SC132 blocking stop、IMU stop/join、队列 drain、writer close、文件 fsync 和原子 publication。不要立即发送 `SIGKILL`，也不要在未看到最终结果前关闭电源。
-
-### 5.4 结果验收
-
-接受完整 bag 时应同时满足：
-
-```text
-process exit code = 0
-SENSOR_BAG_RESULT ...
-bag_outcome=published_complete
-data_complete=yes
-cleanup_complete=yes
-success=yes
-```
-
-并检查：
-
-- `image_frames_by_camera=cam0:N,cam1:N,cam2:N,cam3:N` 四路相等且 `N > 0`；
-- `SENSOR_IMU_RESULT` 中 samples 非零；
-- timestamp/sequence gap、duplicate、regression 和 producer drop 均符合完整性要求；
-- 最终路径来自 `SENSOR_BAG_RESULT path=`，不要只依赖配置路径猜测。
-
-非零退出、`published_partial`、`.partial.bag` 或 quarantine 都不是正式完整数据，但应保留用于诊断，不要自动覆盖或删除。
-
-## 6. 查看和解包 ROS1 bag
-
-运行包不包含离线 Python 工具。将 bag 拷回含有公开源码的 Host，在 `RoboBaton_4p_demo` 仓库中执行：
-
-```bash
-python3 scripts/rosbag_info.py /data/robobaton/run_30fps.bag
-python3 scripts/rosbag_info.py --yaml --freq /data/robobaton/run_30fps.bag
-```
-
-解包为 IMU CSV、相机参数和四路 JPEG：
-
-```bash
-python3 scripts/rosbag_extract.py \
-  /data/robobaton/run_30fps.bag \
-  /data/robobaton/run_30fps_dataset
-```
-
-输出目录必须不存在。当前工具支持未压缩、索引完整的 ROS1 bag v2.0；`.partial.bag` 可用于恢复分析，但不能因此升级为完整数据。
-
-## 7. 保存 H.264 MP4 session
-
-### 7.1 前台启动
 
 ```bash
 DEMO_DIR=/root/demo  # 改成实际完整运行包目录
@@ -270,7 +159,7 @@ cd ${DEMO_DIR}
   --codec h264 \
   --sample-rate-hz 1000 \
   --print-rate-hz 0 \
-  --record-mp4-dir /data/robobaton/run_30fps_mp4
+  --record-mp4-dir /root/data/robobaton/run_30fps_mp4
 ```
 
 不要同时添加 `--record-bag` 或 `--record-frame-skip`。
@@ -283,7 +172,7 @@ SENSOR_MP4_RESULT path=<实际路径> configured_path=<配置路径>
 
 为准。
 
-### 7.2 YAML 启动（更推荐）
+### 5.2 YAML 启动（更推荐）
 
 配置好yaml文件里面的参数，直接运行`sensor_demo`即可。
 
@@ -305,11 +194,11 @@ imu:
 save_data:
   save: true
   format: mp4
-  save_path: /data/robobaton/run_30fps_mp4
+  save_path: /root/data/robobaton/run_30fps_mp4
   skip: false
 ```
 
-### 7.3 正常停止与验收
+### 5.3 正常停止与验收
 
 停止方式与 ROS1 bag 相同，优先一次 `Ctrl+C`/`SIGINT`，并等待 finalize。
 
@@ -350,7 +239,7 @@ MP4 的播放时间轴使用名义帧率；`cameraN_timestamps.csv` 中的纳秒
 
 退出码 2、`published_partial`、`.partial` 目录、marker 或 receipt 不匹配都不是完整 session。
 
-## 8. MP4 转换为时间戳命名 JPEG
+## 6. MP4 转换为时间戳命名 JPEG
 
 离线转换应在有完整 `ffmpeg` 和 `ffprobe` 的 Host 上执行。运行包内的 ffprobe helper 不能替代离线工具。
 
@@ -361,16 +250,16 @@ command -v ffmpeg
 command -v ffprobe
 
 python3 scripts/mp4_extract.py \
-  /data/robobaton/run_30fps_mp4 \
-  /data/robobaton/run_30fps_mp4_dataset
+  /root/data/robobaton/run_30fps_mp4 \
+  /root/data/robobaton/run_30fps_mp4_dataset
 ```
 
 恢复数据也可转换：
 
 ```bash
 python3 scripts/mp4_extract.py \
-  /data/robobaton/run_30fps_mp4.partial \
-  /data/robobaton/run_30fps_mp4_recovery_dataset
+  /root/data/robobaton/run_30fps_mp4.partial \
+  /root/data/robobaton/run_30fps_mp4_recovery_dataset
 ```
 
 但 `conversion_summary.json` 会保留源 outcome，且 `source_data_complete=false`；转换成功不等于源数据完整。
@@ -379,14 +268,137 @@ python3 scripts/mp4_extract.py \
 
 输出目录必须不存在。最终发布使用原子 no-replace，不覆盖并发创建的目录。
 
+## 7. 保存 ROS1 bag
+
+### 7.1 前台启动
+
+以下以默认 `30fps` 作为完整保存示例；需要使用 `25/40/50/60fps` 时替换 `--fps`，并按对应目标板验收矩阵检查完整性：
+
+```bash
+DEMO_DIR=/root/demo  # 改成实际完整运行包目录
+cd ${DEMO_DIR}
+./sensor_demo \
+  --fps 30 \
+  --sample-rate-hz 1000 \
+  --print-rate-hz 0 \
+  --record-bag /root/data/robobaton/run_30fps.bag \
+  --record-frame-skip 0
+```
+
+若业务明确允许每隔一个完整同步 frame-set 保存一次：
+
+```bash
+./sensor_demo \
+  --fps 30 \
+  --record-bag /root/data/robobaton/run_30fps_skip.bag \
+  --record-frame-skip 1
+```
+
+`record-frame-skip=1` 以完整 `group_id` 为单位保存一组、跳过一组，四颗相机共享同一个决策；它不会改变 RTSP 输出帧率。
+
+### 7.2 YAML 启动（更推荐）
+
+配置好yaml文件里面的参数，直接启动即可。
+
+```yaml
+camera:
+  width: 1280
+  height: 1088
+  fps: 30
+  rotate: 0
+rtsp:
+  bps: 4000
+  codec: h264
+  url: /PRR
+imu:
+  sample_rate_hz: 1000
+
+  print_rate_hz: 0
+  print_metrics: false
+save_data:
+  save: true
+  format: rosbag
+  save_path: /root/data/robobaton/run_30fps.bag
+  skip: false
+```
+
+然后运行：
+
+```bash
+./sensor_demo
+```
+
+### 7.3 正常停止
+
+在前台按一次 `Ctrl+C`，或从已确认的控制终端向准确 PID 发送 `SIGINT`/`SIGTERM`：
+
+```bash
+SENSOR_DEMO_PID="$(pgrep -xo sensor_demo)"
+test -n "$SENSOR_DEMO_PID"
+kill -INT "${SENSOR_DEMO_PID}"
+```
+
+发送信号后必须等待程序完成：相机 admission 关闭、consumer join、RTSP close、SC132 blocking stop、IMU stop/join、队列 drain、writer close、文件 fsync 和原子 publication。不要立即发送 `SIGKILL`，也不要在未看到最终结果前关闭电源。
+
+### 7.4 结果验收
+
+接受完整 bag 时应同时满足：
+
+```text
+process exit code = 0
+SENSOR_BAG_RESULT ...
+bag_outcome=published_complete
+data_complete=yes
+cleanup_complete=yes
+success=yes
+```
+
+并检查：
+
+- `image_frames_by_camera=cam0:N,cam1:N,cam2:N,cam3:N` 四路相等且 `N > 0`；
+- `SENSOR_IMU_RESULT` 中 samples 非零；
+- timestamp/sequence gap、duplicate、regression 和 producer drop 均符合完整性要求；
+- 最终路径来自 `SENSOR_BAG_RESULT path=`，不要只依赖配置路径猜测。
+
+非零退出、`published_partial`、`.partial.bag` 或 quarantine 都不是正式完整数据，但应保留用于诊断，不要自动覆盖或删除。
+
+## 8. 查看和解包 ROS1 bag
+
+运行包包含 `bin/rosbag_info.py`（Python 标准库实现，板端系统自带 `/usr/bin/python3`）。保存完成后可直接在板端查看 bag 状态：
+
+```bash
+DEMO_DIR=/root/demo  # 改成实际完整运行包目录
+cd ${DEMO_DIR}
+python3 bin/rosbag_info.py /root/data/robobaton/run_30fps.bag
+python3 bin/rosbag_info.py --yaml --freq /root/data/robobaton/run_30fps.bag
+```
+
+在 Host 使用开发机仓库脚本时：
+
+```bash
+NON_ROS_ROOT="$HOME/RoboBaton_4p_demo"  # 改成实际仓库目录
+cd ${NON_ROS_ROOT}
+python3 scripts/rosbag_info.py /root/data/robobaton/run_30fps.bag
+```
+
+解包为 IMU CSV、相机参数和四路 JPEG（在 Host 上执行，使用公开源码仓库脚本）：
+
+```bash
+python3 scripts/rosbag_extract.py \
+  /root/data/robobaton/run_30fps.bag \
+  /root/data/robobaton/run_30fps_dataset
+```
+
+输出目录必须不存在。当前工具支持未压缩、索引完整的 ROS1 bag v2.0；`.partial.bag` 可用于恢复分析，但不能因此升级为完整数据。
+
 (persistence-fps-boundary)=
 
 ## 9. 帧率与压力边界
 
 按照保存模式分开判定：
 
-- ROS1 bag：参数集合支持25/30/40/50/60fps；40fps以下可以完整保存，50以上会有少量丢帧情况。
 - H.264 MP4：参数集合支持25/30/40/50/60fps；所有档位均可完整保存，推荐使用。
+- ROS1 bag：参数集合支持25/30/40/50/60fps；40fps以下可以完整保存，50以上会有少量丢帧情况。
 
 ## 10. 常见问题
 
