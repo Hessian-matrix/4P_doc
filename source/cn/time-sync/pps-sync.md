@@ -33,7 +33,7 @@ scripts/env_setup/x5pps.ko
 X5_IP=192.168.1.12  # 改成实际板卡地址
 cd /path/to/RoboBaton_4p_demo
 ssh root@${X5_IP} "mkdir -p /userdata/x5-pps"
-scp scripts/env_setup/x5-pps-pin.sh scripts/env_setup/x5pps.ko \\
+scp scripts/env_setup/x5-pps-pin.sh scripts/env_setup/x5pps.ko \
   root@${X5_IP}:/userdata/x5-pps/
 ssh root@${X5_IP} "chmod 755 /userdata/x5-pps/x5-pps-pin.sh && chmod 644 /userdata/x5-pps/x5pps.ko"
 ```
