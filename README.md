@@ -91,7 +91,7 @@ source/
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r source/requirements.txt
-make html                                  # 中文（默认 source/ch）
+make html                                  # 中文（默认 source/cn）
 make html SOURCEDIR=source/en BUILDDIR=build/en   # 英文
 ```
 
@@ -100,8 +100,8 @@ make html SOURCEDIR=source/en BUILDDIR=build/en   # 英文
 ```bash
 export LC_ALL=C.UTF-8
 export LANG=C.UTF-8
-python3 -m sphinx -M html source/ch /tmp/4p-doc-html -W --keep-going
-python3 -m sphinx -M linkcheck source/ch /tmp/4p-doc-linkcheck -W --keep-going
+python3 -m sphinx -M html source/cn /tmp/4p-doc-html -W --keep-going
+python3 -m sphinx -M linkcheck source/cn /tmp/4p-doc-linkcheck -W --keep-going
 python3 -m sphinx -M html source/en /tmp/4p-doc-en-html -W --keep-going
 python3 -m sphinx -M linkcheck source/en /tmp/4p-doc-en-linkcheck -W --keep-going
 git diff --check
@@ -111,4 +111,4 @@ git diff --check
 
 ## Read the Docs 配置
 
-Read the Docs 会读取根目录 `.readthedocs.yaml`，使用 `source/ch/conf.py`、`source/requirements.txt` 和 `source/ch/index.rst` 构建中文在线文档。英文文档使用 `.readthedocs-en.yaml`（`source/en/conf.py`），作为独立的 Read the Docs 项目并与中文项目以翻译关系关联；两个项目共享本仓库、共享 `source/requirements.txt`。
+Read the Docs 只认文件名 `.readthedocs.yaml`，不读取自定义文件名。中文项目读取根目录 `.readthedocs.yaml`（`source/cn/conf.py`），英文项目读取 `source/en/.readthedocs.yaml`（`source/en/conf.py`），作为独立的 Read the Docs 项目并与中文项目以翻译关系关联；英文项目需在项目设置里把「Path for .readthedocs.yaml」设为 `source/en`。两个项目共享本仓库、共享 `source/requirements.txt`。

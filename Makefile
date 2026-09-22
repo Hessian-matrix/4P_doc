@@ -5,7 +5,7 @@
 
 SPHINXOPTS    ?=
 SPHINXBUILD   ?= sphinx-build
-SOURCEDIR     = source/ch
+SOURCEDIR     = source/cn
 BUILDDIR      = build
 
 help:
