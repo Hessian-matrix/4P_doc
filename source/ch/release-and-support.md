@@ -8,7 +8,7 @@
 |---|---|---|
 | 文档 | `v1.3.1` | 随 v1.3.1 四仓发布；发布日期以仓库 tag 为准。 |
 | non-ROS demo/运行包 | `v1.3.1` | 部署到`/root/demo`，按`manifest.sha256`整包校验。 |
-| ROS2 package/install | `v1.3.1` | 软件包部署到`/root/ros2_demo/install`，包名`robobaton_4p_ros2_demo`。目标板使用前应按 [ROS2 Demo 使用](ros2-demo.md)、[non-ROS Demo 使用](non-ros-demo.md) 和 [保存数据](save-data-guide.md) 完成对应路径的实际检查；软件包发布不替代目标板运行检查。 |
+| ROS2 package/install | `v1.3.1` | 软件包部署到`/root/ros2_demo/install`，包名`robobaton_4p_ros2_demo`。目标板使用前应按 [ROS2 Demo 使用](usage/ros2-demo.md)、[non-ROS Demo 使用](usage/non-ros-demo.md) 和 [保存数据](usage/save-data-guide.md) 完成对应路径的实际检查；软件包发布不替代目标板运行检查。 |
 
 功能新增、修复和兼容性变化见 [版本更新记录](changelog.md)。
 
@@ -23,7 +23,7 @@
 - `software_gpio` 是 V1 唯一稳定 trigger；`none` 仅用于显式 free-run 诊断。
 - CameraInfo 只有宽高，IMU orientation 不可用。
 - H.265 或四路高帧率播放依赖客户端解码和渲染能力。
-- DEBUG_UART 是 `1.8V` 系统控制台/调试口；普通模式下 UART1/UART7 使用 `3.3V` TX/RX/GND 并共地，硬件通信已通过 V1 验收。UART1/UART7 的 `3V3` 脚支持输入/输出并可为外设供电，两个接口共享合计 `500 mA` 限制并支持热插拔；`serial_port_demo` 只适用于普通 UART 模式。PPS 模式另占用 UART7 RX 为 `/dev/pps2`，并释放 UART7 TX 为 GPIO/IO，详见 [PPS 同步](pps-sync.md)。
+- DEBUG_UART 是 `1.8V` 系统控制台/调试口；普通模式下 UART1/UART7 使用 `3.3V` TX/RX/GND 并共地，硬件通信已通过 V1 验收。UART1/UART7 的 `3V3` 脚支持输入/输出并可为外设供电，两个接口共享合计 `500 mA` 限制并支持热插拔；`serial_port_demo` 只适用于普通 UART 模式。PPS 模式另占用 UART7 RX 为 `/dev/pps2`，并释放 UART7 TX 为 GPIO/IO，详见 [PPS 同步](time-sync/pps-sync.md)。
 
 ## 授权与支持
 

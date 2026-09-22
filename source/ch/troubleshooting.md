@@ -12,7 +12,7 @@
 
 ## 板载 Wi-Fi 配置失败
 
-完整上传、交互配置和日志路径见 [板载 Wi-Fi 配置](wifi-configuration.md)。
+完整上传、交互配置和日志路径见 [板载 Wi-Fi 配置](getting-started/wifi-configuration.md)。
 
 | 项目 | 内容 |
 |---|---|

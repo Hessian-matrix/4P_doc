@@ -60,37 +60,28 @@ ISP 图像质量修复
 系统烧录
 ```
 
-源码文件保持扁平，便于维护：
+源码按语言分树，中英页面一一对应、口径一致；两棵树共享的图片放在 `source/image/`：
 
 ```text
 source/
-├── index.rst
-├── Product_Introduction.md
-├── product-and-compatibility.md
-├── hardware-and-safety.md
-├── first-boot.md
-├── wifi-configuration.md
-├── system-time-sync.md
-├── ntp-sync.md
-├── pps-sync.md
-├── ptp-sync.md
-├── quick-start.md
-├── non-ros-demo.md
-├── save-data-guide.md
-├── ros2-demo.md
-├── troubleshooting.md
-├── fix-and-upgrade.rst
-├── tf-card-field-fix.md
-├── isp-image-quality-fix.md
-├── system-flashing.md
-├── code-and-interfaces.rst
-├── deployment-and-upgrade.md
-├── open-source-build.md
-├── data-contracts.md
-├── api-reference.md
-├── changelog.md
-└── release-and-support.md
+├── requirements.txt   # 中英共享依赖
+├── image/             # 中英共享图片
+├── ch/                # 中文文档（Sphinx srcdir）
+│   ├── index.rst
+│   ├── conf.py
+│   ├── getting-started/   # 产品介绍、版本兼容、硬件安全、首次上电、Wi-Fi
+│   ├── quick-start.md
+│   ├── usage/             # non-ROS / 保存数据 / ROS2 使用
+│   ├── time-sync/         # 时间同步（NTP / PPS / PTP）
+│   ├── troubleshooting.md
+│   ├── ops/               # 修复、升级、烧录
+│   ├── development/       # 部署、源码编译、数据合同、API 参考
+│   ├── changelog.md
+│   └── release-and-support.md
+└── en/                # 英文文档（Sphinx srcdir，与 ch/ 目录结构一一对应）
 ```
+
+正文引用共享图片时，树根页用 `../image/`，子目录页用 `../../image/`。
 
 ## 本地预览与验证
 
@@ -100,16 +91,19 @@ source/
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r source/requirements.txt
-make html
+make html                                  # 中文（默认 source/ch）
+make html SOURCEDIR=source/en BUILDDIR=build/en   # 英文
 ```
 
-严格构建和链接检查：
+严格构建和链接检查（中英两棵树都要跑）：
 
 ```bash
 export LC_ALL=C.UTF-8
 export LANG=C.UTF-8
-python3 -m sphinx -M html source /tmp/4p-doc-html -W --keep-going
-python3 -m sphinx -M linkcheck source /tmp/4p-doc-linkcheck -W --keep-going
+python3 -m sphinx -M html source/ch /tmp/4p-doc-html -W --keep-going
+python3 -m sphinx -M linkcheck source/ch /tmp/4p-doc-linkcheck -W --keep-going
+python3 -m sphinx -M html source/en /tmp/4p-doc-en-html -W --keep-going
+python3 -m sphinx -M linkcheck source/en /tmp/4p-doc-en-linkcheck -W --keep-going
 git diff --check
 ```
 
@@ -117,4 +111,4 @@ git diff --check
 
 ## Read the Docs 配置
 
-Read the Docs 会读取根目录 `.readthedocs.yaml`，使用 `source/conf.py`、`source/requirements.txt` 和 `source/index.rst` 构建公开在线文档。
+Read the Docs 会读取根目录 `.readthedocs.yaml`，使用 `source/ch/conf.py`、`source/requirements.txt` 和 `source/ch/index.rst` 构建中文在线文档。英文文档使用 `.readthedocs-en.yaml`（`source/en/conf.py`），作为独立的 Read the Docs 项目并与中文项目以翻译关系关联；两个项目共享本仓库、共享 `source/requirements.txt`。

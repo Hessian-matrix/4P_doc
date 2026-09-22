@@ -243,7 +243,7 @@ cd /root/demo
 - `gyro_rps`：角速度，单位 `rad/s`。
 - `uncertainty_us`、`gpio_gap_count`、`fifo_overflow_count`、`mapper_failure_count`：时间戳映射和采集链路诊断。
 
-`accel_mps2` 按 `[X, Y, Z]` 顺序输出，符号以[硬件连接与安全](hardware-and-safety.md#uart)中的板卡顶视图为参考：设备静止且水平放置时约为 `[0, 0, -9.8] m/s^2`；向图片左侧加速时 X 为负；向图片顶部/产品前方加速时 Y 为负。该参考只用于 IMU 读数理解，不定义 IMU 与相机、base、optical frame 或其他坐标系之间的变换。
+`accel_mps2` 按 `[X, Y, Z]` 顺序输出，符号以[硬件连接与安全](../getting-started/hardware-and-safety.md#uart)中的板卡顶视图为参考：设备静止且水平放置时约为 `[0, 0, -9.8] m/s^2`；向图片左侧加速时 X 为负；向图片顶部/产品前方加速时 Y 为负。该参考只用于 IMU 读数理解，不定义 IMU 与相机、base、optical frame 或其他坐标系之间的变换。
 
 IMU 路径使用 GPIO395 DRDY + sensor timestamp FIFO，不使用 GPIO397、FSYNC 或 `icm42688_pulse_fsync()`。
 
@@ -252,7 +252,7 @@ IMU 路径使用 GPIO395 DRDY + sensor timestamp FIFO，不使用 GPIO397、FSYN
 
 UART1/UART7 普通 3.3V 硬件通信已通过 V1 验收；`serial_port_demo` 是普通 UART 模式下的公开用户示例，不适用于 DEBUG_UART。PPS 模式下 UART7 RX 切换为 `/dev/pps2`，UART7 TX 释放为 GPIO/IO；该模式下不要运行 `serial_port_demo`。DEBUG_UART 为 `1.8V`；UART1 是 `/dev/ttyS1`、UART7 是 `/dev/ttyS7`，两者均为 `3.3V` 用户 UART，接口为 GH1.25-4P。UART1/UART7 的 `3V3` 脚支持输入/输出并可为外设供电，两个接口共享合计 `500 mA` 限制并支持热插拔。
 
-接线时板端 TX 接对端 RX，板端 RX 接对端 TX，并始终共地；禁止 5V TTL、RS-232 和 USB-UART 适配器 VCC 反灌。DEBUG_UART 只能接 `1.8V` 逻辑；UART1/UART7 使用 `3.3V` 逻辑。UART1/UART7 的 `3V3` 脚支持输入/输出并可为外设供电，两个接口共享合计 `500 mA` 限制并支持热插拔；板卡顶视图接口位置和完整供电边界见[硬件连接与安全](hardware-and-safety.md#uart)。
+接线时板端 TX 接对端 RX，板端 RX 接对端 TX，并始终共地；禁止 5V TTL、RS-232 和 USB-UART 适配器 VCC 反灌。DEBUG_UART 只能接 `1.8V` 逻辑；UART1/UART7 使用 `3.3V` 逻辑。UART1/UART7 的 `3V3` 脚支持输入/输出并可为外设供电，两个接口共享合计 `500 mA` 限制并支持热插拔；板卡顶视图接口位置和完整供电边界见[硬件连接与安全](../getting-started/hardware-and-safety.md#uart)。
 
 ```bash
 cd /root/demo

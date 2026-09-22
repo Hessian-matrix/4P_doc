@@ -38,8 +38,8 @@
 - non-ROS `sensor_demo` 新增互斥的H.264 MP4 session保存模式，输出四路MP4、四路精确timestamp CSV、独立IMU CSV、相机参数、session status和publication receipt。
 - 新增MP4 session到时间戳命名JPEG的Host离线转换工具，支持complete与recovery源且不会把partial升级为complete。
 - ICM real SO从`libicm42688.so.2.0.0`提升为`libicm42688.so.2.1.0`，ABI minor为2.1；SONAME继续为`libicm42688.so.2`。既有函数保留`ICM42688_X5_2.0`节点，新增`icm42688_get_runtime_health()`使用`ICM42688_X5_2.1`节点，sample/config布局不变。
-- 新增[保存数据](save-data-guide.md)，覆盖整包校验、ROS1 bag/MP4配置、优雅退出、验收、离线转换和恢复。
-- non-ROS 公开仓新增交互式 `scripts/wifi_setup.sh`，支持板载 Wi-Fi AP/STA 配置、状态查看、停用和可选开机恢复；新增[Wi-Fi 配置](wifi-configuration.md)使用说明。
+- 新增[保存数据](usage/save-data-guide.md)，覆盖整包校验、ROS1 bag/MP4配置、优雅退出、验收、离线转换和恢复。
+- non-ROS 公开仓新增交互式 `scripts/wifi_setup.sh`，支持板载 Wi-Fi AP/STA 配置、状态查看、停用和可选开机恢复；新增[Wi-Fi 配置](getting-started/wifi-configuration.md)使用说明。
 
 ### 改进与修复
 
@@ -53,7 +53,7 @@
 - MP4只支持H.264完整四路，不支持frame skip；板端需要`ffmpeg`，离线提取需要Host完整`ffmpeg`/`ffprobe`。
 - v1.1.1 non-ROS相机与RTSP的公开帧率集合为`25/30/40/50/60fps`，默认`30fps`；ROS2图像节点为`25/30fps`。IMU支持`25/50/100/200/500/1000/2000Hz`。保存后端的参数接受、完整性和压力边界见{ref}`数据保存：帧率与压力边界 <persistence-fps-boundary>`。
 - `trigger_mode=none` 仅用于显式 free-run 诊断，不属于 V1 稳定发布合同；V1 验证模式为 `software_gpio`。
-- non-ROS ROS1 bag 与 H.264 MP4 的完整保存判据和逐帧率边界见[保存数据](save-data-guide.md)；历史证据仍按原始帧率保留，不替代当前发布门。
+- non-ROS ROS1 bag 与 H.264 MP4 的完整保存判据和逐帧率边界见[保存数据](usage/save-data-guide.md)；历史证据仍按原始帧率保留，不替代当前发布门。
 
 ## v1.0.0 - 2026-08-06
 

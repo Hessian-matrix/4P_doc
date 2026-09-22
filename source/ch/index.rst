@@ -17,15 +17,15 @@ RoboBaton 4P 产品文档
 .. toctree::
    :maxdepth: 1
 
-   Product_Introduction
-   product-and-compatibility
-   hardware-and-safety
-   first-boot
-   wifi-configuration
-   system-time-sync
+   getting-started/Product_Introduction
+   getting-started/product-and-compatibility
+   getting-started/hardware-and-safety
+   getting-started/first-boot
+   getting-started/wifi-configuration
+   time-sync/system-time-sync
    quick-start
-   code-and-interfaces
+   development/code-and-interfaces
    troubleshooting
-   fix-and-upgrade
+   ops/fix-and-upgrade
    changelog
    release-and-support

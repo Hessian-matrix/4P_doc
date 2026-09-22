@@ -23,7 +23,7 @@
 3. PPS 页面只负责外部边沿进入 `/dev/pps2`；没有额外的 PPS consumer/clock discipline 配置时，PPS 不会自动校准 `CLOCK_REALTIME`。
 4. 执行 NTP/PTP 配置前，应先退出 demo、ROS2 节点和其他时间戳敏感任务；保持 `cam-service` 运行。
 5. UART7 RX 切换 PPS 前，应停止使用 UART7 的程序，并准备 SSH 或其他恢复入口。
-6. 系统时间同步不等于采样同步。相机、IMU、PPS、PTP 和 ROS `header.stamp` 属于不同层次，字段语义见[数据合同](data-contracts.md)。
+6. 系统时间同步不等于采样同步。相机、IMU、PPS、PTP 和 ROS `header.stamp` 属于不同层次，字段语义见[数据合同](../development/data-contracts.md)。
 7. 当前 demo 在进程启动时冻结 `CLOCK_REALTIME - CLOCK_MONOTONIC_RAW` offset；进程启动后再改变系统时间不会自动更新已经冻结的映射。需要校准系统时间时，应先校准，再启动采集程序。
 
 ## 三种同步方式

@@ -203,7 +203,7 @@ script/build_x5_ros2.sh \
 
 相对 `--build-base`、`--install-base` 和 `--log-base` 会按 ROS2 demo 仓根目录解析。
 
-部署到 X5 时不要直接 streaming tar，也不要只依赖 `abi_manifest.sha256` 判断完整 install tree。ROS2 install 部署使用确定性 archive checksum + runtime ABI 子集校验流程，详见 [ROS2 Demo 使用](ros2-demo.md) 与 [部署、升级与回滚](deployment-and-upgrade.md)。
+部署到 X5 时不要直接 streaming tar，也不要只依赖 `abi_manifest.sha256` 判断完整 install tree。ROS2 install 部署使用确定性 archive checksum + runtime ABI 子集校验流程，详见 [ROS2 Demo 使用](../usage/ros2-demo.md) 与 [部署、升级与回滚](deployment-and-upgrade.md)。
 
 ## 6. 常见问题
 

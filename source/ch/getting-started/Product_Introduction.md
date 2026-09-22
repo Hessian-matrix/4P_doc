@@ -1,6 +1,6 @@
 # 产品介绍
 
-```{figure} image/main.png
+```{figure} ../../image/main.png
 :alt: RoboBaton 4P 主控板连接四个相机模组的产品总览
 
 RoboBaton 4P 产品总览。本图用于展示产品组成，不作为接口映射和接线依据。
@@ -40,7 +40,7 @@ A/B 是产品形态版本，两者仅相机 FOV 不同。用户按收到产品�
 
 左图为主控板元件面顶视图，右图为相机板顶视图；尺寸仅作为安装参考。
 
-```{figure} image/size.png
+```{figure} ../../image/size.png
 :alt: RoboBaton 4P 主控板和相机板安装尺寸图，单位为毫米
 
 RoboBaton 4P 主控板和相机板安装尺寸参考图，单位为 mm。
@@ -52,4 +52,4 @@ RoboBaton 4P 主控板和相机板安装尺寸参考图，单位为 mm。
 2. 在断电状态安装主控板和相机模组。
 3. 断电连接相机同轴线、网络线；相机/FPC/同轴线不支持热插拔，通用 USB-UART 适配器默认只接 TX/RX/GND。
 4. 检查固定、线缆、散热和供电后上电。
-5. 进入 [首次上电与开机使用](first-boot.md) 和 [快速开始](quick-start.md)。
+5. 进入 [首次上电与开机使用](first-boot.md) 和 [快速开始](../quick-start.md)。

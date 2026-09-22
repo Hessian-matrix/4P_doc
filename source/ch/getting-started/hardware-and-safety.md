@@ -26,7 +26,7 @@ RTSP path 固定为 `/PRR`；H.264 为默认编码，H.265 可选。Camera callb
 
 ## UART
 
-```{figure} image/uart.jpg
+```{figure} ../../image/uart.jpg
 :alt: 板卡顶视图中的 DEBUG_UART、UART1 和 UART7 接口位置及电平域
 
 板卡顶视图 UART 接口示意：DEBUG_UART 为 `1.8V` 系统调试口，UART1/UART7 为 `3.3V` 用户可编程串口。以此图的当前顶视图为 IMU 加速度符号参考时，图片上方（远离图片底部 Ethernet/USB 大接口的一侧）为产品前方，图片左侧为产品左侧；该参考只用于说明 IMU 符号，不定义 IMU 与相机、base、optical frame 或其他坐标系之间的变换。

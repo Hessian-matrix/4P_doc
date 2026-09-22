@@ -1,6 +1,6 @@
 # 首次上电与开机使用
 
-本页帮助第一次拿到 RoboBaton 4P 的用户完成开机前检查、登录 X5、确认最小系统状态，并选择 [快速开始](quick-start.md) 中的 non-ROS 或 ROS2 路径。部署、升级和回滚细节见 [部署、升级与回滚](deployment-and-upgrade.md)，完整排障见 [故障排查](troubleshooting.md)。
+本页帮助第一次拿到 RoboBaton 4P 的用户完成开机前检查、登录 X5、确认最小系统状态，并选择 [快速开始](../quick-start.md) 中的 non-ROS 或 ROS2 路径。部署、升级和回滚细节见 [部署、升级与回滚](../development/deployment-and-upgrade.md)，完整排障见 [故障排查](../troubleshooting.md)。
 
 ## 1. 开机前检查
 
@@ -107,7 +107,7 @@ passwd
 如果用户修改过 IP 且需要通过调试口进入系统查看地址，只能使用 DEBUG_UART：`1.8V` 逻辑，调试终端波特率设置为 `921600`，板端 TX 接适配器 RX，板端 RX 接适配器 TX，并共地。禁止在 DEBUG_UART 使用 `3.3V` 或 `5V` USB-UART。
 
 ```{note}
-系统无法启动或需要恢复出厂系统时，可重新烧录出厂系统镜像恢复。烧录会覆盖板载 eMMC 并清除其中的全部用户数据，镜像获取、烧录步骤和注意事项见 [系统烧录](system-flashing.md)。
+系统无法启动或需要恢复出厂系统时，可重新烧录出厂系统镜像恢复。烧录会覆盖板载 eMMC 并清除其中的全部用户数据，镜像获取、烧录步骤和注意事项见 [系统烧录](../ops/system-flashing.md)。
 ```
 
 ## 4. 最小系统检查
@@ -121,9 +121,9 @@ df -h /
 pgrep -a cam-service
 ```
 
-期望 `hostname`、`date` 和根文件系统空间可正常返回，且能看到 `cam-service` 进程。若 `cam-service` 缺失或异常，先按 [故障排查](troubleshooting.md) 收集现象，不把停止服务作为常规恢复步骤。
+期望 `hostname`、`date` 和根文件系统空间可正常返回，且能看到 `cam-service` 进程。若 `cam-service` 缺失或异常，先按 [故障排查](../troubleshooting.md) 收集现象，不把停止服务作为常规恢复步骤。
 
-如果板卡可以访问 Internet，建议在启动 demo、ROS2 节点或其他时间戳敏感采集前先做 NTP 同步，具体步骤见 [系统时间同步](system-time-sync.md)。
+如果板卡可以访问 Internet，建议在启动 demo、ROS2 节点或其他时间戳敏感采集前先做 NTP 同步，具体步骤见 [系统时间同步](../time-sync/system-time-sync.md)。
 
 ## 5. 确认版本
 
@@ -149,8 +149,8 @@ ROS2 `/root/ros2_demo/install`：
 
 | 目标 | 运行目录 | 下一步 |
 |---|---|---|
-| 四路 RTSP、IMU、UART 示例 | `/root/demo` | 进入 [快速开始](quick-start.md) 的 non-ROS 路径，或阅读 [non-ROS Demo 使用](non-ros-demo.md)。 |
-| ROS2 raw/compressed 图像、CameraInfo、IMU、温度 topic | `/root/ros2_demo/install` | 进入 [快速开始](quick-start.md) 的 ROS2 路径，或阅读 [ROS2 Demo 使用](ros2-demo.md)。 |
+| 四路 RTSP、IMU、UART 示例 | `/root/demo` | 进入 [快速开始](../quick-start.md) 的 non-ROS 路径，或阅读 [non-ROS Demo 使用](../usage/non-ros-demo.md)。 |
+| ROS2 raw/compressed 图像、CameraInfo、IMU、温度 topic | `/root/ros2_demo/install` | 进入 [快速开始](../quick-start.md) 的 ROS2 路径，或阅读 [ROS2 Demo 使用](../usage/ros2-demo.md)。 |
 
 两条路径不要混用目录、头文件或 `.so`。同一时间只运行一个占用相机资源的应用；切换路径前先用 `Ctrl+C` 正常退出旧应用，并保持 `cam-service` 运行。
 
@@ -179,7 +179,7 @@ poweroff
 | 现象 | 首先检查 | 下一步 |
 |---|---|---|
 | 无法确认地址 | 网络拓扑、开发机网段、交换机或直连链路 | 默认网口 IP 地址为 `192.168.1.12`；如果用户自行修改过 IP 地址，可通过 DEBUG_UART 进入系统查看，DEBUG_UART 必须使用 `1.8V` USB-UART 适配器。修改流程见[修改设备 IP 地址](#修改设备-ip-地址)。 |
-| SSH 无法登录 | `ping 192.168.1.12`（按实际板卡地址修改）、SSH 错误文本 | 见 [故障排查](troubleshooting.md#ssh-无法连接)。 |
-| 相机应用启动失败 | 是否已有相机应用占用资源 | 正常退出旧应用；见 [故障排查](troubleshooting.md#相机服务或资源冲突)。 |
+| SSH 无法登录 | `ping 192.168.1.12`（按实际板卡地址修改）、SSH 错误文本 | 见 [故障排查](../troubleshooting.md#ssh-无法连接)。 |
+| 相机应用启动失败 | 是否已有相机应用占用资源 | 正常退出旧应用；见 [故障排查](../troubleshooting.md#相机服务或资源冲突)。 |
 | 单路无图 | camera ID、线缆和供电状态 | 断电后检查连接；不要带电插拔。 |
 | UART 无数据 | UART1/UART7 的 `3.3V` TX/RX/GND、共地、未接适配器 VCC | 见 [硬件连接与安全](hardware-and-safety.md)。 |

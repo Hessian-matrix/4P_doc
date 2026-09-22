@@ -26,7 +26,7 @@ ROS2包名为`robobaton_4p_ros2_demo`，版本`1.3.0`。主要产物：
 
 当前不提供 RTSP、相机/IMU 硬同步、TF 外参、相机内参或畸变标定。`CameraInfo` 只发布当前帧宽高，标定字段为空；IMU orientation 不可用。
 
-物理相机丝印到 ROS2 prefix 的映射为 CAM1 -> `/robobaton/cam0`、CAM2 -> `/robobaton/cam1`、CAM3 -> `/robobaton/cam2`、CAM4 -> `/robobaton/cam3`；完整 RTSP 端口映射见 [硬件连接与安全](hardware-and-safety.md#相机接口)。
+物理相机丝印到 ROS2 prefix 的映射为 CAM1 -> `/robobaton/cam0`、CAM2 -> `/robobaton/cam1`、CAM3 -> `/robobaton/cam2`、CAM4 -> `/robobaton/cam3`；完整 RTSP 端口映射见 [硬件连接与安全](../getting-started/hardware-and-safety.md#相机接口)。
 
 ## Topics
 
@@ -51,7 +51,7 @@ ROS2包名为`robobaton_4p_ros2_demo`，版本`1.3.0`。主要产物：
 
 ROS2 install 包部署到 `/root/ros2_demo/install`，不改动 non-ROS `/root/demo`。部署必须使用完整 archive checksum 校验传输内容，解包后再用 runtime `abi_manifest.sha256` 校验可执行文件、插件和相关动态库。checksum 或 `abi_manifest.sha256` 失败时不得切换，保留旧 `/root/ros2_demo`。
 
-切换前确认旧 ROS2 节点已退出，保持 `cam-service` 运行；切换时备份旧 `/root/ros2_demo`，失败时按最近备份回滚。完整上传、校验、切换和回滚命令见 [部署、升级与回滚](deployment-and-upgrade.md)。
+切换前确认旧 ROS2 节点已退出，保持 `cam-service` 运行；切换时备份旧 `/root/ros2_demo`，失败时按最近备份回滚。完整上传、校验、切换和回滚命令见 [部署、升级与回滚](../development/deployment-and-upgrade.md)。
 
 ## 运行
 
@@ -172,7 +172,7 @@ FastDDS SHM 和环境变量检查：
 | `imu.sample_rate_hz` | `1000` | 只接受`25/50/100/200/500/1000/2000`。 |
 | `imu.read_mode` | `sensor_timestamp_fifo` | 当前只支持该模式。 |
 | `imu.fifo_watermark_samples` | `1` | 当前固定为 `1`。 |
-| `imu.frame_id` | `robobaton_imu_link` | IMU frame_id；完整加速度符号约定见[数据合同](data-contracts.md#imu)。 |
+| `imu.frame_id` | `robobaton_imu_link` | IMU frame_id；完整加速度符号约定见[数据合同](../development/data-contracts.md#imu)。 |
 | `imu.publish_temperature` | `true` | 是否发布 `/robobaton/imu/temperature`。 |
 
 ## 数据语义

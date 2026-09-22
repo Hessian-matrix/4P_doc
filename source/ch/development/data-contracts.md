@@ -64,7 +64,7 @@
 
 IMU 是独立连续采样路径。当前公开交付不提供相机/IMU 硬同步、公开 TF 外参或公开标定。
 
-IMU 加速度 `accel_mps2` 按 `[X, Y, Z]` 顺序输出，符号以 [硬件连接与安全](hardware-and-safety.md#uart) 中当前板卡顶视图为物理参考：设备静止且水平放置时，`accel_mps2` 约为 `[0, 0, -9.8] m/s^2`；向图片左侧加速时 X 为负；向图片顶部/产品前方加速时 Y 为负。该说明不定义 IMU 到相机、base、optical frame 或其他坐标系的关系，也不提供 TF 或外参。
+IMU 加速度 `accel_mps2` 按 `[X, Y, Z]` 顺序输出，符号以 [硬件连接与安全](../getting-started/hardware-and-safety.md#uart) 中当前板卡顶视图为物理参考：设备静止且水平放置时，`accel_mps2` 约为 `[0, 0, -9.8] m/s^2`；向图片左侧加速时 X 为负；向图片顶部/产品前方加速时 Y 为负。该说明不定义 IMU 到相机、base、optical frame 或其他坐标系的关系，也不提供 TF 或外参。
 
 ## non-ROS 保存输出
 
@@ -116,6 +116,6 @@ ROS2 当前不发布 RTSP、TF 外参或标定；相机/IMU 硬同步仍不提�
 | UART1/UART7 3.3V 供电脚 | 两个供电脚共享 `VCC3V3_SYS`；支持输入/输出和外设供电；正式产品限制为合计 `500 mA`，支持热插拔 |
 | V1 交付边界 | UART1/UART7 普通 3.3V 硬件通信已通过 V1 验收；`serial_port_demo` 是公开用户示例；DEBUG_UART 为 1.8V；PPS 模式另占用 UART7 RX 并释放 UART7 TX GPIO/IO |
 
-UART1/UART7 为 `3.3V` 用户可编程 UART，分别对应 `/dev/ttyS1` 和 `/dev/ttyS7`，连接器为 GH1.25-4P；`serial_port_demo` 只适用于普通 UART 模式。PPS 模式通过 [PPS 同步](pps-sync.md) 占用 UART7 RX，固定注册 `/dev/pps2`，并把 UART7 TX 释放为 GPIO/IO；PPS 模式下不要运行 `serial_port_demo`。DEBUG_UART 是 `1.8V` 系统调试 UART，连接器为 GH1.25-3P，不支持 `serial_port_demo`。接口位置、电平和供电边界见 [硬件连接与安全](hardware-and-safety.md#uart)。
+UART1/UART7 为 `3.3V` 用户可编程 UART，分别对应 `/dev/ttyS1` 和 `/dev/ttyS7`，连接器为 GH1.25-4P；`serial_port_demo` 只适用于普通 UART 模式。PPS 模式通过 [PPS 同步](../time-sync/pps-sync.md) 占用 UART7 RX，固定注册 `/dev/pps2`，并把 UART7 TX 释放为 GPIO/IO；PPS 模式下不要运行 `serial_port_demo`。DEBUG_UART 是 `1.8V` 系统调试 UART，连接器为 GH1.25-3P，不支持 `serial_port_demo`。接口位置、电平和供电边界见 [硬件连接与安全](../getting-started/hardware-and-safety.md#uart)。
 
 连接时板端 TX 接对端 RX，板端 RX 接对端 TX，并始终共地。DEBUG_UART 只能接 `1.8V` 逻辑；UART1/UART7 使用 `3.3V` 逻辑。UART1/UART7 的 `3V3` 脚支持输入/输出并可为外设供电，两个接口共享合计 `500 mA` 限制并支持热插拔；超过合计限制时使用独立电源并保持共地，且不得反向灌入板端 3.3V 电源轨。

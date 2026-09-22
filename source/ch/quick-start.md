@@ -1,6 +1,6 @@
 # 快速开始
 
-本页只负责“最快运行成功”。如果 `/root/demo` 或 `/root/ros2_demo/install` 尚未部署，先按 [部署、升级与回滚](deployment-and-upgrade.md) 完成安全部署；单路诊断、UART、详细参数和排错分别见 [non-ROS Demo 使用](non-ros-demo.md)、[ROS2 Demo 使用](ros2-demo.md)、[硬件连接与安全](hardware-and-safety.md) 和 [故障排查](troubleshooting.md)。
+本页只负责“最快运行成功”。如果 `/root/demo` 或 `/root/ros2_demo/install` 尚未部署，先按 [部署、升级与回滚](development/deployment-and-upgrade.md) 完成安全部署；单路诊断、UART、详细参数和排错分别见 [non-ROS Demo 使用](usage/non-ros-demo.md)、[ROS2 Demo 使用](usage/ros2-demo.md)、[硬件连接与安全](getting-started/hardware-and-safety.md) 和 [故障排查](troubleshooting.md)。
 
 ## 1. 选择路径
 
@@ -35,7 +35,7 @@ CAM4 / cam3 -> rtsp://192.168.1.12:557/PRR
 
 Windows 上可使用 EasyPlayer 查看四路 RTSP 画面。
 
-```{figure} image/rtsp.png
+```{figure} ../image/rtsp.png
 :alt: EasyPlayer 显示 RoboBaton 4P 默认四路 RTSP 画面
 
 EasyPlayer 基本上电播放示例：默认 RTSP 端口为 `554`、`555`、`556`、`557`，path 为 `/PRR`。
@@ -85,14 +85,14 @@ ros2 run robobaton_4p_ros2_demo robobaton_imu_rate_monitor
 pgrep -af 'sensor_demo|cam_demo|robobaton_sensors_node|ros2 launch|ros2 run' || true
 ```
 
-不要通过停止 `cam-service` 来切换 demo。若命令无输出、topic 无数据或 RTSP 无法拉流，先看 [故障排查](troubleshooting.md)；需要单颗相机、IMU、UART 或 YAML 参数细节时，再进入 [non-ROS Demo 使用](non-ros-demo.md) 或 [ROS2 Demo 使用](ros2-demo.md)。
+不要通过停止 `cam-service` 来切换 demo。若命令无输出、topic 无数据或 RTSP 无法拉流，先看 [故障排查](troubleshooting.md)；需要单颗相机、IMU、UART 或 YAML 参数细节时，再进入 [non-ROS Demo 使用](usage/non-ros-demo.md) 或 [ROS2 Demo 使用](usage/ros2-demo.md)。
 
 ## 具体使用
 
 ```{toctree}
 :maxdepth: 1
 
-non-ros-demo
-save-data-guide
-ros2-demo
+usage/non-ros-demo
+usage/save-data-guide
+usage/ros2-demo
 ```
