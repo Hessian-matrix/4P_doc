@@ -1,0 +1,19 @@
+{% set is_english = language == "en" %}
+{% set target_base = docs_base_url_zh if is_english else docs_base_url_en %}
+{% set target_language = "zh-cn" if is_english else "en" %}
+{% set target_hreflang = "zh-CN" if is_english else "en" %}
+{% set target_label = "中文" if is_english else "English" %}
+{% set target_title = "View this page in Chinese" if is_english else "View this page in English" %}
+{% set target_page = "" if pagename == "index" else pagename ~ ".html" %}
+{% set target_url = target_base ~ "/" ~ target_language ~ "/" ~ rtd_version ~ "/" ~ target_page %}
+
+<a class="hm-language-switch"
+   href="{{ target_url }}"
+   hreflang="{{ target_hreflang }}"
+   lang="{{ target_hreflang }}"
+   title="{{ target_title }}"
+   aria-label="{{ target_title }}"
+   data-target-language="{{ target_language }}">
+  <span class="fa-solid fa-globe" aria-hidden="true"></span>
+  <span class="hm-language-switch__label">{{ target_label }}</span>
+</a>

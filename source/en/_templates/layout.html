@@ -1,0 +1,8 @@
+{% extends "!layout.html" %}
+
+{% block extrahead %}
+  {{ super() }}
+  {% set alternate_page = "" if pagename == "index" else pagename ~ ".html" %}
+  <link rel="alternate" hreflang="zh-CN" href="{{ docs_base_url_zh }}/zh-cn/{{ rtd_version }}/{{ alternate_page }}" />
+  <link rel="alternate" hreflang="en" href="{{ docs_base_url_en }}/en/{{ rtd_version }}/{{ alternate_page }}" />
+{% endblock %}
