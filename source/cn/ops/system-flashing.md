@@ -29,14 +29,14 @@
 - 板端软件 `v1.3.0` 配套的系统镜像已随本版发布，镜像包名 `product-20260918-v1.3.0.tar.gz`。
 - 镜像只适用于原产品原板，不保证其他目标板的兼容性（[产品版本与兼容性](../getting-started/product-and-compatibility.md)）。
 
-## 3. 镜像获取与校验
+## 3. 镜像与烧录工具下载
 
-镜像地址:[V1.3.0镜像](https://www.hessian-matrix.com/wp-content/uploads/2026/automaticupdates/product-20260918-v1.3.0.tar.gz)
-烧录工具地址:[地瓜官方烧录工具](https://www.hessian-matrix.com/wp-content/uploads/2026/automaticupdates/xburn-gui_1.2.1_x64-setup.exe)
+- 镜像：[V1.3.0 镜像](https://www.hessian-matrix.com/wp-content/uploads/2026/automaticupdates/product-20260918-v1.3.0.tar.gz)
+- 烧录工具：[地瓜官方烧录工具](https://www.hessian-matrix.com/wp-content/uploads/2026/automaticupdates/xburn-gui_1.2.1_x64-setup.exe)
 
 ## 4. 烧录前准备
 
-- 下载烧录工具和镜像文件。
+- 下载烧录工具和镜像文件，将 `product-20260918-v1.3.0.tar.gz` 解压到电脑本地目录。
 - 安装烧录工具，直接双击 xburn-gui_1.2.1_x64-setup.exe 安装到电脑本地。
 - 安装对应驱动：
 
@@ -51,8 +51,8 @@
 
 ## 5. 烧录步骤
 
-1. 连接板端 debug-uart 和 usb-c。
-2. 选择好串口号和镜像地址：
+1. 在板卡断电状态下，将板端 DEBUG_UART（通过 `1.8V` USB-UART 适配器）和 USB-C 连接到电脑。USB-C 仅用于数据连接，不作为供电口；准备好符合供电要求的 DC 电源，待第 3 步提示时再上电。接口与接线要求见 [硬件连接与安全](../getting-started/hardware-and-safety.md)。
+2. 选择对应的串口号，波特率设为 `921600`；在 **Image Directories** 中选择解压后的镜像目录，而不是 `.tar.gz` 压缩包：
 
    ```{figure} ../../image/burn.png
    :alt: xburn 烧录工具主界面，配置串口号与镜像路径
@@ -60,8 +60,15 @@
    xburn 烧录工具主界面，配置串口号与镜像路径。
    ```
 
-3. 点击烧录，等待烧录完成。
-4. 烧录完成后重启即可。
+3. 点击 **Start Burn**，按照工具提示通过 DC 接口给设备上电，然后等待烧录完成。确认进度达到 **100%**、状态显示 **Success**，且日志显示 `Process terminated, exit code: 0`：
+
+   ```{figure} ../../image/Flashing_complete.png
+   :alt: xburn 烧录完成界面，进度为 100%，状态为 Success，退出码为 0
+
+   烧录成功示例：进度为 100%，状态为 Success，退出码为 0。
+   ```
+
+4. 确认工具报告烧录成功后，再重启设备。
 
 注意：只使用本页发布的 `v1.3.0` 镜像，不要自行刷写未确认的镜像。
 

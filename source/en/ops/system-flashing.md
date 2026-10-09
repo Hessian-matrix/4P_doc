@@ -29,14 +29,14 @@ When only upgrading the non-ROS demo or the ROS2 runtime package, system flashin
 - The system image matching on-device software `v1.3.0` ships with this release; the image package name is `product-20260918-v1.3.0.tar.gz`.
 - The image applies only to the original product board and does not guarantee compatibility with other target boards ([Product Version and Compatibility](../getting-started/product-and-compatibility.md)).
 
-## 3. Image Acquisition and Verification
+## 3. Image and Flashing Tool Downloads
 
-Image: [V1.3.0 image](https://www.hessian-matrix.com/wp-content/uploads/2026/automaticupdates/product-20260918-v1.3.0.tar.gz)
-Flashing tool: [D-Robotics official flashing tool](https://www.hessian-matrix.com/wp-content/uploads/2026/automaticupdates/xburn-gui_1.2.1_x64-setup.exe)
+- Image: [V1.3.0 image](https://www.hessian-matrix.com/wp-content/uploads/2026/automaticupdates/product-20260918-v1.3.0.tar.gz)
+- Flashing tool: [D-Robotics official flashing tool](https://www.hessian-matrix.com/wp-content/uploads/2026/automaticupdates/xburn-gui_1.2.1_x64-setup.exe)
 
 ## 4. Pre-Flashing Preparation
 
-- Download the flashing tool and image file.
+- Download the flashing tool and image file, then extract `product-20260918-v1.3.0.tar.gz` to a local directory on your computer.
 - Install the flashing tool by double-clicking xburn-gui_1.2.1_x64-setup.exe to install it locally.
 - Install the corresponding driver:
 
@@ -51,8 +51,8 @@ Flashing tool: [D-Robotics official flashing tool](https://www.hessian-matrix.co
 
 ## 5. Flashing Steps
 
-1. Connect the on-device debug-uart and usb-c.
-2. Select the serial port and image path:
+1. With the board powered off, connect its DEBUG_UART (via a `1.8V` USB-UART adapter) and USB-C port to your computer. USB-C is for data only and does not power the board. Prepare a DC power supply that meets the board's power requirements, but leave it off until prompted in step 3. See [Hardware Connections and Safety](../getting-started/hardware-and-safety.md) for interface and wiring requirements.
+2. Select the corresponding serial port and set the baud rate to `921600`. Under **Image Directories**, select the extracted image directory, not the `.tar.gz` archive:
 
    ```{figure} ../../image/burn.png
    :alt: xburn flashing tool main interface, configuring serial port and image path
@@ -60,8 +60,15 @@ Flashing tool: [D-Robotics official flashing tool](https://www.hessian-matrix.co
    xburn flashing tool main interface, configuring serial port and image path.
    ```
 
-3. Click flash and wait for flashing to complete.
-4. Reboot after flashing completes.
+3. Click **Start Burn**, power on the device through its DC input when prompted by the tool, and wait for flashing to finish. Confirm that progress reaches **100%**, the status shows **Success**, and the log shows `Process terminated, exit code: 0`:
+
+   ```{figure} ../../image/Flashing_complete.png
+   :alt: xburn flashing completion screen showing 100% progress, Success status, and exit code 0
+
+   Successful flashing example: 100% progress, Success status, and exit code 0.
+   ```
+
+4. Reboot the device only after the tool reports that flashing succeeded.
 
 Note: use only the `v1.3.0` image published on this page; do not flash unconfirmed images yourself.
 
