@@ -1,12 +1,13 @@
 # Configuration file for the Sphinx documentation builder.
 
 import os
+from pathlib import Path
 
 project = "4P_doc"
 author = "4P_doc contributors"
 copyright = "2026, 4P_doc contributors"
-# release 必须与当前四仓 VERSION 文件一致。
-release = "1.3.1"
+# 文档修订号独立于软件版本；中英文构建共用本仓 VERSION。
+release = (Path(__file__).resolve().parents[2] / "VERSION").read_text(encoding="utf-8").strip()
 
 # 2026-07-31：使用 MyST 支持 Markdown，原因是后续章节更容易直接用 .md 编写。
 extensions = [
@@ -50,12 +51,11 @@ html_theme_options = {
 # 2026-07-31：为 Markdown 标题生成锚点，原因是在线文档内部跳转和外链引用更稳定。
 myst_heading_anchors = 3
 
-# 2026-08-04 修改原因：保留用户可点击的公开仓和大体积工具链链接；GitHub 可能返回 403，工具链直链不应在 linkcheck 中下载或阻塞发布门禁。
+# GitHub 仓库可能返回 403；大型系统镜像和烧录工具下载另行核验。
 linkcheck_ignore = [
     r"https://github\.com/Hessian-matrix/RoboBaton_4p_demo/?$",
     r"https://github\.com/Hessian-matrix/RoboBaton_4P_ROS2_demo/?$",
     r"https://github\.com/Hessian-matrix/4P_doc/?$",
-    r"https://www\.hessian-matrix\.com/wp-content/uploads/2026/automaticupdates/x5_4cam_cross_toolchain_20260708\.tar\.gz$",
     r"https://www\.hessian-matrix\.com/wp-content/uploads/2026/automaticupdates/product-20260918-v1\.3\.0\.tar\.gz$",
     r"https://www\.hessian-matrix\.com/wp-content/uploads/2026/automaticupdates/xburn-gui_1\.2\.1_x64-setup\.exe$",
     # 中英切换按钮与 hreflang 指向对侧语言部署域名；URL 由 RTD 部署状态决定，不参与内容链接校验。

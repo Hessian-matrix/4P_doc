@@ -2,13 +2,15 @@
 
 本页说明 RoboBaton 4P 第一版文档、non-ROS demo、ROS2 demo 和 X5 运行环境之间的匹配关系。技术事实以公开仓、公开头文件、默认配置、`VERSION` 和运行包 manifest 为准。
 
-## 当前正式发布基线：v1.3.0
+## 文档与软件版本
 
-| 交付物 | 当前版本 | 用户入口 |
-|---|---|---|
-| 文档 | `1.3.0` | 本站与 `4P_doc` 仓库。 |
-| non-ROS demo/运行包 | `1.3.0` | `/root/demo`，来自 `RoboBaton_4p_demo` 的 `demo/`。 |
-| ROS2 package/install | `1.3.0` | `/root/ros2_demo/install`，包名 `robobaton_4p_ros2_demo`。 |
+当前文档修订号、软件发布版本和统一版本定义见 [发布、授权与支持](../release-and-support.md#文档版本政策)。文档修订不要求软件版本同步递增。
+
+| 交付物 | 用户入口 |
+|---|---|
+| 文档 | 本站与 `4P_doc` 仓库。 |
+| non-ROS demo/运行包 | `/root/demo`，来自 `RoboBaton_4p_demo` 的 `demo/`。 |
+| ROS2 package/install | `/root/ros2_demo/install`，包名 `robobaton_4p_ros2_demo`。 |
 
 
 ## 功能与运行目录
@@ -45,4 +47,4 @@ ROS2 路径不提供 RTSP；需要 RTSP 时使用 non-ROS 路径。当前不提�
 /root/ros2_demo/install/lib/robobaton_4p_ros2_demo/robobaton_imu_rate_monitor --version
 ```
 
-部署时按整包更新和校验：non-ROS使用`manifest.sha256`，ROS2 install使用archive checksum和runtime `abi_manifest.sha256`。不要只替换单个可执行文件或单个`.so`；文档、运行包和ROS2 package的`1.3.0`应作为同一v1.3.0发布集合使用。
+部署时按整包更新和校验：non-ROS使用`manifest.sha256`，ROS2 install使用archive checksum和runtime `abi_manifest.sha256`。不要只替换单个可执行文件或单个`.so`；运行包中的程序、头文件和运行库应来自同一经验证的软件包，不能根据文档修订号判断软件或 ABI 是否匹配。

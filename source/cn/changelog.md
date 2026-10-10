@@ -1,6 +1,20 @@
 # 版本更新记录
 
-本文件记录 RoboBaton 4P 公开交付的用户可见更新。版本号遵循 [Semantic Versioning 2.0.0](https://semver.org/)；SO 的 SONAME/ABI 版本与产品发布版本独立，例如 `libicm42688.so.2` 中的 `2` 表示 ABI major，不等于产品版本。
+本文件记录 RoboBaton 4P 公开交付的用户可见更新，版本定义统一遵循 [文档版本政策](release-and-support.md#文档版本政策)。本页文档修订号不自动改变软件版本，也不等于 SO 的 SONAME/ABI 版本。
+
+## 1.3.2 - 2026-10-10
+
+本次为 1.3 系列内的构建与文档修订，各软件版本号保持不变。
+
+### 改进与修复
+
+- 修正 ROS2 显式工具链参数优先级及运行库来源，支持从独立 non-ROS 仓库生成并验证运行包。
+- 补充 Ubuntu 22.04 x86_64 主机准备、五个 non-ROS 示例和 ROS2 节点/插件的完整构建步骤，见 [公开 Demo 源码编译](development/open-source-build.md)。构建与包验证不替代板端硬件验收。
+- 统一文档版本定义与维护约束；文档修订号独立于软件版本，中英文构建从 `4P_doc/VERSION` 读取同一修订号。
+
+## 20261009 工具链 - 2026-10-10
+
+- 发布 [x5_4cam_cross_toolchain_20261009.tar.gz](https://www.hessian-matrix.com/wp-content/uploads/2026/automaticupdates/x5_4cam_cross_toolchain_20261009.tar.gz)，补齐目标 ROS Humble、image_transport/pluginlib 及环境入口，固定包内编译器和 sysroot 查找路径。大小、SHA-256 和用法见 [公开 Demo 源码编译](development/open-source-build.md)。
 
 ## 1.3.1 - 2026-09-20
 

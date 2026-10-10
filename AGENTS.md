@@ -46,3 +46,4 @@ cn/ 与 en/ 各自：
 7. 默认不stage、不commit、不push、不tag；禁止无边界reset、clean或restore。
 8. 已发布的版本化下载 URL 及其工件内容不可变；更新工件必须使用新的版本化文件名和新 URL，禁止原地替换已发布 URL 对应的文件。
 9. 在线文档当前跟随用户反馈和文档/代码更新持续发布；在产品负责人变更策略前，不定义或承诺固定的 Read the Docs 文档版本或 `stable` 别名。
+10. 文档版本政策统一维护在中英文 `source/cn/release-and-support.md` 与 `source/en/release-and-support.md`：采用“主版本.次版本.修订号”，末位修订号用于同一版本系列内的小 bug 修复、构建脚本调整或文档修正，不自动改变软件版本。本仓 `VERSION` 是文档修订号的唯一来源，中英文 `conf.py` 必须读取它，最新版本化 changelog 条目必须与其一致；更新时同步两棵树。不得因文档修订联动修改主仓、Demo、ROS2 的 `VERSION` 或 `package.xml`，不得要求文档版本与软件版本相等；SO 的 SONAME/ABI 独立。

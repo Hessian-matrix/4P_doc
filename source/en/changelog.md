@@ -1,6 +1,20 @@
 # Changelog
 
-This file records user-visible updates in the RoboBaton 4P public delivery. Version numbers follow [Semantic Versioning 2.0.0](https://semver.org/); the SO SONAME/ABI version is independent of the product release version — for example the `2` in `libicm42688.so.2` is the ABI major and does not equal the product version.
+This file records user-visible updates in the RoboBaton 4P public delivery, following the shared [Documentation Version Policy](release-and-support.md#documentation-version-policy). Documentation revisions on this page do not automatically change software versions and are distinct from SO SONAME/ABI versions.
+
+## 1.3.2 - 2026-10-10
+
+This update revises build scripts and documentation within the 1.3 series. All software version numbers remain unchanged.
+
+### Improvements and Fixes
+
+- Corrects ROS2 explicit toolchain argument precedence and runtime-library selection, and supports generating and verifying runtime packages from standalone non-ROS clones.
+- Adds Ubuntu 22.04 x86_64 host preparation and complete build steps for five non-ROS examples and ROS2 nodes/plugins; see [Building the Public Demo Source](development/open-source-build.md). Build and package verification do not replace on-device hardware acceptance.
+- Defines a shared documentation version policy and maintenance constraints; documentation revisions are independent of software versions, and both language builds read the same revision from `4P_doc/VERSION`.
+
+## 20261009 Toolchain - 2026-10-10
+
+- Publishes [x5_4cam_cross_toolchain_20261009.tar.gz](https://www.hessian-matrix.com/wp-content/uploads/2026/automaticupdates/x5_4cam_cross_toolchain_20261009.tar.gz), adding target ROS Humble, image_transport/pluginlib, and environment entries, with a fixed bundled compiler and sysroot search paths. See [Building the Public Demo Source](development/open-source-build.md) for the size, SHA-256, and usage.
 
 ## 1.3.1 - 2026-09-20
 

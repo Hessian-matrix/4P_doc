@@ -14,13 +14,15 @@ The public demo repositories build the user-side example programs:
 ```text
 RoboBaton_4p_demo
 ├── cam_demo
+├── mosaic_rtsp_demo
 ├── sensor_demo
 ├── imu_reader_demo
 └── serial_port_demo
 
 RoboBaton_4P_ROS2_demo
 ├── robobaton_sensors_node
-└── robobaton_imu_rate_monitor
+├── robobaton_imu_rate_monitor
+└── robobaton_nv12_compressed_image_transport (shared plugin)
 ```
 
 The public demo repositories already carry the public headers and matching precompiled runtime libraries required for building:
@@ -32,44 +34,51 @@ These repositories do not compile the underlying ICM42688, SC132, or PRRTSP prod
 
 ## 2. Prepare the Cross-Compilation Environment
 
-The host needs host-side tools:
+The verified host is **Ubuntu 22.04 x86_64**; the target is **X5 AArch64**. The bundle always selects its Arm GNU 11.3.Rel1 compiler. A system AArch64 cross compiler is not required.
 
-- `cmake`
-- `make` or another CMake-supported build backend
-- `python3`
-- ELF inspection tools such as `readelf` / `file`
+```bash
+sudo apt-get update
+sudo apt-get install -y build-essential cmake git python3 file binutils pkg-config curl
+```
 
-### Download the X5 Cross-Compilation Package
+For ROS2 builds, configure the repositories using the [official ROS Humble Ubuntu installation instructions](https://docs.ros.org/en/humble/Installation/Ubuntu-Install-Debs.html), then install host tools:
 
-Download [x5_4cam_cross_toolchain_20260708.tar.gz](https://www.hessian-matrix.com/wp-content/uploads/2026/automaticupdates/x5_4cam_cross_toolchain_20260708.tar.gz), size `2,044,412,424 bytes` (about `1.90 GiB`), SHA-256 `4ebc9cd8e7416ed6a7ce610421fd90509f368e26a9ffedd498a52171d1d16a1d`. This package provides the X5 aarch64 toolchain, sysroot, platform headers, and runtime libraries required to compile the public demos.
+```bash
+sudo apt-get install -y ros-humble-ros-base python3-colcon-common-extensions
+source /opt/ros/humble/setup.bash
+/usr/bin/python3 -c 'import ament_package, catkin_pkg, em, colcon_core'
+```
 
-Linux download and readability-check example:
+Host ROS supplies Python/ament/colcon build tools; the cross bundle supplies AArch64 ROS headers, libraries, and exports. Do not source the bundled target ROS setup on the host or link host `/opt/ros/humble/lib` into X5 programs. Use system Python; leave any active virtual environment first.
+
+### Obtain and Verify the X5 Cross-Compilation Package
+
+Download [x5_4cam_cross_toolchain_20261009.tar.gz](https://www.hessian-matrix.com/wp-content/uploads/2026/automaticupdates/x5_4cam_cross_toolchain_20261009.tar.gz): `2,058,709,673 bytes` (about `1.92 GiB`), SHA-256 `f708547c8936dddc0ce32e0d4a6dfbb605ff7bfc9d711b036ffd0ed982e6b035`. This version adds target ROS Humble (including image_transport/pluginlib), cross-environment scripts, sysroot linker entries, and relocatable CMake exports. Its supported build scope is the two consumer repositories on this page.
+
+Download, verify, and build using the following steps:
 
 ```bash
 curl -fL --retry 3 -O \
-  "https://www.hessian-matrix.com/wp-content/uploads/2026/automaticupdates/x5_4cam_cross_toolchain_20260708.tar.gz"
-test "$(stat -c %s x5_4cam_cross_toolchain_20260708.tar.gz)" -eq 2044412424
-printf '%s  %s\n' \
-  4ebc9cd8e7416ed6a7ce610421fd90509f368e26a9ffedd498a52171d1d16a1d \
-  x5_4cam_cross_toolchain_20260708.tar.gz | sha256sum -c -
-tar -tzf x5_4cam_cross_toolchain_20260708.tar.gz >/dev/null
+  "https://www.hessian-matrix.com/wp-content/uploads/2026/automaticupdates/x5_4cam_cross_toolchain_20261009.tar.gz"
 ```
-
-Extraction and environment variables example:
 
 ```bash
+test "$(stat -c %s x5_4cam_cross_toolchain_20261009.tar.gz)" -eq 2058709673
+printf '%s  %s\n' \
+  f708547c8936dddc0ce32e0d4a6dfbb605ff7bfc9d711b036ffd0ed982e6b035 \
+  x5_4cam_cross_toolchain_20261009.tar.gz | sha256sum -c -
+tar -tzf x5_4cam_cross_toolchain_20261009.tar.gz >/dev/null
 mkdir -p cross_compile_toolchain
-tar -xzf x5_4cam_cross_toolchain_20260708.tar.gz \
-  -C cross_compile_toolchain
-
-export X5_TOOLCHAIN_ROOT="$PWD/cross_compile_toolchain/x5_4cam_cross_toolchain_20260708"
-export TOOLCHAIN_FILE="$X5_TOOLCHAIN_ROOT/cross_compile/new/toolchain/aarch64_x5_host_toolchain.cmake"
-
+tar -xzf x5_4cam_cross_toolchain_20261009.tar.gz -C cross_compile_toolchain
+export X5_TOOLCHAIN_ROOT="$PWD/cross_compile_toolchain/x5_4cam_cross_toolchain_20261009"
+source "$X5_TOOLCHAIN_ROOT/setup_4cam_cross_env.sh"
 test -f "$TOOLCHAIN_FILE"
-cmake --version
+test -f "$TARGET_ROS_PREFIX/share/image_transport/cmake/image_transportConfig.cmake"
+file -L "$TARGET_ROS_PREFIX/lib/librclcpp.so"
+"$CC" --version
 ```
 
-If the actual extraction directory differs, just point `TOOLCHAIN_FILE` at the real `aarch64_x5_host_toolchain.cmake`.
+`file` should report `ARM aarch64`. The environment script sets `X5_CROSS_ROOT` to the bundled `cross_compile/new`; both named CMake toolchains use the same compiler and search rules. Source the environment again and use a new build directory after moving the bundle.
 
 ## 3. Build the non-ROS Demo
 
@@ -80,7 +89,7 @@ git clone https://github.com/Hessian-matrix/RoboBaton_4p_demo.git
 cd RoboBaton_4p_demo
 ```
 
-Build all four demos:
+Build all five demos:
 
 ```bash
 cmake -S . -B build_x5 \
@@ -92,6 +101,7 @@ Or build a single target:
 
 ```bash
 cmake --build build_x5 --target cam_demo -j
+cmake --build build_x5 --target mosaic_rtsp_demo -j
 cmake --build build_x5 --target sensor_demo -j
 cmake --build build_x5 --target imu_reader_demo -j
 cmake --build build_x5 --target serial_port_demo -j
@@ -101,6 +111,7 @@ The repository also provides equivalent script entries:
 
 ```bash
 TOOLCHAIN_FILE="$TOOLCHAIN_FILE" scripts/build_cam_demo.sh
+TOOLCHAIN_FILE="$TOOLCHAIN_FILE" scripts/build_mosaic_rtsp_demo.sh
 TOOLCHAIN_FILE="$TOOLCHAIN_FILE" scripts/build_sensor_demo.sh
 TOOLCHAIN_FILE="$TOOLCHAIN_FILE" scripts/build_imu_reader_demo.sh
 TOOLCHAIN_FILE="$TOOLCHAIN_FILE" scripts/build_serial_port_demo.sh
@@ -110,6 +121,7 @@ Build artifacts are at:
 
 ```text
 build_x5/cam_demo
+build_x5/mosaic_rtsp_demo
 build_x5/sensor_demo
 build_x5/imu_reader_demo
 build_x5/serial_port_demo
@@ -119,6 +131,7 @@ Check the target architecture:
 
 ```bash
 file build_x5/cam_demo
+file build_x5/mosaic_rtsp_demo
 file build_x5/sensor_demo
 file build_x5/imu_reader_demo
 file build_x5/serial_port_demo
@@ -136,10 +149,10 @@ TOOLCHAIN_FILE="$TOOLCHAIN_FILE" scripts/package_runtime.sh
 
 The script:
 
-1. Reconfigures and builds the four consumer demos.
+1. Reconfigures and builds the five consumer demos.
 2. Copies matching runtime libraries from the current repository's `lib/`.
 3. Generates the top-level launcher scripts, `env.sh`, `config/sensor_config.yaml`, and `bin/`.
-4. Writes and verifies `manifest.sha256`.
+4. Writes and verifies `manifest.sha256` and `runtime-provenance.json`; standalone clones bind the source commit and file hashes, while composition checkouts also bind the parent gitlink.
 5. Outputs `Runtime package generated and verified: <demo-dir>`.
 
 Manually verify the generated runtime package:
@@ -147,6 +160,8 @@ Manually verify the generated runtime package:
 ```bash
 python3 scripts/verify_runtime_package.py demo
 ```
+
+A custom `--build-dir` must remain inside the source repository, for example `build_public_cross`. Repackage after source or runtime changes; provenance verification rejects files that differ from the packaging snapshot.
 
 When deploying to the X5, do not delete `/root/demo` directly, and do not copy the outer `demo/` directory as `/root/demo/demo/`. Use the safe entry in [Deployment, Upgrade, and Rollback](deployment-and-upgrade.md): unique temporary directory, full `manifest.sha256` verification, old-application-exit check, old-directory backup, atomic switch, help/smoke verification, and failure rollback.
 
@@ -159,21 +174,16 @@ git clone https://github.com/Hessian-matrix/RoboBaton_4P_ROS2_demo.git
 cd RoboBaton_4P_ROS2_demo
 ```
 
-Prepare the ROS Humble host environment and the X5 cross-compilation package:
+Build in a terminal where the host preparation and bundle extraction in section 2 are complete:
 
 ```bash
-# replace the path below with the actual X5 cross-compilation package root
-export X5_CROSS_ROOT=/absolute/path/to/cross_compile/new
-set +u
 source /opt/ros/humble/setup.bash
-set -u
+source "$X5_TOOLCHAIN_ROOT/setup_4cam_cross_env.sh"
+CMAKE_BUILD_PARALLEL_LEVEL=4 script/build_x5_ros2.sh \
+  --cross-root "$X5_CROSS_ROOT" --parallel-workers 1
 ```
 
-A clean build with the in-package script is recommended:
-
-```bash
-script/build_x5_ros2.sh --clean --cross-root "$X5_CROSS_ROOT"
-```
+`X5_CROSS_ROOT` identifies the bundled `cross_compile/new`; target ROS is in its `target_ros/humble`. The script uses this cross environment by default; an explicit `--toolchain-file` takes precedence over environment setup. No business overlay or private developer directory is needed. Use a new `--build-root` when switching bundles to avoid stale caches.
 
 The script explicitly passes the X5 CMake toolchain file and pins colcon artifacts to this package:
 

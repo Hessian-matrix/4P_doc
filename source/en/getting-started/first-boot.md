@@ -143,7 +143,7 @@ ROS2 `/root/ros2_demo/install`:
 /root/ros2_demo/install/lib/robobaton_4p_ros2_demo/robobaton_imu_rate_monitor --version
 ```
 
-The latest official release baseline is docs `v1.3.0`, non-ROS `v1.3.0`, ROS2/package `v1.3.0`; file and package version queries may show `1.3.0` without the `v` prefix.
+Software version queries identify the deployed package and may omit the `v` prefix; see [Release, License, and Support](../release-and-support.md) for current software releases. Documentation revisions follow that page's independent [Documentation Version Policy](../release-and-support.md#documentation-version-policy) and need not equal the software query results.
 
 ## 6. Choose non-ROS or ROS2
 

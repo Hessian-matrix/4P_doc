@@ -2,17 +2,26 @@
 
 This page records the release status of public deliverables, the known limitations users will encounter, licensing, and problem-feedback information.
 
+## Documentation Version Policy
+
+This page defines the version policy for the entire public documentation set; [Changelog](changelog.md) records user-visible updates under this policy.
+
+- Documentation versions use major.minor.revision. The final revision number identifies small bug fixes, build-script adjustments, or documentation corrections within the same release series, without automatically changing individual software versions.
+- `4P_doc/VERSION` is the sole source of the documentation revision; both Sphinx language configurations read it directly. Each revision updates the latest versioned changelog entry and this page's version information in both languages.
+- Software versions in the main, non-ROS, and ROS2 repositories remain identified by their own `VERSION`, ROS2 `package.xml`, package version, and `--version` output. Documentation revisions must not change these versions or require them to equal the documentation revision.
+- SO SONAME/ABI versions are independent of documentation revisions and software versions: for example, the `2` in `libicm42688.so.2` is the ABI major. A documentation revision does not imply an ABI change, a software re-release, or an update on the target board.
+
 ## Version Set
 
-| Item | Current official release | Status |
+| Item | Current version | Status |
 |---|---|---|
-| Documentation | `v1.3.1` | Released with the v1.3.1 four-repository release; the release date follows the repository tag. |
+| Documentation revision | `1.3.2` | This site updates continuously; see [Changelog](changelog.md) for revision details. This does not indicate a software version upgrade. |
 | non-ROS demo/runtime package | `v1.3.1` | Deployed to `/root/demo`, whole-package verified by `manifest.sha256`. |
 | ROS2 package/install | `v1.3.1` | The package is deployed to `/root/ros2_demo/install`, package name `robobaton_4p_ros2_demo`. Before use on the target board, complete the corresponding path's actual checks per [ROS2 Demo Usage](usage/ros2-demo.md), [non-ROS Demo Usage](usage/non-ros-demo.md), and [Saving Data](usage/save-data-guide.md); package release does not replace target-board runtime checks. |
 
 Feature additions, fixes, and compatibility changes are in [Changelog](changelog.md).
 
-The online documentation continues to update based on user feedback; there is currently no separately pinned `stable` documentation version. Code and package version identification still follows the repository tag, `VERSION`, package version, and changelog. "Official release" here means versioned documentation/repositories/packages have been released, not that target-board runtime checks can be skipped. The public camera parameter set supports `25/30/40/50/60fps`, default `30fps`; the saving and ROS2 paths should be judged by actual results, exit codes, manifest, and target-board environment checks.
+The online documentation continues to update based on user feedback; there is currently no separately pinned `stable` documentation version. Documentation revisions follow the policy above; Read the Docs `latest` is a deployment identifier, not a software version. An official software release does not mean target-board runtime checks can be skipped. The public camera parameter set supports `25/30/40/50/60fps`, default `30fps`; the saving and ROS2 paths should be judged by actual results, exit codes, manifest, and target-board environment checks.
 
 ## Known Limitations
 

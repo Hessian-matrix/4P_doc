@@ -2,13 +2,15 @@
 
 This page describes the matching relationship among the RoboBaton 4P first-release documentation, the non-ROS demo, the ROS2 demo, and the X5 runtime environment. Technical facts are sourced from the public repositories, public headers, default configuration, `VERSION`, and runtime package manifest.
 
-## Current official release baseline: v1.3.0
+## Documentation and Software Versions
 
-| Deliverable | Current version | User entry |
-|---|---|---|
-| Documentation | `1.3.0` | This site and the `4P_doc` repository. |
-| non-ROS demo / runtime package | `1.3.0` | `/root/demo`, from `RoboBaton_4p_demo`'s `demo/`. |
-| ROS2 package / install | `1.3.0` | `/root/ros2_demo/install`, package name `robobaton_4p_ros2_demo`. |
+See [Release, License, and Support](../release-and-support.md#documentation-version-policy) for the current documentation revision, software releases, and shared version definitions. A documentation revision does not require software versions to increase with it.
+
+| Deliverable | User entry |
+|---|---|
+| Documentation | This site and the `4P_doc` repository. |
+| non-ROS demo / runtime package | `/root/demo`, from `RoboBaton_4p_demo`'s `demo/`. |
+| ROS2 package/install | `/root/ros2_demo/install`, package name `robobaton_4p_ros2_demo`. |
 
 
 ## Capabilities and runtime directories
@@ -45,4 +47,4 @@ On-device software `v1.3.0` ships a matching factory system image and flashing t
 /root/ros2_demo/install/lib/robobaton_4p_ros2_demo/robobaton_imu_rate_monitor --version
 ```
 
-Deploy and verify as a whole package: non-ROS uses `manifest.sha256`, and the ROS2 install uses the archive checksum plus the runtime `abi_manifest.sha256`. Do not replace only a single executable or a single `.so`; the `1.3.0` documentation, runtime package, and ROS2 package should be used as the same v1.3.0 release set.
+Deploy and verify as a whole package: non-ROS uses `manifest.sha256`, and the ROS2 install uses the archive checksum plus the runtime `abi_manifest.sha256`. Do not replace only a single executable or a single `.so`; programs, headers, and runtime libraries must come from the same verified software package. The documentation revision cannot establish software or ABI compatibility.

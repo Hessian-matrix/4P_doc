@@ -1,12 +1,13 @@
 # Configuration file for the Sphinx documentation builder.
 
 import os
+from pathlib import Path
 
 project = "4P_doc"
 author = "4P_doc contributors"
 copyright = "2026, 4P_doc contributors"
-# release must stay in sync with the VERSION file shared across the four repositories.
-release = "1.3.1"
+# Documentation revisions are independent of software versions; both languages use this repo's VERSION.
+release = (Path(__file__).resolve().parents[2] / "VERSION").read_text(encoding="utf-8").strip()
 
 # MyST is enabled so chapters can be authored directly in Markdown.
 extensions = [
@@ -51,13 +52,11 @@ html_theme_options = {
 # Generate stable anchors for Markdown headings so in-page and cross-page links stay valid.
 myst_heading_anchors = 3
 
-# Keep user-facing public repositories and large toolchain links clickable; GitHub may return
-# 403 and the toolchain direct links must not be downloaded or block the release linkcheck.
+# GitHub repositories may return 403; large system images and flashing tools are verified separately.
 linkcheck_ignore = [
     r"https://github\.com/Hessian-matrix/RoboBaton_4p_demo/?$",
     r"https://github\.com/Hessian-matrix/RoboBaton_4P_ROS2_demo/?$",
     r"https://github\.com/Hessian-matrix/4P_doc/?$",
-    r"https://www\.hessian-matrix\.com/wp-content/uploads/2026/automaticupdates/x5_4cam_cross_toolchain_20260708\.tar\.gz$",
     r"https://www\.hessian-matrix\.com/wp-content/uploads/2026/automaticupdates/product-20260918-v1\.3\.0\.tar\.gz$",
     r"https://www\.hessian-matrix\.com/wp-content/uploads/2026/automaticupdates/xburn-gui_1\.2\.1_x64-setup\.exe$",
     # The switcher and hreflang links point at the opposite language's deployment domain; those
