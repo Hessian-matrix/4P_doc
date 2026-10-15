@@ -8,7 +8,7 @@
 
 ```c
 const char *camera_version = sc132_get_version();
-const char *imu_version = icm42688_get_version();
+const char *imu_version = icm42670_get_version();
 const char *rtsp_version = prrtsp_get_version();
 ```
 
@@ -16,7 +16,7 @@ const char *rtsp_version = prrtsp_get_version();
 
 ## `libsc132.so`
 
-头文件：`include/sc132camera.h`。ABI：`SC132_ABI_VERSION_MAJOR=2`，`SC132_ABI_VERSION_MINOR=0`；real SO 为 `libsc132.so.2.0.1`，SONAME 仍为 `libsc132.so.2`。
+头文件：`include/sc132camera.h`。ABI：`SC132_ABI_VERSION_MAJOR=2`，`SC132_ABI_VERSION_MINOR=0`；real SO 为 `libsc132.so.2.0.0`，SONAME 仍为 `libsc132.so.2`。
 
 状态码：
 
@@ -94,37 +94,37 @@ int run_camera(void) {
 }
 ```
 
-## `libicm42688.so`
+## `libicm42670.so`
 
-头文件：`include/icm42688_driver.h`。ABI：`ICM42688_ABI_VERSION_MAJOR=2`，`ICM42688_ABI_VERSION_MINOR=1`；real SO 为 `libicm42688.so.2.1.0`，SONAME 仍为 `libicm42688.so.2`。
+non-ROS 头文件：`include/icm42670_driver.h`；ROS2：`include/robobaton_4p_ros2_demo/icm42670_driver.h`；producer：`include/icm42670_x5/icm42670_driver.h`。ABI：`ICM42670_ABI_VERSION_MAJOR=2`、`ICM42670_ABI_VERSION_MINOR=0`；real SO 为 `libicm42670.so.2.0.0`，SONAME 为 `libicm42670.so.2`，全部九个 C 函数使用 `ICM42670_X5_2.0` 节点。与 V1 ICM-42688 库不兼容，必须成套迁移 caller、头文件、SO 和配置。
 
 状态码：
 
 | 状态码 | 含义 |
 |---|---|
-| `ICM42688_STATUS_OK` | 成功 |
-| `ICM42688_STATUS_INVALID_ARGUMENT` | 参数非法 |
-| `ICM42688_STATUS_INVALID_STATE` | 生命周期状态非法 |
-| `ICM42688_STATUS_IO_ERROR` | I/O 错误 |
-| `ICM42688_STATUS_INTERNAL_ERROR` | 内部错误 |
+| `ICM42670_STATUS_OK` | 成功 |
+| `ICM42670_STATUS_INVALID_ARGUMENT` | 参数非法 |
+| `ICM42670_STATUS_INVALID_STATE` | 生命周期状态非法 |
+| `ICM42670_STATUS_IO_ERROR` | I/O 错误 |
+| `ICM42670_STATUS_INTERNAL_ERROR` | 内部错误 |
 
 核心结构与约束：
 
-- `icm42688_config_t` 默认 `sample_rate_hz=1000`、`fifo_watermark_samples=1`、`read_mode=ICM42688_READ_MODE_SENSOR_TIMESTAMP_FIFO`。
-- `sample_rate_hz`只接受`25/50/100/200/500/1000/2000`；当前只接受 sensor timestamp FIFO 读取模式。
+- `icm42670_config_t` 默认 `sample_rate_hz=800`、`fifo_watermark_samples=1`、`read_mode=ICM42670_READ_MODE_SENSOR_TIMESTAMP_FIFO`。
+- `sample_rate_hz` 只接受原生 `25/50/100/200/400/800/1600`；旧 `500/1000/2000Hz` 和其他非法值明确拒绝，不会自动重采样；当前只接受 sensor timestamp FIFO 读取模式。
 - callback 由采集线程串行调用；`sample` 是借用引用。
 - `stop/destroy` 会等待采集线程，不得从 callback 中调用。
-- `user_data` 必须保持有效直到 `icm42688_stop()` 返回。
-- `icm42688_get_runtime_health()` 只在最近一次 start generation 成功 stop 后读取；未成功 stop 时不应把输出结构当作有效快照。
-- `icm42688_is_running()` 返回当前 handle 是否处于运行状态，可用于状态查询；它不替代 `icm42688_stop()`/`destroy()` 的生命周期顺序。
-- `icm42688_status_message(status)` 把状态码映射为进程静态只读文本；返回指针不得修改或释放。
+- `user_data` 必须保持有效直到 `icm42670_stop()` 返回。
+- `icm42670_get_runtime_health()` 只在最近一次 start generation 成功 stop 后读取；未成功 stop 时不应把输出结构当作有效快照。
+- `icm42670_is_running()` 返回当前 handle 是否处于运行状态，可用于状态查询；它不替代 `icm42670_stop()`/`destroy()` 的生命周期顺序。
+- `icm42670_status_message(status)` 把状态码映射为进程静态只读文本；返回指针不得修改或释放。
 
-`icm42688_runtime_health_t` 使用 `ICM42688_RUNTIME_HEALTH_INIT` 初始化。字段含义为：`session_generation`（最近一次 start generation）、`published_samples`（producer 发布样本数）、`gpio_event_gap_count`（GPIO 边沿缺口）、`fifo_overflow_count`（FIFO 溢出）、`mapper_failure_count`（时间映射失败）、`uncertainty_over_200_drop_count`（不确定度超过 200 us 而丢弃的样本数）和 `max_consecutive_timing_drop_count`（连续 timing drop 最大值）。调用返回非 `ICM42688_STATUS_OK` 时，不要读取输出结构作为有效快照。
+`icm42670_runtime_health_t` 使用 `ICM42670_RUNTIME_HEALTH_INIT` 初始化。字段含义为：`session_generation`（最近一次 start generation）、`published_samples`（producer 发布样本数）、`gpio_event_gap_count`（GPIO 边沿缺口）、`fifo_overflow_count`（FIFO 溢出）、`mapper_failure_count`（时间映射失败）、`uncertainty_over_200_drop_count`（不确定度超过 200 us 而丢弃的样本数）和 `max_consecutive_timing_drop_count`（连续 timing drop 最大值）。调用返回非 `ICM42670_STATUS_OK` 时，不要读取输出结构作为有效快照。
 
 ```c
-icm42688_runtime_health_t health = ICM42688_RUNTIME_HEALTH_INIT;
-int health_ret = icm42688_get_runtime_health(handle, &health);
-if (health_ret != ICM42688_STATUS_OK) {
+icm42670_runtime_health_t health = ICM42670_RUNTIME_HEALTH_INIT;
+int health_ret = icm42670_get_runtime_health(handle, &health);
+if (health_ret != ICM42670_STATUS_OK) {
   /* 只有最近一次 start 已成功且 stop 已完成后，快照才有效。 */
   return health_ret;
 }
@@ -133,9 +133,9 @@ if (health_ret != ICM42688_STATUS_OK) {
 最小骨架：
 
 ```c
-#include "icm42688_driver.h"
+#include "icm42670_driver.h"
 
-static void on_imu_sample(const icm42688_sample_t *sample, void *user_data) {
+static void on_imu_sample(const icm42670_sample_t *sample, void *user_data) {
   (void)user_data;
   /* sample_timestamp_ns/host_timestamp_ns 为底层时间域，demo 打印前会另行映射。 */
   (void)sample->sample_timestamp_ns;
@@ -143,30 +143,30 @@ static void on_imu_sample(const icm42688_sample_t *sample, void *user_data) {
 }
 
 int run_imu(void) {
-  icm42688_config_t config = ICM42688_CONFIG_INIT;
-  config.sample_rate_hz = 1000;
+  icm42670_config_t config = ICM42670_CONFIG_INIT;
+  config.sample_rate_hz = 800;
   config.fifo_watermark_samples = 1;
 
-  icm42688_handle_t *handle = 0;
-  int ret = icm42688_create(&config, &handle);
-  if (ret != ICM42688_STATUS_OK) {
+  icm42670_handle_t *handle = 0;
+  int ret = icm42670_create(&config, &handle);
+  if (ret != ICM42670_STATUS_OK) {
     return ret;
   }
-  ret = icm42688_set_callback(handle, on_imu_sample, 0);
-  if (ret != ICM42688_STATUS_OK) {
-    icm42688_destroy(handle);
+  ret = icm42670_set_callback(handle, on_imu_sample, 0);
+  if (ret != ICM42670_STATUS_OK) {
+    icm42670_destroy(handle);
     return ret;
   }
-  ret = icm42688_start(handle);
-  if (ret != ICM42688_STATUS_OK) {
-    icm42688_destroy(handle);
+  ret = icm42670_start(handle);
+  if (ret != ICM42670_STATUS_OK) {
+    icm42670_destroy(handle);
     return ret;
   }
 
   /* 应用主循环在这里运行。 */
 
-  icm42688_stop(handle);
-  icm42688_destroy(handle);
+  icm42670_stop(handle);
+  icm42670_destroy(handle);
   return 0;
 }
 ```
@@ -250,4 +250,4 @@ int open_rtsp(prrtsp_stream_t **stream) {
 
 ## 成套部署要求
 
-`libsc132.so`、`libicm42688.so`、`libprrtsp.so`、公开头文件和 demo 程序必须来自同一公开交付包。不要把当前 `.so` 单独替换到未迁移程序；ROS2 install 路径使用 `RoboBaton_4P_ROS2_demo` 自身携带的公开头文件、运行库和 manifest，不要与 non-ROS `/root/demo` 运行包混用。
+`libsc132.so`、`libicm42670.so`、`libprrtsp.so`、公开头文件和 demo 程序必须来自同一公开交付包。不要把当前 `.so` 单独替换到未迁移程序；ROS2 install 路径使用 `RoboBaton_4P_ROS2_demo` 自身携带的公开头文件、运行库和 manifest，不要与 non-ROS `/root/demo` 运行包混用。

@@ -20,7 +20,7 @@ cd /root/demo
 ./sensor_demo
 ```
 
-`sensor_demo`默认运行四路SC132相机、PRRTSP v2 H.264 RTSP推流和ICM-42688 IMU采集。默认图像为`1280x1088@30fps`，支持`25/30/40/50/60fps`；输出画布支持`1280x1088`/`640x480`/`720x480`/`1280x720`。其他帧率值在启动相机前拒绝。
+`sensor_demo` 默认运行四路 SC132 相机、PRRTSP v2 H.264 RTSP 推流和 ICM-42670-P IMU（原生默认 `800Hz`）采集。默认图像为 `1280x1088@30fps`，支持 `25/30/40/50/60fps`；输出画布支持 `1280x1088`/`640x480`/`720x480`/`1280x720`。V2 实板验收仍待完成。
 
 四路 RTSP URL：
 
@@ -31,7 +31,7 @@ CAM3 / cam2 -> rtsp://192.168.1.12:556/PRR
 CAM4 / cam3 -> rtsp://192.168.1.12:557/PRR
 ```
 
-其中 CAM1/CAM2/CAM3/CAM4 是物理丝印，cam0/cam1/cam2/cam3 是软件相机 ID。
+CAM1/CAM2/CAM3/CAM4 是 V1 图中的物理丝印；这里的 cam0/cam1/cam2/cam3 是软件 ID，V2 物理接口与软件 ID 的对应关系尚待核实；上述 IP 是 V1 出厂默认示例，V2 上应换成已确认的实际地址。
 
 Windows 上可使用 EasyPlayer 查看四路 RTSP 画面。
 

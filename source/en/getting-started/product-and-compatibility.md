@@ -1,10 +1,12 @@
 # Product Version and Compatibility
 
-This page describes the matching relationship among the RoboBaton 4P first-release documentation, the non-ROS demo, the ROS2 demo, and the X5 runtime environment. Technical facts are sourced from the public repositories, public headers, default configuration, `VERSION`, and runtime package manifest.
+This page describes compatibility between current RoboBaton 4P V2 source, non-ROS/ROS2 demos, and runtime environments; historical V1 downloads are not automatically V2-compatible. Technical facts follow public headers, configuration, VERSION, and runtime manifests.
 
 ## Documentation and Software Versions
 
 See [Release, License, and Support](../release-and-support.md#documentation-version-policy) for the current documentation revision, software releases, and shared version definitions. A documentation revision does not require software versions to increase with it.
+
+V2 uses ICM-42670-P, API `icm42670_*`, real SO `libicm42670.so.2.0.0`, SONAME `libicm42670.so.2`, and node `ICM42670_X5_2.0`. This is incompatible with V1 ICM libraries; update headers, libraries, consumers, and configuration together. Native ODRs are `25/50/100/200/400/800/1600Hz`, default `800Hz`; old `500/1000/2000Hz` rates are explicitly rejected, not silently resampled.
 
 | Deliverable | User entry |
 |---|---|
@@ -30,13 +32,13 @@ Do not mix directories, headers, or `.so` files between the two paths. Run only 
 | ROS2 | Humble underlay; load the environment via `robobaton_ros2_env.bash`. |
 | Cross compilation | Only use the X5 cross-compilation package on the host; native compilation on the X5 is not recommended. |
 | non-ROS camera configuration | default `1280x1088@30fps`; supports `25/30/40/50/60fps`; output canvas `1280x1088`/`640x480`/`720x480`/`1280x720`. |
-| Trigger | `software_gpio` is the only stable V1 trigger; `none` is only for explicit free-run diagnostics. |
+| Trigger | `vin_lpwm` is the V2.0.0 default trigger (VIN hardware trigger); `none` is only for explicit free-run diagnostics; `software_gpio` is main-repo internal debug only. |
 
 The ROS2 path does not provide RTSP; use the non-ROS path when RTSP is needed. TF, extrinsics, camera intrinsics, and distortion calibration are not currently provided; CameraInfo only has width/height, and IMU orientation is unavailable.
 
 ## Factory system image and target-board compatibility
 
-On-device software `v1.3.0` ships a matching factory system image and flashing tool. The image applies only to the original product board and does not guarantee compatibility with other target boards; see [System Flashing](../ops/system-flashing.md) for image acquisition and flashing steps.
+The historical factory image and flashing tool for on-device software `v1.3.0` apply only to its original V1 board and must not be written to V2; URLs and artifacts cannot be overwritten in place. Public information for the matching V2 BSP/system image and recovery channel is pending confirmation; see [System Flashing](../ops/system-flashing.md).
 
 ## Version query and whole-package matching
 

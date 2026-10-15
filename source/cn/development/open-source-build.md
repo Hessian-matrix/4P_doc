@@ -27,10 +27,10 @@ RoboBaton_4P_ROS2_demo
 
 公开 demo 仓库已经携带编译所需的公开头文件和匹配的预编译运行库：
 
-- non-ROS：`include/`、`lib/libicm42688.so*`、`lib/libsc132.so*`、`lib/libprrtsp.so*`。
-- ROS2：`include/robobaton_4p_ros2_demo/`、`lib/libicm42688.so*`、`lib/libsc132.so*`，构建时还需要 X5 交叉编译包提供目标侧 ROS2、`hb_media_codec.h`、`libmultimedia.so.1`、`libhbmem.so.1` 和 `libalog.so.1`。
+- non-ROS：`include/`、`lib/libicm42670.so*`、`lib/libsc132.so*`、`lib/libprrtsp.so*`。
+- ROS2：`include/robobaton_4p_ros2_demo/`、`lib/libicm42670.so*`、`lib/libsc132.so*`，构建时还需要 X5 交叉编译包提供目标侧 ROS2、`hb_media_codec.h`、`libmultimedia.so.1`、`libhbmem.so.1` 和 `libalog.so.1`。
 
-这些仓库不编译底层 ICM42688、SC132 或 PRRTSP producer 源码。如果没有 X5 交叉编译工具链，不能重新编译源码，只能直接使用仓库里的 `demo/` 或已生成的 install 包部署运行。
+这些仓库不编译底层 ICM42670、SC132 或 PRRTSP producer 源码。如果没有 X5 交叉编译工具链，不能重新编译源码，只能直接使用仓库里的 `demo/` 或已生成的 install 包部署运行。
 
 ## 2. 准备交叉编译环境
 
@@ -219,7 +219,7 @@ script/build_x5_ros2.sh \
 
 | 现象 | 处理 |
 |---|---|
-| `Missing ... libicm42688/libsc132/libprrtsp` | 确认公开 demo 仓库的 `lib/` 完整；公开 demo 只编译 consumer 示例，不从源码生成 producer 库。 |
+| `Missing ... libicm42670/libsc132/libprrtsp` | 确认公开 demo 仓库的 `lib/` 完整；公开 demo 只编译 consumer 示例，不从源码生成 producer 库。 |
 | `Missing consumer toolchain file` | 检查 `TOOLCHAIN_FILE` 是否指向真实的 `aarch64_x5_host_toolchain.cmake`。 |
 | `file build_x5/...` 显示 `x86-64` | 重新配置 CMake，确保传入 `-DCMAKE_TOOLCHAIN_FILE="$TOOLCHAIN_FILE"`。 |
 | 只复制 `build_x5/` 下的单个可执行文件后板端找不到库 | 使用 `scripts/package_runtime.sh` 生成完整 `demo/`，并完整部署 `demo/` 内容。 |

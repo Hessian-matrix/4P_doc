@@ -7,19 +7,20 @@ This page helps first-time RoboBaton 4P users complete pre-power-on checks, log 
 Power, camera cables, UART, and thermal boundaries are governed by [Hardware Connection and Safety](hardware-and-safety.md). Before powering on, confirm:
 
 - Camera FPC/coaxial cables are connected with power off; camera/FPC/coaxial cables do not support hot-plug and must be disconnected from power before plug/unplug.
-- The main board input range is DC `12V ~ 24V` (3S-6S), supply current recommended no less than `600 mA`; the bundled adapter is `12V`, which does not mean the board only supports 12V.
-- Heatsink, fan, and airflow are unobstructed; the fan starts at power-on, stops after system startup completes, then the fan thermal control starts when CPU temperature `> 55°C` and stops when temperature drops below `< 50°C`.
-- If using UART1/UART7, connect only matching `3.3V`-level TX/RX and common GND; generic USB-UART adapters leave VCC disconnected by default.
-- The two 3.3V power pins of UART1/UART7 have a combined rated boundary of `500 mA` for powering peripherals; above that use an independent supply, keep common ground, and prevent reverse-feeding the board 3.3V rail.
-- DEBUG_UART is only for the system console/debug and must use a `1.8V` USB-UART adapter; do not connect `3.3V` or `5V` logic to DEBUG_UART.
+- V2 rated input range, USB-C power role, full-load current, and fan thresholds are pending confirmation. Use only a power supply and system confirmed for V2 by product support; do not inherit V1 `12V ~ 24V`/`600 mA` claims.
+- Keep heatsink, fan, and airflow clear; V1 fan/LED boot patterns are not V2 readiness criteria.
+- V2 UART1/UART7 use 5 pins; pinout, actual voltage, and power-pin function are pending. Leave generic USB-UART VCC disconnected and wire with power off after confirming signal order and ground.
+- V1 UART `500 mA`/hot-plug claims do not apply to V2; verify V2 DEBUG_UART voltage, baud, and recovery method before use.
 
 ## 2. Connect and Power On
 
-With power off, complete the camera, power, network, and optional UART debug cable connections, then power on using the bundled `12V` adapter and wait for system startup. If using another input power supply, it must meet the input range and power boundary published on the hardware page. At power-on the fan starts and the outer green LED stays solid (first-batch boards are green; later boards were changed to a red LED for better distinction); after system startup completes, the fan stops and the inner green LED blinks. During startup, do not plug/unplug camera FPC/coaxial cables, do not stop or reconfigure `cam-service`, and do not start multiple applications that use camera resources at the same time.
+Confirm V2 power, harnesses, and actual pinout first, then complete camera, power, network, and optional debug wiring with power off. Check actual system status after power-on rather than infer readiness from V1 LED/fan images. Do not hot-plug camera harnesses, stop or reconfigure `cam-service`, or start multiple camera applications together.
 
 ## 3. Network and Login
 
 Wired Ethernet is recommended for first login. To configure the on-board Wi-Fi as an AP hotspot or connect to a router, see [Wi-Fi Configuration](wifi-configuration.md); switching Wi-Fi mode resets `wlan0`, so do not rely on the same Wi-Fi SSH session to complete the switch.
+
+The factory IP/account below are historical public V1 defaults, not V2 experiment-device information. V2 factory settings and system network management are pending confirmation. Execute these examples only after confirming the target system uses those settings; never submit actual device addresses or credentials to public repositories.
 
 | Item | Factory default |
 |---|---|

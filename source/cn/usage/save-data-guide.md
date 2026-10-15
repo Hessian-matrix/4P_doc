@@ -47,7 +47,7 @@ cat VERSION
 ./sensor_demo --version
 ```
 
-`VERSION`、程序 `--version`、实际加载的 `libsc132`、`libprrtsp`、`libicm42688` 产品版本及 ABI 信息必须属于同一份包。不要混用系统目录、旧部署或其他工程中的同名动态库。
+`VERSION`、程序 `--version`、实际加载的 `libsc132`、`libprrtsp`、`libicm42670` 产品版本及 ABI 信息必须属于同一份 V2 包。不要混用系统目录、旧部署或其他工程中的同名动态库。
 
 `v1.3.0`发布使用同一组AArch64 ELF、`runtime-provenance.json`和`manifest.sha256`；使用时以部署包内实际`VERSION`为准，不以文档标题推断版本。
 
@@ -58,10 +58,10 @@ cat VERSION
 当前稳定路径要求：
 
 - 四颗相机全部连接；
-- ICM-42688 INT1 采集链路可用；
+- ICM-42670-P INT1 采集链路可用；
 - `cam-service` 正常运行；
 - 同一时刻没有另一个 `cam_demo` 或 `sensor_demo` 占用相机；
-- 默认稳定 trigger 模式为 `software_gpio`。
+- 默认稳定 trigger 模式为 `vin_lpwm`。
 
 检查：
 
@@ -157,7 +157,7 @@ cd ${DEMO_DIR}
 ./sensor_demo \
   --fps 30 \
   --codec h264 \
-  --sample-rate-hz 1000 \
+  --sample-rate-hz 800 \
   --print-rate-hz 0 \
   --record-mp4-dir /root/data/robobaton/run_30fps_mp4
 ```
@@ -187,7 +187,7 @@ rtsp:
   codec: h264
   url: /PRR
 imu:
-  sample_rate_hz: 1000
+  sample_rate_hz: 800
 
   print_rate_hz: 0
   print_metrics: false
@@ -279,7 +279,7 @@ DEMO_DIR=/root/demo  # 改成实际完整运行包目录
 cd ${DEMO_DIR}
 ./sensor_demo \
   --fps 30 \
-  --sample-rate-hz 1000 \
+  --sample-rate-hz 800 \
   --print-rate-hz 0 \
   --record-bag /root/data/robobaton/run_30fps.bag \
   --record-frame-skip 0
@@ -311,7 +311,7 @@ rtsp:
   codec: h264
   url: /PRR
 imu:
-  sample_rate_hz: 1000
+  sample_rate_hz: 800
 
   print_rate_hz: 0
   print_metrics: false

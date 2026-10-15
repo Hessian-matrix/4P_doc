@@ -2,6 +2,23 @@
 
 本文件记录 RoboBaton 4P 公开交付的用户可见更新，版本定义统一遵循 [文档版本政策](release-and-support.md#文档版本政策)。本页文档修订号不自动改变软件版本，也不等于 SO 的 SONAME/ABI 版本。
 
+## 2.0.0 - 2026-10-15
+
+V2.0.0 发布：软件与文档版本统一至 2.0.0，默认触发模式切换为 LPWM。
+
+- 相机/ROS2 默认触发模式从 `software_gpio` 改为 `vin_lpwm`（VIN 硬件触发）。
+- 关闭 `software_gpio` 公开入口：non-ROS `--trigger-mode` 与 ROS2 `camera.trigger_mode` 只接受 `vin_lpwm` 或 `none`。
+- `software_gpio` 仍保留为主仓内部调试路径，通过进程环境预设 `SC132_TRIGGER_MODE` 直驱，不对外公开。
+
+## 1.3.3 - 2026-10-11
+
+本次为 V2 硬件迁移的中英文文档修订；软件 VERSION 不变，不代表 V2 全功能或整机验收通过。
+
+- 当前 IMU 指南/API/示例切换至 ICM-42670-P、`icm42670_*`、`icm42670_driver.h`；real SO `libicm42670.so.2.0.0`、SONAME `libicm42670.so.2`、节点 `ICM42670_X5_2.0`。
+- 原生 ODR 为 `25/50/100/200/400/800/1600Hz`，默认 `800Hz`；旧 `500/1000/2000Hz` 明确拒绝，需用户显式迁移配置。
+- 相机 producer 解析触发控制器 `34130000.gpio` offset `0`，INT1 为 `34120000.gpio` offset `8`；IMU FSYNC 与相机触发共网不代表相机/IMU 硬件对齐。
+- 时间字段按新公开头文件说明；V2 pinout、电气、物理映射、IMU 方向及照片仍标记待确认。历史 V1 下载 URL、工件身份和以下 changelog 原样保留，不构成 V2 兼容或验收承诺。
+
 ## 1.3.2 - 2026-10-10
 
 本次为 1.3 系列内的构建与文档修订，各软件版本号保持不变。

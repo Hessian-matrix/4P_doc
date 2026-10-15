@@ -1,6 +1,6 @@
 # non-ROS Demo Usage
 
-[`RoboBaton_4p_demo`](https://github.com/Hessian-matrix/RoboBaton_4p_demo) is the minimal non-ROS public delivery repository aimed at users, providing four-camera SC132 RTSP, four-channel mosaic RTSP, ICM-42688 IMU, and UART examples.
+[`RoboBaton_4p_demo`](https://github.com/Hessian-matrix/RoboBaton_4p_demo) is the public V2 non-ROS source repository, providing four-camera SC132 RTSP, four-channel mosaic RTSP, ICM-42670-P IMU, and UART examples. Old V1 downloads do not provide the V2 hardware/API.
 
 ## 1. Directory and Runtime Package
 
@@ -34,7 +34,7 @@ Deploy the full contents of `demo/`. The top-level `cam_demo`, `sensor_demo`, `m
 
 - Four SC132 cameras;
 - PRRTSP v2 H.264/H.265 RTSP streaming;
-- ICM-42688 GPIO395 DRDY + sensor timestamp FIFO IMU acquisition thread.
+- ICM-42670-P INT1 (`34120000.gpio` offset `8`) + sensor timestamp FIFO IMU acquisition thread.
 
 ```bash
 cd /root/demo
@@ -44,7 +44,7 @@ cd /root/demo
 Common overrides:
 
 ```bash
-./sensor_demo --sample-rate-hz 2000
+./sensor_demo --sample-rate-hz 1600
 ./sensor_demo --print-rate-hz 50 --print-metrics
 ./sensor_demo --diagnostics
 ```
@@ -74,7 +74,7 @@ rtsp:
   codec: h264
   url: /PRR
 imu:
-  sample_rate_hz: 1000
+  sample_rate_hz: 800
   print_rate_hz: 10
   print_metrics: false
 save_data:
@@ -90,7 +90,7 @@ Boundaries:
 - The full four-camera path is fixed to four channels; single-sensor diagnostics use `cam_demo --camera-id`.
 - The non-ROS public frame-rate set is 25/30/40/50/60fps; default `30`, other values rejected before the camera starts.
 - `rtsp.codec` supports `h264` and `h265`.
-- IMU sample rate supports `25/50/100/200/500/1000/2000Hz`, default `1000Hz`.
+- IMU native sample rates are `25/50/100/200/400/800/1600Hz`, default `800Hz`; old `500/1000/2000Hz` values are rejected, not resampled.
 - `save_data.format` defaults to `mp4` and also supports `rosbag`; the save path must be an absolute path.
 
 (non-ros-save)=
@@ -124,7 +124,7 @@ python3 scripts/rosbag_extract.py /root/save_demo/record.bag /data/record_datase
 python3 scripts/mp4_extract.py /root/save_demo/mp4_session /data/mp4_dataset
 ```
 
-| `imu.sample_rate_hz` | `1000` | `25/50/100/200/500/1000/2000`. |
+| `imu.sample_rate_hz` | `800` | `25/50/100/200/400/800/1600`; old values rejected. |
 
 ## 5. Run Camera RTSP Alone
 
@@ -144,7 +144,7 @@ Common parameters:
 --rotate <0|90|180|270>
 --bps <kbps>
 --url <path>
---trigger-mode <software_gpio|none>
+--trigger-mode <vin_lpwm|none>
 --diagnostics
 --max-skew-ns <ns>
 --frame-timeout-ms <ms>
@@ -154,8 +154,8 @@ Trigger mode status:
 
 | Mode | Current status |
 |---|---|
-| `software_gpio` | Default and the only verified stable mode. |
-| `none` | Experimental, not part of the V1 stable configuration. |
+| `vin_lpwm` | Default, VIN hardware trigger. |
+| `none` | Explicit free-run diagnostics. |
 
 Limits: `--width/--height` accepts `1280x1088` (default), `640x480`, `720x480`, `1280x720`, either axial orientation; other combinations are rejected; scaling is performed by `libsc132` VSE hardware full-frame stretch and does not change the FOV. `--rotate 180` supports only `30fps`, not `25fps`, `40fps`, `50fps`, or `60fps`. The external NV12/RTSP canvas keeps width/height unchanged under rotation `0/180` (e.g. `1280x1088`, `640x480`) and swaps them under `90/270` (e.g. `1088x1280`, `480x640`). Camera, RTSP, ROS1 bag, and H.264 MP4 share the same `25/30/40/50/60fps` public frame-rate set.
 
@@ -227,7 +227,7 @@ Like `cam_demo`/`sensor_demo`, `mosaic_rtsp_demo` exclusively holds the four-cam
 ```bash
 cd /root/demo
 ./imu_reader_demo
-./imu_reader_demo --sample-rate-hz 2000 --count 10000
+./imu_reader_demo --sample-rate-hz 1600 --count 10000
 ```
 
 It prints sampled records at `10Hz` by default; the program still consumes all IMU samples. To view metrics use:
@@ -243,16 +243,14 @@ Key fields:
 - `gyro_rps`: angular velocity in `rad/s`.
 - `uncertainty_us`, `gpio_gap_count`, `fifo_overflow_count`, `mapper_failure_count`: timestamp mapping and acquisition-link diagnostics.
 
-`accel_mps2` outputs in `[X, Y, Z]` order, with sign referenced to the board top view in [Hardware Connection and Safety](../getting-started/hardware-and-safety.md#uart): when the device is still and level, it is about `[0, 0, -9.8] m/s^2`; accelerating toward the left of the image makes X negative; accelerating toward the top of the image / product front makes Y negative. This reference is only for understanding IMU readings and does not define the transform between the IMU and camera, base, optical frame, or other coordinate systems.
+V2 `accel_mps2` outputs `[X, Y, Z]`; PCB orientation and signs still need six-face/rotation board verification. Do not infer axis signs or camera-frame transforms from V1 top-view images.
 
-The IMU path uses GPIO395 DRDY + sensor timestamp FIFO, and does not use GPIO397, FSYNC, or `icm42688_pulse_fsync()`.
+IMU INT1 uses `34120000.gpio` offset `8`, and FIFO TMST supplies per-sample timing; the camera producer exclusively drives trigger `34130000.gpio` offset `0`. Although V2 IMU FSYNC input shares that net, sample/exposure alignment is not provided.
 
 ## 8. Serial Demo
 
 
-UART1/UART7 normal 3.3V hardware communication has passed V1 acceptance; `serial_port_demo` is the public user example for normal UART mode and does not apply to DEBUG_UART. In PPS mode, UART7 RX is switched to `/dev/pps2` and UART7 TX is released as GPIO/IO; do not run `serial_port_demo` in that mode. DEBUG_UART is `1.8V`; UART1 is `/dev/ttyS1` and UART7 is `/dev/ttyS7`, both `3.3V` user UARTs with GH1.25-4P connectors. The `3V3` pins of UART1/UART7 support input/output and can power peripherals, with a shared `500 mA` total limit across the two interfaces and hot-plug support.
-
-When wiring, connect the board TX to the peer RX, the board RX to the peer TX, and always share ground; do not reverse-feed 5V TTL, RS-232, or USB-UART adapter VCC. DEBUG_UART accepts only `1.8V` logic; UART1/UART7 use `3.3V` logic. The `3V3` pins of UART1/UART7 support input/output and can power peripherals, with a shared `500 mA` total limit across the two interfaces and hot-plug support; see [Hardware Connection and Safety](../getting-started/hardware-and-safety.md#uart) for board-top-view interface positions and the full power boundary.
+The V1 UART1/UART7 3.3V communication and hot-plug acceptance are historical and do not govern V2 wiring. V2 CN2/CN3 are 5-pin; actual pinout, voltage, device mapping, and power-pin limits are pending confirmation, and additional pins are not assumed to be flow control or PPS. `serial_port_demo` does not apply to DEBUG_UART. Wire with power off and first verify signal order and peer voltage; do not wire from V1 GH1.25-4P, `500 mA`, hot-plug, or top-view claims. See [Hardware Connection and Safety](../getting-started/hardware-and-safety.md#uart).
 
 ```bash
 cd /root/demo

@@ -27,10 +27,10 @@ RoboBaton_4P_ROS2_demo
 
 The public demo repositories already carry the public headers and matching precompiled runtime libraries required for building:
 
-- non-ROS: `include/`, `lib/libicm42688.so*`, `lib/libsc132.so*`, `lib/libprrtsp.so*`.
-- ROS2: `include/robobaton_4p_ros2_demo/`, `lib/libicm42688.so*`, `lib/libsc132.so*`; building also requires the target-side ROS2, `hb_media_codec.h`, `libmultimedia.so.1`, `libhbmem.so.1`, and `libalog.so.1` provided by the X5 cross-compilation package.
+- non-ROS: `include/`, `lib/libicm42670.so*`, `lib/libsc132.so*`, `lib/libprrtsp.so*`.
+- ROS2: `include/robobaton_4p_ros2_demo/`, `lib/libicm42670.so*`, `lib/libsc132.so*`; building also requires the target-side ROS2, `hb_media_codec.h`, `libmultimedia.so.1`, `libhbmem.so.1`, and `libalog.so.1` provided by the X5 cross-compilation package.
 
-These repositories do not compile the underlying ICM42688, SC132, or PRRTSP producer source. Without the X5 cross-compilation toolchain, you cannot recompile the source and can only use the `demo/` in the repository or a pre-generated install package for deployment.
+These repositories do not compile the underlying ICM42670, SC132, or PRRTSP producer source. Without the X5 cross-compilation toolchain, you cannot recompile the source and can only use the `demo/` in the repository or a pre-generated install package for deployment.
 
 ## 2. Prepare the Cross-Compilation Environment
 
@@ -185,7 +185,7 @@ CMAKE_BUILD_PARALLEL_LEVEL=4 script/build_x5_ros2.sh \
 
 `X5_CROSS_ROOT` identifies the bundled `cross_compile/new`; target ROS is in its `target_ros/humble`. The script uses this cross environment by default; an explicit `--toolchain-file` takes precedence over environment setup. No business overlay or private developer directory is needed. Use a new `--build-root` when switching bundles to avoid stale caches.
 
-The script explicitly passes the X5 CMake toolchain file and pins colcon artifacts to this package:
+The scripte toolchain file and pins colcon artifacts to this package:
 
 ```text
 1.ros2_build/
@@ -219,7 +219,7 @@ When deploying to the X5, do not stream a tar directly, and do not rely only on 
 
 | Symptom | Handling |
 |---|---|
-| `Missing ... libicm42688/libsc132/libprrtsp` | Confirm the public demo repository's `lib/` is complete; public demos only compile consumer examples and do not generate producer libraries from source. |
+| `Missing ... libicm42670/libsc132/libprrtsp` | Confirm the public demo repository's `lib/` is complete; public demos only compile consumer examples and do not generate producer libraries from source. |
 | `Missing consumer toolchain file` | Check whether `TOOLCHAIN_FILE` points at the real `aarch64_x5_host_toolchain.cmake`. |
 | `file build_x5/...` shows `x86-64` | Reconfigure CMake and ensure `-DCMAKE_TOOLCHAIN_FILE="$TOOLCHAIN_FILE"` is passed. |
 | After copying only a single executable under `build_x5/`, the device cannot find libraries | Use `scripts/package_runtime.sh` to generate the full `demo/` and deploy the complete `demo/` contents. |

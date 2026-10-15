@@ -47,7 +47,7 @@ cat VERSION
 ./sensor_demo --version
 ```
 
-`VERSION`, the program `--version`, and the actually loaded `libsc132`, `libprrtsp`, `libicm42688` product versions and ABI information must belong to the same package. Do not mix same-named dynamic libraries from system directories, old deployments, or other projects.
+`VERSION`, program `--version`, and loaded `libsc132`, `libprrtsp`, `libicm42670` product versions and ABI information must belong to the same V2 package. Do not mix same-named dynamic libraries from system directories, old deployments, or other projects.
 
 The `v1.3.0` release uses the same set of AArch64 ELFs, `runtime-provenance.json`, and `manifest.sha256`; in use, follow the actual `VERSION` inside the deployment package, not the version inferred from the document title.
 
@@ -58,10 +58,10 @@ The `v1.3.0` release uses the same set of AArch64 ELFs, `runtime-provenance.json
 The current stable path requires:
 
 - All four cameras connected;
-- ICM-42688 INT1 acquisition link available;
+- ICM-42670-P INT1 acquisition link available;
 - `cam-service` running normally;
 - No other `cam_demo` or `sensor_demo` occupying the cameras at the same time;
-- The default stable trigger mode is `software_gpio`.
+- The default stable trigger mode is `vin_lpwm`.
 
 Check:
 
@@ -157,7 +157,7 @@ cd ${DEMO_DIR}
 ./sensor_demo \
   --fps 30 \
   --codec h264 \
-  --sample-rate-hz 1000 \
+  --sample-rate-hz 800 \
   --print-rate-hz 0 \
   --record-mp4-dir /root/data/robobaton/run_30fps_mp4
 ```
@@ -185,7 +185,7 @@ rtsp:
   codec: h264
   url: /PRR
 imu:
-  sample_rate_hz: 1000
+  sample_rate_hz: 800
 
   print_rate_hz: 0
   print_metrics: false
@@ -277,7 +277,7 @@ DEMO_DIR=/root/demo  # change to the actual full runtime package directory
 cd ${DEMO_DIR}
 ./sensor_demo \
   --fps 30 \
-  --sample-rate-hz 1000 \
+  --sample-rate-hz 800 \
   --print-rate-hz 0 \
   --record-bag /root/data/robobaton/run_30fps.bag \
   --record-frame-skip 0
@@ -309,7 +309,7 @@ rtsp:
   codec: h264
   url: /PRR
 imu:
-  sample_rate_hz: 1000
+  sample_rate_hz: 800
 
   print_rate_hz: 0
   print_metrics: false

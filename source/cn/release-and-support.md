@@ -9,19 +9,21 @@
 - 文档版本采用“主版本.次版本.修订号”。末位修订号表示同一版本系列内的小 bug 修复、构建脚本调整或文档内容修正，不自动改变各软件版本号。
 - `4P_doc/VERSION` 是文档修订号的唯一来源；中英文 Sphinx 配置直接读取它。修订时同步两棵树的最新版本化 changelog 条目和本页版本信息。
 - 主仓、non-ROS、ROS2 的软件版本仍以各自 `VERSION`、ROS2 `package.xml`、包版本和 `--version` 输出为准。文档修订不得联动修改这些版本，也不要求文档版本与软件版本相等。
-- SO 的 SONAME/ABI 独立于文档修订号和软件版本，例如 `libicm42688.so.2` 中的 `2` 表示 ABI major。文档修订不代表 ABI 变更、软件重新发布或板端已更新。
+- SO 的 SONAME/ABI 独立于文档和软件版本，例如 `libicm42670.so.2` 中的 `2` 表示 ABI major；real SO `2.0.0` 与产品 `--version` 也是不同标识。文档修订不表示软件重新发布或板端已更新。
 
 ## 版本集合
 
 | 项目 | 当前版本 | 状态 |
 |---|---|---|
-| 文档修订 | `1.3.2` | 本站持续更新；修订内容见 [版本更新记录](changelog.md)，不表示软件版本升级。 |
-| non-ROS demo/运行包 | `v1.3.1` | 部署到`/root/demo`，按`manifest.sha256`整包校验。 |
-| ROS2 package/install | `v1.3.1` | 软件包部署到`/root/ros2_demo/install`，包名`robobaton_4p_ros2_demo`。目标板使用前应按 [ROS2 Demo 使用](usage/ros2-demo.md)、[non-ROS Demo 使用](usage/non-ros-demo.md) 和 [保存数据](usage/save-data-guide.md) 完成对应路径的实际检查；软件包发布不替代目标板运行检查。 |
+| 文档修订 | `2.0.0` | 本站持续更新；修订内容见 [版本更新记录](changelog.md)，不表示软件版本升级。 |
+| non-ROS demo/运行包 | `v2.0.0` | 部署到`/root/demo`，按`manifest.sha256`整包校验。 |
+| ROS2 package/install | `v2.0.0` | 软件包部署到`/root/ros2_demo/install`，包名`robobaton_4p_ros2_demo`。目标板使用前应按 [ROS2 Demo 使用](usage/ros2-demo.md)、[non-ROS Demo 使用](usage/non-ros-demo.md) 和 [保存数据](usage/save-data-guide.md) 完成对应路径的实际检查；软件包发布不替代目标板运行检查。 |
 
 功能新增、修复和兼容性变化见 [版本更新记录](changelog.md)。
 
 在线文档会根据用户反馈继续更新；当前没有单独固定的 `stable` 文档版本。文档修订号按上述政策识别，Read the Docs 的 `latest` 是部署标识，不是软件版本。软件正式发布不等同于跳过目标板运行检查。相机参数集合公开支持 `25/30/40/50/60fps`，默认 `30fps`；保存和 ROS2 路径应以实际结果、退出码、manifest 和目标板环境检查判定。
+
+当前使用指南按 V2 源码描述。软件版本沿用继承值不表示 V1 二进制兼容：ICM-42670-P 的新头文件、库、consumer 与配置必须成套迁移。ICM 原生 `25/50/100/200/400/800/1600Hz`，默认 `800Hz`，旧 `500/1000/2000Hz` 明确拒绝。历史 V1 下载 URL 和 changelog 不改写，不能用于宣称 V2 实板或整机验收。
 
 ## 已知限制
 
@@ -29,10 +31,10 @@
 - ROS2 不提供 RTSP；需要 RTSP 时使用 non-ROS `/root/demo`。
 - 相机应用独占 camera/VIO/编码资源；切换前先退出旧应用，并保持 `cam-service` 运行。
 - non-ROS相机、RTSP、ROS1 bag、H.264 MP4和ROS2图像节点公开支持`25/30/40/50/60fps`，默认`30fps`；`--rotate 180` 仍只支持 `30fps`。
-- `software_gpio` 是 V1 唯一稳定 trigger；`none` 仅用于显式 free-run 诊断。
+- `vin_lpwm` 是 V2.0.0 默认 trigger（VIN 硬件触发）；`none` 仅用于显式 free-run 诊断；`software_gpio` 已关闭公开入口，仅保留为主仓内部调试路径。
 - CameraInfo 只有宽高，IMU orientation 不可用。
 - H.265 或四路高帧率播放依赖客户端解码和渲染能力。
-- DEBUG_UART 是 `1.8V` 系统控制台/调试口；普通模式下 UART1/UART7 使用 `3.3V` TX/RX/GND 并共地，硬件通信已通过 V1 验收。UART1/UART7 的 `3V3` 脚支持输入/输出并可为外设供电，两个接口共享合计 `500 mA` 限制并支持热插拔；`serial_port_demo` 只适用于普通 UART 模式。PPS 模式另占用 UART7 RX 为 `/dev/pps2`，并释放 UART7 TX 为 GPIO/IO，详见 [PPS 同步](time-sync/pps-sync.md)。
+- V2 UART pinout、电平、供电/热插拔边界、PPS 复用和物理映射待确认，不沿用 V1 `500 mA` 或历史硬件验收；详见[硬件连接与安全](getting-started/hardware-and-safety.md)。IMU FSYNC 输入共享相机触发网，不提供相机/IMU 硬件对齐。
 
 ## 授权与支持
 

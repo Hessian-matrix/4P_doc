@@ -38,7 +38,7 @@ For the full upload, interactive configuration, and log paths see [Wi-Fi Configu
 |---|---|
 | Symptom | `error while loading shared libraries`, or `.so` missing when running a `bin/` program. |
 | Check | `ls -l /root/demo/lib`; run from the `/root/demo` top-level launcher script; run `. ./env.sh` before directly running `bin/`. |
-| Normal result | `libsc132.so*`, `libicm42688.so*`, `libprrtsp.so*` exist and load preferentially from `/root/demo/lib`. |
+| Normal result | `libsc132.so*`, `libicm42670.so*`, and `libprrtsp.so*` exist and load preferentially from `/root/demo/lib`; ICM SONAME is `libicm42670.so.2`. |
 | Common causes | Only a single ELF copied, `lib/` omitted, `env.sh` not loaded, or same-named `.so` mixed from other projects. |
 | Recovery / info to collect | Re-deploy the full package and provide `ls -l /root/demo /root/demo/lib` and the full error text. |
 
@@ -58,7 +58,7 @@ For the full upload, interactive configuration, and log paths see [Wi-Fi Configu
 |---|---|
 | Symptom | `ros2 launch` cannot find the package, node startup reports a missing `.so`, or the environment is wrong after relocating the install. |
 | Check | Using Bash: `source /root/ros2_demo/install/robobaton_ros2_env.bash`; confirm `ls /root/ros2_demo/install/lib/robobaton_4p_ros2_demo`. |
-| Normal result | `robobaton_ros2_env.bash`, `robobaton_sensors_node`, `robobaton_imu_rate_monitor`, `abi_manifest.sha256`, the NV12 compressed plugin, `libicm42688.so*`, and `libsc132.so*` are found. |
+| Normal result | `robobaton_ros2_env.bash`, `robobaton_sensors_node`, `robobaton_imu_rate_monitor`, `abi_manifest.sha256`, the NV12 compressed plugin, `libicm42670.so*`, and `libsc132.so*` are found. |
 | Common causes | Only a single ELF uploaded, the full install not uploaded, the ROS2 underlay path is not the default `/opt/ros/humble/setup.bash`, or a relocated POSIX `setup.sh` was used without setting `COLCON_CURRENT_PREFIX`. |
 | Recovery / info to collect | Re-deploy the full `/root/ros2_demo/install`; for a non-default underlay use `ROBOBATON_ROS_UNDERLAY=/path/to/setup.bash`; when `sh` is required, use `COLCON_CURRENT_PREFIX=/root/ros2_demo/install . /root/ros2_demo/install/setup.sh`. |
 
@@ -97,11 +97,11 @@ For the full upload, interactive configuration, and log paths see [Wi-Fi Configu
 
 | Item | Content |
 |---|---|
-| Symptom | The statistics frequency of `/robobaton/imu/data` clearly deviates from the configured `25/50/100/200/500/1000/2000Hz` target. |
+| Symptom | The statistics frequency of `/robobaton/imu/data` clearly deviates from the configured native `25/50/100/200/400/800/1600Hz` target (default `800Hz`). |
 | Check | Use `ros2 run robobaton_4p_ros2_demo robobaton_imu_rate_monitor` and view the consecutive statistics windows after startup. |
 | Normal result | The C++ monitor outputs `ROB2_IMU_RATE topic=/robobaton/imu/data hz=...` every second, with the stable value close to the configured target. |
 | Common causes | YAML not applied, DDS receive-link sample loss, process resource contention, or still observing the first incomplete statistics window. |
-| Recovery / info to collect | Confirm `imu.sample_rate_hz` is one of `25/50/100/200/500/1000/2000`; collect node parameters, consecutive monitor output, and process logs. |
+| Recovery / info to collect | Confirm `imu.sample_rate_hz` is one of `25/50/100/200/400/800/1600`; old `500/1000/2000` values are rejected. Collect node parameters, consecutive monitor output, and process logs. |
 
 ## ROS2 Topic Has No Data or Resource Conflict
 
@@ -128,7 +128,7 @@ For the full upload, interactive configuration, and log paths see [Wi-Fi Configu
 | Item | Content |
 |---|---|
 | Symptom | Only a certain camera ID has no image or a single-sensor diagnostic fails. |
-| Check | `./cam_demo --camera-id <0|1|2|3> --diagnostics`; pull the corresponding RTSP port from the host. Physical silkscreen mapping is CAM1 -> cam0, CAM2 -> cam1, CAM3 -> cam2, CAM4 -> cam3. |
+| Check | `./cam_demo --camera-id <0|1|2|3> --diagnostics`; pull the corresponding RTSP port from the host. V2 physical connector-to-software mapping awaits board confirmation; do not inherit V1 silkscreen mapping. |
 | Normal result | The corresponding camera ID starts alone and streams on the matching port among `554/555/556/557`. |
 | Common causes | The corresponding FPC, power, I2C, or MIPI/VIN link is abnormal. |
 | Recovery / info to collect | Record the failed camera ID, port, and demo log. |
@@ -168,7 +168,7 @@ For the full upload, interactive configuration, and log paths see [Wi-Fi Configu
 | Item | Content |
 |---|---|
 | Symptom | `imu_reader_demo` has no output, fails to start, or reports nonzero timestamp duplicate/regression. |
-| Check | `ls -l /dev/spidev2.0`; `./imu_reader_demo --sample-rate-hz 1000 --print-metrics`. |
+| Check | `ls -l /dev/spidev2.0`; `./imu_reader_demo --sample-rate-hz 800 --print-metrics`; INT1 is `34120000.gpio` offset `8`, not old GPIO395. |
 | Normal result | Samples output continuously; `timestamp_duplicates=0`, `timestamp_regressions=0`. |
 | Common causes | SPI device missing, IMU power/soldering/device-tree abnormal, or sample-rate parameter not in the supported list. |
 | Recovery / info to collect | Collect the startup log, `SENSOR_IMU_RESULT` or demo exit summary, and `/dev/spidev2.0` state. |
@@ -178,10 +178,10 @@ For the full upload, interactive configuration, and log paths see [Wi-Fi Configu
 | Item | Content |
 |---|---|
 | Symptom | `serial_port_demo` sends or receives no data. |
-| Check | `ls -l /dev/ttyS1 /dev/ttyS7`; verify interfaces only for UART1/UART7 per the formal harness/product pinout. Board TX to peer RX, board RX to peer TX, always common ground; both sides of UART1/UART7 TX/RX must be `3.3V` logic, and DEBUG_UART is not part of this demo path. |
+| Check | `ls -l /dev/ttyS1 /dev/ttyS7`; V2 CN2/CN3 5-pin physical pinout, tty mapping, and voltage are pending confirmation. Verify the formal harness and peer voltage before power-off wiring; do not use V1 `3.3V` or DEBUG_UART notes as a V2 pinout. |
 | Software-example expectation | Device nodes exist and both sides agree on 8N1/raw/no-flow-control; `serial_port_demo` applies only to UART1/UART7, not DEBUG_UART. |
 | Common causes | Wrong port, mismatched baud rate, TX/RX not crossed or miswired, or the peer not sending. |
-| Recovery / info to collect | Collect port, baud, mode, the `3.3V` peer, and wiring direction; UART1/UART7 3.3V hardware communication passed V1 acceptance, `serial_port_demo` is a public user example and does not apply to DEBUG_UART. Do not connect `3.3V` or `5V` logic to DEBUG_UART; DEBUG_UART uses only a `1.8V` USB-UART adapter. |
+| Recovery / info to collect | Collect the node, baud, mode, and confirmed wiring direction; V1 UART hardware acceptance is not V2 acceptance. `serial_port_demo` applies to normal user UARTs, not DEBUG_UART. |
 
 ## Resources Not Released After Exit
 

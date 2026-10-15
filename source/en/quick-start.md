@@ -20,7 +20,7 @@ cd /root/demo
 ./sensor_demo
 ```
 
-`sensor_demo` runs four SC132 cameras, PRRTSP v2 H.264 RTSP streaming, and ICM-42688 IMU acquisition by default. The default image is `1280x1088@30fps`, supporting `25/30/40/50/60fps`; the output canvas supports `1280x1088`/`640x480`/`720x480`/`1280x720`. Other frame-rate values are rejected before the camera starts.
+`sensor_demo` runs four SC132 cameras, PRRTSP v2 H.264 RTSP streaming, and ICM-42670-P IMU acquisition (native default `800Hz`). The default image is `1280x1088@30fps`, supporting `25/30/40/50/60fps`; the output canvas supports `1280x1088`/`640x480`/`720x480`/`1280x720`. V2 on-board acceptance is still pending.
 
 Four-channel RTSP URLs:
 
@@ -31,7 +31,7 @@ CAM3 / cam2 -> rtsp://192.168.1.12:556/PRR
 CAM4 / cam3 -> rtsp://192.168.1.12:557/PRR
 ```
 
-CAM1/CAM2/CAM3/CAM4 are the physical silkscreen labels, and cam0/cam1/cam2/cam3 are the software camera IDs.
+CAM1/CAM2/CAM3/CAM4 are V1 image silkscreen labels; cam0/cam1/cam2/cam3 are software IDs, and V2 physical connector mapping remains unverified. The displayed IP is a V1 factory-default example; replace it with the verified actual address for V2.
 
 On Windows you can use EasyPlayer to view the four RTSP streams.
 

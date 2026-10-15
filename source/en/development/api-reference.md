@@ -8,7 +8,7 @@ The product release version follows SemVer and is independent of the SO SONAME/A
 
 ```c
 const char *camera_version = sc132_get_version();
-const char *imu_version = icm42688_get_version();
+const char *imu_version = icm42670_get_version();
 const char *rtsp_version = prrtsp_get_version();
 ```
 
@@ -16,7 +16,7 @@ Delivered executables also support `--version`. The non-ROS `cam_demo`/`sensor_d
 
 ## `libsc132.so`
 
-Header: `include/sc132camera.h`. ABI: `SC132_ABI_VERSION_MAJOR=2`, `SC132_ABI_VERSION_MINOR=0`; the real SO is `libsc132.so.2.0.1`, SONAME still `libsc132.so.2`.
+Header: `include/sc132camera.h`. ABI: `SC132_ABI_VERSION_MAJOR=2`, `SC132_ABI_VERSION_MINOR=0`; the real SO is `libsc132.so.2.0.0`, SONAME still `libsc132.so.2`.
 
 Status codes:
 
@@ -94,37 +94,37 @@ int run_camera(void) {
 }
 ```
 
-## `libicm42688.so`
+## `libicm42670.so`
 
-Header: `include/icm42688_driver.h`. ABI: `ICM42688_ABI_VERSION_MAJOR=2`, `ICM42688_ABI_VERSION_MINOR=1`; the real SO is `libicm42688.so.2.1.0`, SONAME still `libicm42688.so.2`.
+non-ROS header: `include/icm42670_driver.h`; ROS2: `include/robobaton_4p_ros2_demo/icm42670_driver.h`; producer: `include/icm42670_x5/icm42670_driver.h`. ABI: `ICM42670_ABI_VERSION_MAJOR=2`, `ICM42670_ABI_VERSION_MINOR=0`; real SO `libicm42670.so.2.0.0`, SONAME `libicm42670.so.2`, and all nine C functions use node `ICM42670_X5_2.0`. This is incompatible with the V1 ICM-42688 library; migrate callers, headers, SOs, and configuration together.
 
 Status codes:
 
 | Status code | Meaning |
 |---|---|
-| `ICM42688_STATUS_OK` | Success |
-| `ICM42688_STATUS_INVALID_ARGUMENT` | Invalid argument |
-| `ICM42688_STATUS_INVALID_STATE` | Invalid lifecycle state |
-| `ICM42688_STATUS_IO_ERROR` | I/O error |
-| `ICM42688_STATUS_INTERNAL_ERROR` | Internal error |
+| `ICM42670_STATUS_OK` | Success |
+| `ICM42670_STATUS_INVALID_ARGUMENT` | Invalid argument |
+| `ICM42670_STATUS_INVALID_STATE` | Invalid lifecycle state |
+| `ICM42670_STATUS_IO_ERROR` | I/O error |
+| `ICM42670_STATUS_INTERNAL_ERROR` | Internal error |
 
 Core structures and constraints:
 
-- `icm42688_config_t` defaults to `sample_rate_hz=1000`, `fifo_watermark_samples=1`, `read_mode=ICM42688_READ_MODE_SENSOR_TIMESTAMP_FIFO`.
-- `sample_rate_hz` accepts only `25/50/100/200/500/1000/2000`; currently only the sensor timestamp FIFO read mode is accepted.
+- `icm42670_config_t` defaults to `sample_rate_hz=800`, `fifo_watermark_samples=1`, `read_mode=ICM42670_READ_MODE_SENSOR_TIMESTAMP_FIFO`.
+- `sample_rate_hz` accepts only native `25/50/100/200/400/800/1600`; old `500/1000/2000Hz` and other invalid values are explicitly rejected, not silently resampled. Only sensor timestamp FIFO read mode is accepted.
 - The callback is invoked serially by the acquisition thread; `sample` is a borrowed reference.
 - `stop/destroy` wait for the acquisition thread and must not be called from the callback.
-- `user_data` must remain valid until `icm42688_stop()` returns.
-- `icm42688_get_runtime_health()` reads only after the most recent start generation has successfully stopped; before a successful stop, do not treat the output structure as a valid snapshot.
-- `icm42688_is_running()` returns whether the current handle is in the running state and can be used for state queries; it does not replace the `icm42688_stop()`/`destroy()` lifecycle order.
-- `icm42688_status_message(status)` maps a status code to a process-static read-only string; the returned pointer must not be modified or freed.
+- `user_data` must remain valid until `icm42670_stop()` returns.
+- `icm42670_get_runtime_health()` reads only after the most recent start generation has successfully stopped; before a successful stop, do not treat the output structure as a valid snapshot.
+- `icm42670_is_running()` returns whether the current handle is in the running state and can be used for state queries; it does not replace the `icm42670_stop()`/`destroy()` lifecycle order.
+- `icm42670_status_message(status)` maps a status code to a process-static read-only string; the returned pointer must not be modified or freed.
 
-`icm42688_runtime_health_t` is initialized with `ICM42688_RUNTIME_HEALTH_INIT`. Field meanings: `session_generation` (the most recent start generation), `published_samples` (samples published by the producer), `gpio_event_gap_count` (GPIO edge gaps), `fifo_overflow_count` (FIFO overflows), `mapper_failure_count` (time-mapping failures), `uncertainty_over_200_drop_count` (samples dropped because uncertainty exceeded 200 us), and `max_consecutive_timing_drop_count` (maximum consecutive timing drops). When the call returns a non-`ICM42688_STATUS_OK` value, do not read the output structure as a valid snapshot.
+`icm42670_runtime_health_t` is initialized with `ICM42670_RUNTIME_HEALTH_INIT`. Field meanings: `session_generation` (the most recent start generation), `published_samples` (samples published by the producer), `gpio_event_gap_count` (GPIO edge gaps), `fifo_overflow_count` (FIFO overflows), `mapper_failure_count` (time-mapping failures), `uncertainty_over_200_drop_count` (samples dropped because uncertainty exceeded 200 us), and `max_consecutive_timing_drop_count` (maximum consecutive timing drops). When the call returns a non-`ICM42670_STATUS_OK` value, do not read the output structure as a valid snapshot.
 
 ```c
-icm42688_runtime_health_t health = ICM42688_RUNTIME_HEALTH_INIT;
-int health_ret = icm42688_get_runtime_health(handle, &health);
-if (health_ret != ICM42688_STATUS_OK) {
+icm42670_runtime_health_t health = ICM42670_RUNTIME_HEALTH_INIT;
+int health_ret = icm42670_get_runtime_health(handle, &health);
+if (health_ret != ICM42670_STATUS_OK) {
   /* The snapshot is valid only after the most recent start succeeded and the stop completed. */
   return health_ret;
 }
@@ -133,9 +133,9 @@ if (health_ret != ICM42688_STATUS_OK) {
 Minimal skeleton:
 
 ```c
-#include "icm42688_driver.h"
+#include "icm42670_driver.h"
 
-static void on_imu_sample(const icm42688_sample_t *sample, void *user_data) {
+static void on_imu_sample(const icm42670_sample_t *sample, void *user_data) {
   (void)user_data;
   /* sample_timestamp_ns/host_timestamp_ns are in the underlying time domain; the demo maps them separately before printing. */
   (void)sample->sample_timestamp_ns;
@@ -143,30 +143,30 @@ static void on_imu_sample(const icm42688_sample_t *sample, void *user_data) {
 }
 
 int run_imu(void) {
-  icm42688_config_t config = ICM42688_CONFIG_INIT;
-  config.sample_rate_hz = 1000;
+  icm42670_config_t config = ICM42670_CONFIG_INIT;
+  config.sample_rate_hz = 800;
   config.fifo_watermark_samples = 1;
 
-  icm42688_handle_t *handle = 0;
-  int ret = icm42688_create(&config, &handle);
-  if (ret != ICM42688_STATUS_OK) {
+  icm42670_handle_t *handle = 0;
+  int ret = icm42670_create(&config, &handle);
+  if (ret != ICM42670_STATUS_OK) {
     return ret;
   }
-  ret = icm42688_set_callback(handle, on_imu_sample, 0);
-  if (ret != ICM42688_STATUS_OK) {
-    icm42688_destroy(handle);
+  ret = icm42670_set_callback(handle, on_imu_sample, 0);
+  if (ret != ICM42670_STATUS_OK) {
+    icm42670_destroy(handle);
     return ret;
   }
-  ret = icm42688_start(handle);
-  if (ret != ICM42688_STATUS_OK) {
-    icm42688_destroy(handle);
+  ret = icm42670_start(handle);
+  if (ret != ICM42670_STATUS_OK) {
+    icm42670_destroy(handle);
     return ret;
   }
 
   /* The application main loop runs here. */
 
-  icm42688_stop(handle);
-  icm42688_destroy(handle);
+  icm42670_stop(handle);
+  icm42670_destroy(handle);
   return 0;
 }
 ```
@@ -250,4 +250,4 @@ int open_rtsp(prrtsp_stream_t **stream) {
 
 ## Whole-Package Deployment Requirement
 
-`libsc132.so`, `libicm42688.so`, `libprrtsp.so`, the public headers, and the demo programs must come from the same public delivery package. Do not replace the current `.so` alone into unmigrated programs; the ROS2 install path uses the public headers, runtime libraries, and manifest carried by `RoboBaton_4P_ROS2_demo` itself, and must not be mixed with the non-ROS `/root/demo` runtime package.
+`libsc132.so`, `libicm42670.so`, `libprrtsp.so`, the public headers, and the demo programs must come from the same public delivery package. Do not replace the current `.so` alone into unmigrated programs; the ROS2 install path uses the public headers, runtime libraries, and manifest carried by `RoboBaton_4P_ROS2_demo` itself, and must not be mixed with the non-ROS `/root/demo` runtime package.

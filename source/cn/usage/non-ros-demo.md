@@ -1,6 +1,6 @@
 # non-ROS Demo 使用
 
-[`RoboBaton_4p_demo`](https://github.com/Hessian-matrix/RoboBaton_4p_demo) 是面向用户的最小 non-ROS 公开交付仓库，提供四目 SC132 RTSP、四路拼接 RTSP、ICM-42688 IMU 和 UART 示例。
+[`RoboBaton_4p_demo`](https://github.com/Hessian-matrix/RoboBaton_4p_demo) 是面向用户的 V2 non-ROS 公开源码仓库，提供四目 SC132 RTSP、四路拼接 RTSP、ICM-42670-P IMU 和 UART 示例。旧 V1 下载包的硬件/API 不适用于 V2。
 
 ## 1. 目录和运行包
 
@@ -34,7 +34,7 @@
 
 - 四路 SC132 相机；
 - PRRTSP v2 H.264/H.265 RTSP 推流；
-- ICM-42688 GPIO395 DRDY + sensor timestamp FIFO IMU 采集线程。
+- ICM-42670-P INT1（`34120000.gpio` offset `8`）+ sensor timestamp FIFO IMU 采集线程。
 
 ```bash
 cd /root/demo
@@ -44,7 +44,7 @@ cd /root/demo
 常用覆盖：
 
 ```bash
-./sensor_demo --sample-rate-hz 2000
+./sensor_demo --sample-rate-hz 1600
 ./sensor_demo --print-rate-hz 50 --print-metrics
 ./sensor_demo --diagnostics
 ```
@@ -74,7 +74,7 @@ rtsp:
   codec: h264
   url: /PRR
 imu:
-  sample_rate_hz: 1000
+  sample_rate_hz: 800
   print_rate_hz: 10
   print_metrics: false
 save_data:
@@ -90,7 +90,7 @@ save_data:
 - 完整四目路径固定为四路；单颗 sensor 诊断使用 `cam_demo --camera-id`。
 - non-ROS公开帧率集合为25/30/40/50/60fps；默认`30`，其他值在启动相机前拒绝。
 - `rtsp.codec` 支持 `h264` 和 `h265`。
-- IMU采样率支持`25/50/100/200/500/1000/2000Hz`，默认`1000Hz`。
+- IMU 原生采样率支持 `25/50/100/200/400/800/1600Hz`，默认 `800Hz`；旧 `500/1000/2000Hz` 明确拒绝，不会重采样。
 - `save_data.format` 默认是 `mp4`，同时支持 `rosbag`；保存路径必须是绝对路径。
 
 (non-ros-save)=
@@ -124,7 +124,7 @@ python3 scripts/rosbag_extract.py /root/save_demo/record.bag /data/record_datase
 python3 scripts/mp4_extract.py /root/save_demo/mp4_session /data/mp4_dataset
 ```
 
-| `imu.sample_rate_hz` | `1000` | `25/50/100/200/500/1000/2000`。 |
+| `imu.sample_rate_hz` | `800` | `25/50/100/200/400/800/1600`；旧档位拒绝。 |
 
 ## 5. 单独运行相机 RTSP
 
@@ -144,7 +144,7 @@ pgrep -a cam-service
 --rotate <0|90|180|270>
 --bps <kbps>
 --url <path>
---trigger-mode <software_gpio|none>
+--trigger-mode <vin_lpwm|none>
 --diagnostics
 --max-skew-ns <ns>
 --frame-timeout-ms <ms>
@@ -154,8 +154,8 @@ Trigger 模式状态：
 
 | 模式 | 当前状态 |
 |---|---|
-| `software_gpio` | 默认且唯一已验证的稳定模式。 |
-| `none` | 实验性，不属于 V1 稳定配置。 |
+| `vin_lpwm` | 默认，VIN 硬件触发。 |
+| `none` | 显式 free-run 诊断。 |
 
 限制：`--width/--height` 接受 `1280x1088`（默认）、`640x480`、`720x480`、`1280x720`，两种轴向写法均合法，其余组合拒绝；缩放由 `libsc132` VSE 硬件整幅拉伸完成，不改变 FOV。`--rotate 180`只支持`30fps`，不支持`25fps`、`40fps`、`50fps`和`60fps`。对外 NV12/RTSP 画布在旋转 `0/180` 时宽高不变（如 `1280x1088`、`640x480`），旋转 `90/270` 时宽高交换（如 `1088x1280`、`480x640`）。相机、RTSP、ROS1 bag和H.264 MP4使用同一`25/30/40/50/60fps`公开帧率集合。
 
@@ -227,7 +227,7 @@ retain_release_balance=... copy_duration_avg_ms=... send_duration_avg_ms=...
 ```bash
 cd /root/demo
 ./imu_reader_demo
-./imu_reader_demo --sample-rate-hz 2000 --count 10000
+./imu_reader_demo --sample-rate-hz 1600 --count 10000
 ```
 
 默认按 `10Hz` 打印抽样记录；程序仍消费全部 IMU 样本。需要看指标时使用：
@@ -243,16 +243,14 @@ cd /root/demo
 - `gyro_rps`：角速度，单位 `rad/s`。
 - `uncertainty_us`、`gpio_gap_count`、`fifo_overflow_count`、`mapper_failure_count`：时间戳映射和采集链路诊断。
 
-`accel_mps2` 按 `[X, Y, Z]` 顺序输出，符号以[硬件连接与安全](../getting-started/hardware-and-safety.md#uart)中的板卡顶视图为参考：设备静止且水平放置时约为 `[0, 0, -9.8] m/s^2`；向图片左侧加速时 X 为负；向图片顶部/产品前方加速时 Y 为负。该参考只用于 IMU 读数理解，不定义 IMU 与相机、base、optical frame 或其他坐标系之间的变换。
+V2 `accel_mps2` 按 `[X, Y, Z]` 输出；PCB 安装方向和符号尚待实板六面/旋转验证，不以 V1 顶视图推断正负轴或相机坐标变换。
 
-IMU 路径使用 GPIO395 DRDY + sensor timestamp FIFO，不使用 GPIO397、FSYNC 或 `icm42688_pulse_fsync()`。
+IMU INT1 使用 `34120000.gpio` offset `8`，FIFO TMST 为逐样本时间；相机触发由 producer 独占 `34130000.gpio` offset `0`。V2 IMU FSYNC 输入虽与相机触发共网，当前不提供样本/曝光对齐。
 
 ## 8. 串口 Demo
 
 
-UART1/UART7 普通 3.3V 硬件通信已通过 V1 验收；`serial_port_demo` 是普通 UART 模式下的公开用户示例，不适用于 DEBUG_UART。PPS 模式下 UART7 RX 切换为 `/dev/pps2`，UART7 TX 释放为 GPIO/IO；该模式下不要运行 `serial_port_demo`。DEBUG_UART 为 `1.8V`；UART1 是 `/dev/ttyS1`、UART7 是 `/dev/ttyS7`，两者均为 `3.3V` 用户 UART，接口为 GH1.25-4P。UART1/UART7 的 `3V3` 脚支持输入/输出并可为外设供电，两个接口共享合计 `500 mA` 限制并支持热插拔。
-
-接线时板端 TX 接对端 RX，板端 RX 接对端 TX，并始终共地；禁止 5V TTL、RS-232 和 USB-UART 适配器 VCC 反灌。DEBUG_UART 只能接 `1.8V` 逻辑；UART1/UART7 使用 `3.3V` 逻辑。UART1/UART7 的 `3V3` 脚支持输入/输出并可为外设供电，两个接口共享合计 `500 mA` 限制并支持热插拔；板卡顶视图接口位置和完整供电边界见[硬件连接与安全](../getting-started/hardware-and-safety.md#uart)。
+V1 UART1/UART7 的 3.3V 通信和热插拔属于历史验收，不适用于 V2 接线。V2 CN2/CN3 为 5P，实际 pinout、电平、设备节点和供电脚限值待确认；额外脚不默认为流控或 PPS。`serial_port_demo` 不适用于 DEBUG_UART。断电接线、先核实线序和对端电平，不要依据 V1 的 GH1.25-4P、`500 mA`、热插拔或顶视图接线；见[硬件连接与安全](../getting-started/hardware-and-safety.md#uart)。
 
 ```bash
 cd /root/demo

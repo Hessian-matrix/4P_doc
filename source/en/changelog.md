@@ -2,6 +2,23 @@
 
 This file records user-visible updates in the RoboBaton 4P public delivery, following the shared [Documentation Version Policy](release-and-support.md#documentation-version-policy). Documentation revisions on this page do not automatically change software versions and are distinct from SO SONAME/ABI versions.
 
+## 2.0.0 - 2026-10-15
+
+V2.0.0 release: software and documentation versions unified to 2.0.0, with default trigger mode switched to LPWM.
+
+- Camera/ROS2 default trigger mode changes from `software_gpio` to `vin_lpwm` (VIN hardware trigger).
+- Closes the `software_gpio` public entry: non-ROS `--trigger-mode` and ROS2 `camera.trigger_mode` accept only `vin_lpwm` or `none`.
+- `software_gpio` remains a main-repo internal debug path, driven by presetting `SC132_TRIGGER_MODE` in the process environment; it is not publicly exposed.
+
+## 1.3.3 - 2026-10-11
+
+This bilingual documentation revision covers the V2 hardware migration; software VERSION files are unchanged, and this does not declare full V2 feature or system acceptance.
+
+- Current IMU guides, APIs, and examples move to ICM-42670-P, `icm42670_*`, and `icm42670_driver.h`; real SO `libicm42670.so.2.0.0`, SONAME `libicm42670.so.2`, node `ICM42670_X5_2.0`.
+- Native ODRs are `25/50/100/200/400/800/1600Hz`, default `800Hz`; old `500/1000/2000Hz` rates are explicitly rejected and require deliberate configuration migration.
+- Camera producer resolves trigger controller `34130000.gpio` offset `0`; INT1 uses `34120000.gpio` offset `8`. Sharing the camera trigger net at IMU FSYNC does not establish camera/IMU hardware alignment.
+- Time fields follow the new public header; V2 pinout, electrical limits, physical mapping, IMU direction, and photographs remain pending confirmation. Historical V1 download URLs, artifact identities, and changelog entries below are retained unchanged, not as V2 compatibility or acceptance claims.
+
 ## 1.3.2 - 2026-10-10
 
 This update revises build scripts and documentation within the 1.3 series. All software version numbers remain unchanged.

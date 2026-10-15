@@ -1,10 +1,12 @@
 # 产品版本与兼容性
 
-本页说明 RoboBaton 4P 第一版文档、non-ROS demo、ROS2 demo 和 X5 运行环境之间的匹配关系。技术事实以公开仓、公开头文件、默认配置、`VERSION` 和运行包 manifest 为准。
+本页说明 RoboBaton 4P V2 当前源码、non-ROS/ROS2 demo 与运行环境的匹配关系；历史 V1 下载包不自动兼容 V2。技术事实以公开头文件、配置、VERSION 和运行包 manifest 为准。
 
 ## 文档与软件版本
 
 当前文档修订号、软件发布版本和统一版本定义见 [发布、授权与支持](../release-and-support.md#文档版本政策)。文档修订不要求软件版本同步递增。
+
+V2 IMU 为 ICM-42670-P，API `icm42670_*`，real SO `libicm42670.so.2.0.0`、SONAME `libicm42670.so.2`、节点 `ICM42670_X5_2.0`。不兼容 V1 ICM 库；头文件、库、consumer 和配置必须成套更新。原生 ODR `25/50/100/200/400/800/1600Hz`，默认 `800Hz`；旧 `500/1000/2000Hz` 明确拒绝，不静默重采样。
 
 | 交付物 | 用户入口 |
 |---|---|
@@ -30,13 +32,13 @@
 | ROS2 | Humble underlay；通过 `robobaton_ros2_env.bash` 加载环境。 |
 | 交叉编译 | 只在开发机使用 X5 交叉编译包；不建议在 X5 板端原生编译。 |
 | non-ROS相机配置 | 默认`1280x1088@30fps`；支持`25/30/40/50/60fps`；输出画布 `1280x1088`/`640x480`/`720x480`/`1280x720`。 |
-| Trigger | `software_gpio` 是 V1 唯一稳定 trigger；`none` 仅用于显式 free-run 诊断。 |
+| Trigger | `vin_lpwm` 是 V2.0.0 默认 trigger（VIN 硬件触发）；`none` 仅用于显式 free-run 诊断；`software_gpio` 仅主仓内部调试。 |
 
 ROS2 路径不提供 RTSP；需要 RTSP 时使用 non-ROS 路径。当前不提供TF、外参、相机内参或畸变标定；CameraInfo 只有宽高，IMU orientation 不可用。
 
 ## 出厂系统镜像与目标板兼容性
 
-板端软件 `v1.3.0` 提供配套的出厂系统镜像和烧录工具。镜像只适用于原产品原板，不保证其他目标板的兼容性；镜像获取与烧录步骤见 [系统烧录](../ops/system-flashing.md)。
+板端软件 `v1.3.0` 的历史出厂镜像与烧录工具只适用于其 V1 原产品原板，不能写入 V2；URL 和工件不可原地改写。V2 匹配 BSP/系统镜像和恢复通道的公开资料待确认，见[系统烧录](../ops/system-flashing.md)。
 
 ## 版本查询与整包匹配
 

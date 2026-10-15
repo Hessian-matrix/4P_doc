@@ -38,7 +38,7 @@
 |---|---|
 | 现象 | `error while loading shared libraries` 或运行到 `bin/` 程序时报 `.so` 缺失。 |
 | 检查 | `ls -l /root/demo/lib`；从 `/root/demo` 顶层启动脚本运行；直接运行 `bin/` 前执行 `. ./env.sh`。 |
-| 正常结果 | `libsc132.so*`、`libicm42688.so*`、`libprrtsp.so*` 存在，且优先从 `/root/demo/lib` 加载。 |
+| 正常结果 | `libsc132.so*`、`libicm42670.so*`、`libprrtsp.so*` 存在，且优先从 `/root/demo/lib` 加载；ICM SONAME 为 `libicm42670.so.2`。 |
 | 常见原因 | 只复制单个 ELF、漏复制 `lib/`、未加载 `env.sh`、混用了其他工程的同名 `.so`。 |
 | 恢复/需收集信息 | 重新整包部署并提供 `ls -l /root/demo /root/demo/lib` 和完整错误文本。 |
 
@@ -58,7 +58,7 @@
 |---|---|
 | 现象 | `ros2 launch` 找不到包、节点启动时报 `.so` 缺失，或搬迁 install 后环境不正确。 |
 | 检查 | 使用 Bash：`source /root/ros2_demo/install/robobaton_ros2_env.bash`；确认 `ls /root/ros2_demo/install/lib/robobaton_4p_ros2_demo`。 |
-| 正常结果 | 能找到 `robobaton_ros2_env.bash`、`robobaton_sensors_node`、`robobaton_imu_rate_monitor`、`abi_manifest.sha256`、NV12 compressed 插件、`libicm42688.so*` 和 `libsc132.so*`。 |
+| 正常结果 | 能找到 `robobaton_ros2_env.bash`、`robobaton_sensors_node`、`robobaton_imu_rate_monitor`、`abi_manifest.sha256`、NV12 compressed 插件、`libicm42670.so*` 和 `libsc132.so*`。 |
 | 常见原因 | 只上传了单个 ELF、没有上传完整 install、ROS2 underlay 路径不是默认 `/opt/ros/humble/setup.bash`、使用搬迁后的 POSIX `setup.sh` 但未设置 `COLCON_CURRENT_PREFIX`。 |
 | 恢复/需收集信息 | 重新部署完整 `/root/ros2_demo/install`；非默认 underlay 用 `ROBOBATON_ROS_UNDERLAY=/path/to/setup.bash` 覆盖；确需 `sh` 时用 `COLCON_CURRENT_PREFIX=/root/ros2_demo/install . /root/ros2_demo/install/setup.sh`。 |
 
@@ -97,11 +97,11 @@
 
 | 项目 | 内容 |
 |---|---|
-| 现象 | `/robobaton/imu/data`的统计频率明显偏离配置的`25/50/100/200/500/1000/2000Hz`目标。 |
+| 现象 | `/robobaton/imu/data` 的统计频率明显偏离配置的原生 `25/50/100/200/400/800/1600Hz` 目标（默认 `800Hz`）。 |
 | 检查 | 使用`ros2 run robobaton_4p_ros2_demo robobaton_imu_rate_monitor`并查看启动后的连续统计窗口。 |
 | 正常结果 | C++ monitor每秒输出`ROB2_IMU_RATE topic=/robobaton/imu/data hz=...`，稳定值接近配置目标。 |
 | 常见原因 | YAML未生效、DDS接收链路丢样、进程资源争用或仍在观察首个不完整统计窗口。 |
-| 恢复/需收集信息 | 确认`imu.sample_rate_hz`为`25/50/100/200/500/1000/2000`中之一，收集node参数、连续monitor输出和进程日志。 |
+| 恢复/需收集信息 | 确认 `imu.sample_rate_hz` 为 `25/50/100/200/400/800/1600` 中之一；旧 `500/1000/2000` 会被拒绝。收集 node 参数、连续 monitor 输出和进程日志。 |
 
 ## ROS2 topic 无数据或资源冲突
 
@@ -128,7 +128,7 @@
 | 项目 | 内容 |
 |---|---|
 | 现象 | 只有某个 camera ID 无图或单颗诊断失败。 |
-| 检查 | `./cam_demo --camera-id <0|1|2|3> --diagnostics`；开发机拉对应端口 RTSP。物理丝印映射为 CAM1 -> cam0、CAM2 -> cam1、CAM3 -> cam2、CAM4 -> cam3。 |
+| 检查 | `./cam_demo --camera-id <0|1|2|3> --diagnostics`；开发机拉对应端口 RTSP。V2 物理接口到软件 ID 的映射待实板核对，不能沿用 V1 丝印映射。 |
 | 正常结果 | 对应 camera ID 单独启动并能在端口 `554/555/556/557` 中的对应端口出流。 |
 | 常见原因 | 对应 FPC、供电、I2C、MIPI/VIN 链路异常。 |
 | 恢复/需收集信息 | 记录失败 camera ID、端口、demo 日志。 |
@@ -168,7 +168,7 @@
 | 项目 | 内容 |
 |---|---|
 | 现象 | `imu_reader_demo` 无输出、启动失败或 timestamp duplicate/regression 非零。 |
-| 检查 | `ls -l /dev/spidev2.0`；`./imu_reader_demo --sample-rate-hz 1000 --print-metrics`。 |
+| 检查 | `ls -l /dev/spidev2.0`；`./imu_reader_demo --sample-rate-hz 800 --print-metrics`；INT1 为 `34120000.gpio` offset `8`，不是旧 GPIO395。 |
 | 正常结果 | 能持续输出样本；`timestamp_duplicates=0`、`timestamp_regressions=0`。 |
 | 常见原因 | SPI 设备不存在、IMU 供电/焊接/设备树异常、采样率参数不在支持列表。 |
 | 恢复/需收集信息 | 收集启动日志、`SENSOR_IMU_RESULT` 或 demo 退出摘要、`/dev/spidev2.0` 状态。 |
@@ -178,10 +178,10 @@
 | 项目 | 内容 |
 |---|---|
 | 现象 | `serial_port_demo` 发送或接收无数据。 |
-| 检查 | `ls -l /dev/ttyS1 /dev/ttyS7`；仅对 UART1/UART7 按正式线束/产品 pinout 核对接口。板端 TX 接对端 RX，板端 RX 接对端 TX，并始终共地；UART1/UART7 双方 TX/RX 必须为 `3.3V` 逻辑，DEBUG_UART 不属于该 demo 路径。 |
+| 检查 | `ls -l /dev/ttyS1 /dev/ttyS7`；V2 CN2/CN3 5P 的实际 pinout、tty 映射和电平待确认。核实正式线束与对端电平后再断电接线，不要把 V1 `3.3V` 或 DEBUG_UART 说明当成 V2 接线图。 |
 | 软件示例预期 | 设备节点存在，双方 8N1/raw/no-flow-control 参数一致；`serial_port_demo` 只适用于 UART1/UART7，不适用于 DEBUG_UART。 |
 | 常见原因 | 端口选错、波特率不一致、TX/RX 未交叉或接线错误、对端未发送。 |
-| 恢复/需收集信息 | 收集端口、baud、mode、`3.3V` 对端和接线方向；UART1/UART7 3.3V 硬件通信已通过 V1 验收，`serial_port_demo` 是公开用户示例且不适用于 DEBUG_UART。禁止把 `3.3V` 或 `5V` 逻辑接到 DEBUG_UART；DEBUG_UART 仅使用 `1.8V` USB-UART 适配器。 |
+| 恢复/需收集信息 | 收集设备节点、baud、mode 和已核实的接线方向；V1 UART 硬件验收不构成 V2 验收。`serial_port_demo` 仅用于普通用户 UART，不用于 DEBUG_UART。 |
 
 ## 退出后资源未释放
 
