@@ -1,12 +1,9 @@
 Fixes and Upgrades
 ==================
 
-This section collects fixes for historical faults, upgrades, and the system
-image flashing method.
+This section provides V2 system image release status; use the deployment guide for runtime updates.
 
 .. toctree::
    :maxdepth: 1
 
-   tf-card-field-fix
-   isp-image-quality-fix
    system-flashing

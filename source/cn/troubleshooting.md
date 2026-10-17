@@ -128,7 +128,7 @@
 | 项目 | 内容 |
 |---|---|
 | 现象 | 只有某个 camera ID 无图或单颗诊断失败。 |
-| 检查 | `./cam_demo --camera-id <0|1|2|3> --diagnostics`；开发机拉对应端口 RTSP。V2 物理接口到软件 ID 的映射待实板核对，不能沿用 V1 丝印映射。 |
+| 检查 | `./cam_demo --camera-id <0|1|2|3> --diagnostics`；开发机拉对应端口 RTSP。CAM1..CAM4 依次对应软件 cam0..cam3，物理映射与 V1 保持一致。 |
 | 正常结果 | 对应 camera ID 单独启动并能在端口 `554/555/556/557` 中的对应端口出流。 |
 | 常见原因 | 对应 FPC、供电、I2C、MIPI/VIN 链路异常。 |
 | 恢复/需收集信息 | 记录失败 camera ID、端口、demo 日志。 |
@@ -178,7 +178,7 @@
 | 项目 | 内容 |
 |---|---|
 | 现象 | `serial_port_demo` 发送或接收无数据。 |
-| 检查 | `ls -l /dev/ttyS1 /dev/ttyS7`；V2 CN2/CN3 5P 的实际 pinout、tty 映射和电平待确认。核实正式线束与对端电平后再断电接线，不要把 V1 `3.3V` 或 DEBUG_UART 说明当成 V2 接线图。 |
+| 检查 | `ls -l /dev/ttyS1 /dev/ttyS7`；UART1/UART7 为 `3.3V`，DEBUG_UART 为 `1.8V`。CN2/CN3 5pin 完整线序以正式 V2 标识为准；核实线序和对端电平后断电接线，不按 V1 4pin 照片接线。 |
 | 软件示例预期 | 设备节点存在，双方 8N1/raw/no-flow-control 参数一致；`serial_port_demo` 只适用于 UART1/UART7，不适用于 DEBUG_UART。 |
 | 常见原因 | 端口选错、波特率不一致、TX/RX 未交叉或接线错误、对端未发送。 |
 | 恢复/需收集信息 | 收集设备节点、baud、mode 和已核实的接线方向；V1 UART 硬件验收不构成 V2 验收。`serial_port_demo` 仅用于普通用户 UART，不用于 DEBUG_UART。 |

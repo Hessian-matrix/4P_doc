@@ -31,7 +31,7 @@ CAM3 / cam2 -> rtsp://192.168.1.12:556/PRR
 CAM4 / cam3 -> rtsp://192.168.1.12:557/PRR
 ```
 
-CAM1/CAM2/CAM3/CAM4 are V1 image silkscreen labels; cam0/cam1/cam2/cam3 are software IDs, and V2 physical connector mapping remains unverified. The displayed IP is a V1 factory-default example; replace it with the verified actual address for V2.
+CAM1/CAM2/CAM3/CAM4 map to software cam0/cam1/cam2/cam3 respectively, unchanged from V1. The factory address remains `192.168.1.12/24`; use the actual device address if it has been changed.
 
 On Windows you can use EasyPlayer to view the four RTSP streams.
 
@@ -95,4 +95,5 @@ Do not stop `cam-service` to switch demos. If a command produces no output, a to
 usage/non-ros-demo
 usage/save-data-guide
 usage/ros2-demo
+usage/usb-gadget-switch
 ```

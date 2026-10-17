@@ -128,7 +128,7 @@ For the full upload, interactive configuration, and log paths see [Wi-Fi Configu
 | Item | Content |
 |---|---|
 | Symptom | Only a certain camera ID has no image or a single-sensor diagnostic fails. |
-| Check | `./cam_demo --camera-id <0|1|2|3> --diagnostics`; pull the corresponding RTSP port from the host. V2 physical connector-to-software mapping awaits board confirmation; do not inherit V1 silkscreen mapping. |
+| Check | `./cam_demo --camera-id <0|1|2|3> --diagnostics`; pull the corresponding RTSP port from the host. CAM1..CAM4 map respectively to software cam0..cam3, with physical mapping unchanged from V1. |
 | Normal result | The corresponding camera ID starts alone and streams on the matching port among `554/555/556/557`. |
 | Common causes | The corresponding FPC, power, I2C, or MIPI/VIN link is abnormal. |
 | Recovery / info to collect | Record the failed camera ID, port, and demo log. |
@@ -178,7 +178,7 @@ For the full upload, interactive configuration, and log paths see [Wi-Fi Configu
 | Item | Content |
 |---|---|
 | Symptom | `serial_port_demo` sends or receives no data. |
-| Check | `ls -l /dev/ttyS1 /dev/ttyS7`; V2 CN2/CN3 5-pin physical pinout, tty mapping, and voltage are pending confirmation. Verify the formal harness and peer voltage before power-off wiring; do not use V1 `3.3V` or DEBUG_UART notes as a V2 pinout. |
+| Check | `ls -l /dev/ttyS1 /dev/ttyS7`; UART1/UART7 use `3.3V`, DEBUG_UART uses `1.8V`. Use official V2 labeling for the complete CN2/CN3 5-pin order; verify peer voltage and wire with power off, not from V1 4-pin photographs. |
 | Software-example expectation | Device nodes exist and both sides agree on 8N1/raw/no-flow-control; `serial_port_demo` applies only to UART1/UART7, not DEBUG_UART. |
 | Common causes | Wrong port, mismatched baud rate, TX/RX not crossed or miswired, or the peer not sending. |
 | Recovery / info to collect | Collect the node, baud, mode, and confirmed wiring direction; V1 UART hardware acceptance is not V2 acceptance. `serial_port_demo` applies to normal user UARTs, not DEBUG_UART. |

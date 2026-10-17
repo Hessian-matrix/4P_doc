@@ -23,7 +23,7 @@
 
 在线文档会根据用户反馈继续更新；当前没有单独固定的 `stable` 文档版本。文档修订号按上述政策识别，Read the Docs 的 `latest` 是部署标识，不是软件版本。软件正式发布不等同于跳过目标板运行检查。相机参数集合公开支持 `25/30/40/50/60fps`，默认 `30fps`；保存和 ROS2 路径应以实际结果、退出码、manifest 和目标板环境检查判定。
 
-当前使用指南按 V2 源码描述。软件版本沿用继承值不表示 V1 二进制兼容：ICM-42670-P 的新头文件、库、consumer 与配置必须成套迁移。ICM 原生 `25/50/100/200/400/800/1600Hz`，默认 `800Hz`，旧 `500/1000/2000Hz` 明确拒绝。历史 V1 下载 URL 和 changelog 不改写，不能用于宣称 V2 实板或整机验收。
+当前使用指南按 V2 `2.0.0` 软件描述，不表示 V1 二进制兼容：ICM-42670-P 的新头文件、库、consumer 与配置必须成套迁移。ICM 原生 `25/50/100/200/400/800/1600Hz`，默认 `800Hz`，旧 `500/1000/2000Hz` 明确拒绝。历史 V1 changelog 不改写，不能用于宣称 V2 实板或整机验收。
 
 ## 已知限制
 
@@ -31,10 +31,10 @@
 - ROS2 不提供 RTSP；需要 RTSP 时使用 non-ROS `/root/demo`。
 - 相机应用独占 camera/VIO/编码资源；切换前先退出旧应用，并保持 `cam-service` 运行。
 - non-ROS相机、RTSP、ROS1 bag、H.264 MP4和ROS2图像节点公开支持`25/30/40/50/60fps`，默认`30fps`；`--rotate 180` 仍只支持 `30fps`。
-- `vin_lpwm` 是 V2.0.0 默认 trigger（VIN 硬件触发）；`none` 仅用于显式 free-run 诊断；`software_gpio` 已关闭公开入口，仅保留为主仓内部调试路径。
+- 所有相机采集入口仅支持 `vin_lpwm`（VIN LPWM 硬件触发）；不再提供 `none`、free-run 或 `software_gpio` 路径。
 - CameraInfo 只有宽高，IMU orientation 不可用。
 - H.265 或四路高帧率播放依赖客户端解码和渲染能力。
-- V2 UART pinout、电平、供电/热插拔边界、PPS 复用和物理映射待确认，不沿用 V1 `500 mA` 或历史硬件验收；详见[硬件连接与安全](getting-started/hardware-and-safety.md)。IMU FSYNC 输入共享相机触发网，不提供相机/IMU 硬件对齐。
+- UART1/UART7 电平保持 `3.3V`，DEBUG_UART 保持 `1.8V`；相机物理映射和 FOV 不变，独立 PPS IO 默认启用。V2 完整 5pin 线序、供电脚额定值和热插拔条件以正式硬件资料为准，不沿用 V1 `500 mA` 或历史验收；见[硬件连接与安全](getting-started/hardware-and-safety.md)。相机/IMU 共触发线不自动提供样本/曝光关联。
 
 ## 授权与支持
 

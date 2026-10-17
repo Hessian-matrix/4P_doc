@@ -56,8 +56,6 @@ linkcheck_ignore = [
     r"https://github\.com/Hessian-matrix/RoboBaton_4p_demo/?$",
     r"https://github\.com/Hessian-matrix/RoboBaton_4P_ROS2_demo/?$",
     r"https://github\.com/Hessian-matrix/4P_doc/?$",
-    r"https://www\.hessian-matrix\.com/wp-content/uploads/2026/automaticupdates/product-20260918-v1\.3\.0\.tar\.gz$",
-    r"https://www\.hessian-matrix\.com/wp-content/uploads/2026/automaticupdates/xburn-gui_1\.2\.1_x64-setup\.exe$",
     # 中英切换按钮与 hreflang 指向对侧语言部署域名；URL 由 RTD 部署状态决定，不参与内容链接校验。
     r"https://4p-docs\.readthedocs\.io/.*",
     r"https://4p-doc-en\.readthedocs\.io/.*",

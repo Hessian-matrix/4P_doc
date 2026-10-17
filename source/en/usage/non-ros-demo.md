@@ -144,7 +144,7 @@ Common parameters:
 --rotate <0|90|180|270>
 --bps <kbps>
 --url <path>
---trigger-mode <vin_lpwm|none>
+--trigger-mode vin_lpwm
 --diagnostics
 --max-skew-ns <ns>
 --frame-timeout-ms <ms>
@@ -154,8 +154,7 @@ Trigger mode status:
 
 | Mode | Current status |
 |---|---|
-| `vin_lpwm` | Default, VIN hardware trigger. |
-| `none` | Explicit free-run diagnostics. |
+| `vin_lpwm` | The only supported mode, VIN LPWM hardware triggering; other values are rejected. |
 
 Limits: `--width/--height` accepts `1280x1088` (default), `640x480`, `720x480`, `1280x720`, either axial orientation; other combinations are rejected; scaling is performed by `libsc132` VSE hardware full-frame stretch and does not change the FOV. `--rotate 180` supports only `30fps`, not `25fps`, `40fps`, `50fps`, or `60fps`. The external NV12/RTSP canvas keeps width/height unchanged under rotation `0/180` (e.g. `1280x1088`, `640x480`) and swaps them under `90/270` (e.g. `1088x1280`, `480x640`). Camera, RTSP, ROS1 bag, and H.264 MP4 share the same `25/30/40/50/60fps` public frame-rate set.
 
@@ -238,19 +237,19 @@ It prints sampled records at `10Hz` by default; the program still consumes all I
 
 Key fields:
 
-- `ts_ns`: the IMU sample timestamp mapped to the `system_realtime` epoch, in `ns`.
+- `ts_ns`: the IMU sample timestamp in `CLOCK_MONOTONIC_RAW`, in `ns`, without realtime conversion. `TIME_BASE domain=monotonic_raw monotonic_raw_start_ns=...` declares the local RAW startup reference, not a camera SIF-to-RAW mapping or UTC anchor.
 - `accel_mps2`: acceleration in `m/s^2`.
 - `gyro_rps`: angular velocity in `rad/s`.
 - `uncertainty_us`, `gpio_gap_count`, `fifo_overflow_count`, `mapper_failure_count`: timestamp mapping and acquisition-link diagnostics.
 
 V2 `accel_mps2` outputs `[X, Y, Z]`; PCB orientation and signs still need six-face/rotation board verification. Do not infer axis signs or camera-frame transforms from V1 top-view images.
 
-IMU INT1 uses `34120000.gpio` offset `8`, and FIFO TMST supplies per-sample timing; the camera producer exclusively drives trigger `34130000.gpio` offset `0`. Although V2 IMU FSYNC input shares that net, sample/exposure alignment is not provided.
+IMU INT1 uses `34120000.gpio` offset `8`, with per-sample FIFO TMST timing. Cameras use LPWM and the VIN-propagated trigger capture, not frame arrival time. Camera and IMU FSYNC share one physical IO; this does not automatically associate FIFO samples one-to-one with exposures.
 
 ## 8. Serial Demo
 
 
-The V1 UART1/UART7 3.3V communication and hot-plug acceptance are historical and do not govern V2 wiring. V2 CN2/CN3 are 5-pin; actual pinout, voltage, device mapping, and power-pin limits are pending confirmation, and additional pins are not assumed to be flow control or PPS. `serial_port_demo` does not apply to DEBUG_UART. Wire with power off and first verify signal order and peer voltage; do not wire from V1 GH1.25-4P, `500 mA`, hot-plug, or top-view claims. See [Hardware Connection and Safety](../getting-started/hardware-and-safety.md#uart).
+UART1/UART7 retain `3.3V` logic at `/dev/ttyS1` and `/dev/ttyS7`; DEBUG_UART uses `1.8V` and is not for `serial_port_demo`. V2 CN2/CN3 have 5 pins; the separate CN3 IO defaults to PPS input without switching UART7 RX/TX. Use official V2 pin order and power ratings, wire with power off, and do not inherit V1 `500 mA` or hot-plug claims. See [Hardware Connection and Safety](../getting-started/hardware-and-safety.md#uart).
 
 ```bash
 cd /root/demo

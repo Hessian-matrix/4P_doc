@@ -82,7 +82,7 @@ RESULT=PASS
 1. `eth0` 支持 PTP 硬件 TX/RX/raw timestamp。
 2. X5 已确认或追加 PTP 网段地址 `192.168.1.12/24`。
 3. `ptp4l` 已按 master 配置启动。
-4. `phc2sys` 已启动，使 `eth0` PHC 跟随 `CLOCK_REALTIME`。
+4. `phc2sys` 已启动，使 `eth0` PHC 跟随 `CLOCK_REALTIME`，并按 `ptp4l` 的 UTC offset 转换至 PTP 时间尺度。
 5. `pmc` 看到了 `portState MASTER`。
 6. `tcpdump` 捕获到了 PTP UDP 319/320 报文。
 7. `tcpdump` 捕获到了涉及目标 slave IP 的 PTP UDP 319/320 报文。
@@ -102,6 +102,8 @@ masterOnly              1
 network_transport       UDPv4
 delay_mechanism         E2E
 time_stamping           hardware
+hwts_filter             full
+utc_offset              37
 step_threshold          1.0
 
 [eth0]
@@ -113,6 +115,7 @@ step_threshold          1.0
 - `network_transport UDPv4`：对应 Mid-360 官方 PTP UDP/IP。
 - `delay_mechanism E2E`：对应官方 Delay request-response 机制。
 - `time_stamping hardware`：使用 X5 `eth0` 的硬件时间戳。
+- `hwts_filter full`：X5 的 event-only RX filter 会漏掉 Delay_Req 的硬件接收时间戳；full 模式仍使用硬件时间戳，确保 master 能返回 Delay_Resp。
 
 ### 5.2 `/etc/default/ptp4l`
 
@@ -123,15 +126,17 @@ PTP4L_ARGS="-f /etc/linuxptp-mid360-master.cfg -i eth0"
 ### 5.3 `/etc/default/phc2sys`
 
 ```sh
-PHC2SYS_ARGS="-c eth0 -s CLOCK_REALTIME -O 0 -S 1.0"
+PHC2SYS_ARGS="-c eth0 -s CLOCK_REALTIME -w -S 1.0"
 ```
 
 含义：
 
 - `-s CLOCK_REALTIME`：X5 系统时间作为源。
 - `-c eth0`：同步到 `eth0` 的 PTP hardware clock。
-- `-O 0`：不加固定偏移。
-- `-S 1.0`：初始差值超过 1 秒时直接 step。
+- `-w`：等待 `ptp4l` 就绪，并从其 `currentUtcOffset` 自动维护系统 UTC 与 PHC PTP/TAI 的偏移和方向；不能使用 `-O 0` 把两个时间尺度混为一谈。
+- `-S 1.0`：偏差超过 1 秒时允许 step，目标是 PHC，不是系统时钟。
+
+硬件 timestamp 模式下，PHC 应为系统 UTC 加当前 TAI−UTC（当前 `37 s`），与 `pmc` 的 `currentUtcOffset` 一致。`utc_offset` 不是永久常数，闰秒政策变化时须同步更新。`phc_ctl eth0 cmp` 在此工具版本输出的是 REALTIME−PHC，正确情况下约为 `-37000000000 ns`；不要把负号误解为 PHC 落后。master 与报文通过不能证明 UTC 已校准：先校准系统时间，再启动此链路。它也不会把相机 SIF 捕获时间转换成 UTC。
 
 ### 5.4 ifupdown 地址钩子
 
@@ -152,7 +157,9 @@ PHC2SYS_ARGS="-c eth0 -s CLOCK_REALTIME -O 0 -S 1.0"
 ethtool -T eth0
 ip -br addr show eth0
 ps w | sed -n '/[p]tp4l\|[p]hc2sys/p'
-pmc -u -b 0 'GET PORT_DATA_SET'
+pmc -u -b 0 'GET PORT_DATA_SET' 'GET TIME_PROPERTIES_DATA_SET'
+phc_ctl eth0 get
+phc_ctl eth0 cmp
 tcpdump -i eth0 -nn 'udp port 319 or udp port 320'
 tcpdump -i eth0 -nn 'host 192.168.1.100 and (udp port 319 or udp port 320)'
 ```
@@ -207,3 +214,4 @@ ip addr del 192.168.1.12/24 dev eth0 2>/dev/null || true
 
 - Livox Mid-360 同步方式和 PoE 警告：<https://livox-wiki-en.readthedocs.io/en/latest/tutorials/new_product/mid360/mid360.html>
 - LinuxPTP 硬件/软件 timestamp 能力和 `ethtool -T` 检查：<https://raw.githubusercontent.com/richardcochran/linuxptp/master/README.org>
+- LinuxPTP 时钟方向、`-w` 与时间尺度：[phc2sys(8)](https://manpages.debian.org/bullseye/linuxptp/phc2sys.8.en.html#TIME_SCALE_USAGE)。

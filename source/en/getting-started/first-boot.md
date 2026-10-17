@@ -9,8 +9,8 @@ Power, camera cables, UART, and thermal boundaries are governed by [Hardware Con
 - Camera FPC/coaxial cables are connected with power off; camera/FPC/coaxial cables do not support hot-plug and must be disconnected from power before plug/unplug.
 - V2 rated input range, USB-C power role, full-load current, and fan thresholds are pending confirmation. Use only a power supply and system confirmed for V2 by product support; do not inherit V1 `12V ~ 24V`/`600 mA` claims.
 - Keep heatsink, fan, and airflow clear; V1 fan/LED boot patterns are not V2 readiness criteria.
-- V2 UART1/UART7 use 5 pins; pinout, actual voltage, and power-pin function are pending. Leave generic USB-UART VCC disconnected and wire with power off after confirming signal order and ground.
-- V1 UART `500 mA`/hot-plug claims do not apply to V2; verify V2 DEBUG_UART voltage, baud, and recovery method before use.
+- V2 UART1/UART7 have 5 pins and retain `3.3V` logic; DEBUG_UART retains `1.8V`, `921600` baud. Use official V2 labeling for complete pin order and power-pin function; leave generic USB-UART VCC disconnected and wire with power off after checking common ground.
+- V1 UART `500 mA`/hot-plug acceptance is not a V2 rating or hot-plug promise.
 
 ## 2. Connect and Power On
 
@@ -20,7 +20,7 @@ Confirm V2 power, harnesses, and actual pinout first, then complete camera, powe
 
 Wired Ethernet is recommended for first login. To configure the on-board Wi-Fi as an AP hotspot or connect to a router, see [Wi-Fi Configuration](wifi-configuration.md); switching Wi-Fi mode resets `wlan0`, so do not rely on the same Wi-Fi SSH session to complete the switch.
 
-The factory IP/account below are historical public V1 defaults, not V2 experiment-device information. V2 factory settings and system network management are pending confirmation. Execute these examples only after confirming the target system uses those settings; never submit actual device addresses or credentials to public repositories.
+V2 retains factory address `192.168.1.12/24` and the `root` account/password. Network configuration continues to use `/etc/network/interfaces`. These are public factory defaults, not experiment-device addresses or credentials.
 
 | Item | Factory default |
 |---|---|
@@ -108,7 +108,7 @@ passwd
 If the user has changed the IP and needs to enter the system through the debug port to check the address, only DEBUG_UART can be used: `1.8V` logic, debug terminal baud rate `921600`, board TX to adapter RX, board RX to adapter TX, with common ground. Do not use a `3.3V` or `5V` USB-UART on DEBUG_UART.
 
 ```{note}
-If the system cannot boot or needs factory restore, re-flash the factory system image to recover. Flashing overwrites the on-board eMMC and erases all user data; see [System Flashing](../ops/system-flashing.md) for image acquisition, flashing steps, and cautions.
+The V2 system image has not been released; do not recover V2 using a V1 image. See [System Flashing](../ops/system-flashing.md) for release status. Official flashing overwrites on-board eMMC and user data.
 ```
 
 ## 4. Minimal System Check

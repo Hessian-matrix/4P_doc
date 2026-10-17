@@ -26,7 +26,7 @@ cn/ 与 en/ 各自：
 ├── usage/             # non-ros-demo、save-data-guide、ros2-demo
 ├── time-sync/         # system-time-sync、ntp-sync、pps-sync、ptp-sync
 ├── troubleshooting.md
-├── ops/               # fix-and-upgrade、tf-card-field-fix、isp-image-quality-fix、system-flashing
+├── ops/               # fix-and-upgrade、system-flashing
 ├── development/       # code-and-interfaces、deployment-and-upgrade、open-source-build、data-contracts、api-reference
 ├── changelog.md
 └── release-and-support.md

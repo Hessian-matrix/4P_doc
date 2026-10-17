@@ -25,6 +25,8 @@ H.264 MP4 saving is recommended first: the four `cameraN.mp4` files play directl
 
 Only when the process exit code is 0 and the corresponding `SENSOR_*_RESULT` explicitly reports completeness can the data be used as formally complete data. `.partial`, a nonzero exit code, or `data_complete=no` can only be used as recovery or diagnostic data.
 
+Images, frame metadata, and exact MP4 indexes preserve native SIF LPWM `trig_tv` captures, not UTC. IMU CSV/bag times retain FIFO TMST-to-RAW mapping results without a realtime offset; bag record time also uses RAW. Camera SIF-to-RAW mapping is not implemented, so camera/IMU timestamps cannot be paired directly. Relative MP4 playback time does not establish a cross-sensor clock mapping; see [Data Contracts](../development/data-contracts.md).
+
 ## 2. Version and Runtime Package Consistency
 
 Every deployment must copy the complete `demo/` runtime package, not just replace `sensor_demo` or a single `.so`.

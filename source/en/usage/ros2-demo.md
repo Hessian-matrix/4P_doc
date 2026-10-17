@@ -26,7 +26,7 @@ Exposed capabilities:
 
 RTSP, camera/IMU hardware sync, TF extrinsics, camera intrinsics, and distortion calibration are currently not provided. `CameraInfo` only publishes the current frame width/height, with empty calibration fields; IMU orientation is unavailable.
 
-Software cam0..cam3 map to `/robobaton/cam0..3`; V2 physical connector/silkscreen mapping is pending confirmation and must not inherit the V1 CAM1..CAM4 mapping. See [Hardware Connection and Safety](../getting-started/hardware-and-safety.md#camera-interface).
+CAM1..CAM4 map respectively to software cam0..cam3 and `/robobaton/cam0..3`, unchanged from V1. See [Hardware Connection and Safety](../getting-started/hardware-and-safety.md#camera-interface).
 
 ## Topics
 
@@ -156,7 +156,7 @@ Only when the launch has been stopped, `ros2 daemon stop` has run, and you have 
 |---|---:|---|
 | `enable_camera` | `true` | Whether to start the camera publishers. |
 | `enable_imu` | `true` | Whether to start the IMU publisher. |
-| `camera.camera_mask` | `15` | bit0..bit3 map to software cam0..cam3; V2 physical mapping pending; only single or full four-channel is supported, not 2/3 channels. |
+| `camera.camera_mask` | `15` | bit0..bit3 map respectively to CAM1..CAM4 / software cam0..cam3; only single or full four-channel is supported, not 2/3 channels. |
 | `camera.fps` | `30` | Supports `25/30/40/50/60fps`; other values are rejected before the camera starts. |
 | `camera.rotate_degrees` | `0` | Supports `0/90/180/270`; `180` only allows `30fps`, `25/40/50/60fps` rejected; `0/180` output `1280x1088`, `90/270` output `1088x1280`. |
 | `camera.frame_set_max_skew_ns` | `10000000` | Frame-set admission upper bound in ns; by default covers the four-channel 10 ms exposure bound. |
@@ -168,7 +168,7 @@ Only when the launch has been stopped, `ros2 daemon stop` has run, and you have 
 | `camera.publish_compressed_image` | `true` | Whether to register raw and compressed image_transport publish plugins. |
 | `camera.compressed_jpeg_quality` | `80` | JPEG quality, range `1..100`. |
 | `camera.frame_id_prefix` | `robobaton_cam` | Generates frame_ids such as `robobaton_cam0_optical_frame`. |
-| `camera.trigger_mode` | `vin_lpwm` | VIN hardware trigger; public accepts only `vin_lpwm` or `none`. `software_gpio` public entry is closed and kept only as a main-repo internal debug path. |
+| `camera.trigger_mode` | `vin_lpwm` | Only VIN LPWM hardware triggering is supported; other values are rejected. |
 | `imu.sample_rate_hz` | `800` | Only native `25/50/100/200/400/800/1600`; old `500/1000/2000` explicitly rejected. |
 | `imu.read_mode` | `sensor_timestamp_fifo` | Currently only this mode is supported. |
 | `imu.fifo_watermark_samples` | `1` | Currently fixed to `1`. |
@@ -184,6 +184,6 @@ raw `Image` uses NV12. `Image.step` keeps the underlying DMA buffer's stride; `d
 The compressed topic is a standard `CompressedImage` JPEG payload. The plugin only performs compression when there is an `/image_raw/compressed` subscriber: it validates the NV12 layout per `Image.step` and `data.size()`, copies valid Y/UV rows into the X5 media-codec input buffer, and generates JPEG via `MEDIA_CODEC_ID_JPEG`, preserving the original message `header`.
 
 
-`header.stamp` is not the publish moment. In `software_gpio` mode (main-repo internal debug only, not public), the node freezes the `CLOCK_REALTIME - CLOCK_MONOTONIC_RAW` offset at startup and maps the camera SC132 raw timestamp to system realtime/ROS stamp. The explicit `none` diagnostic mode keeps the underlying SC132 time domain and is not declared as a V1 wall/realtime contract. IMU `sample_timestamp_ns` is mapped to system realtime/ROS timestamps through the same frozen offset; IMU does not use `host_timestamp_ns` as the message time.
+`header.stamp` is not publication time. Cameras retain the LPWM `trig_tv` trigger capture in the native SIF counter domain; IMU directly uses RAW `sample_timestamp_ns`, without realtime conversion or substituting `host_timestamp_ns`. Camera SIF-to-RAW mapping is not implemented, so image/IMU stamps cannot be paired directly or compared with node `now()` or `/clock`. RAW has a common reference only on the same device and boot. Sharing the LPWM IO does not associate FSYNC samples with exposures, and PTP does not automatically convert these domains.
 
 `CameraInfo` only carries the current frame width/height, with the distortion model and calibration matrices empty. IMU orientation is unavailable, and messages set `orientation_covariance[0] = -1.0`; gyro/accel covariance is currently not fabricated. `robobaton_imu_link` only identifies the source of the IMU message; it does not establish a transform to the camera, base, optical frame, or other coordinate systems, nor declare TF or extrinsics.

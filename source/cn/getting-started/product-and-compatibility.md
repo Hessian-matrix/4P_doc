@@ -32,7 +32,7 @@ V2 IMU 为 ICM-42670-P，API `icm42670_*`，real SO `libicm42670.so.2.0.0`、SON
 | ROS2 | Humble underlay；通过 `robobaton_ros2_env.bash` 加载环境。 |
 | 交叉编译 | 只在开发机使用 X5 交叉编译包；不建议在 X5 板端原生编译。 |
 | non-ROS相机配置 | 默认`1280x1088@30fps`；支持`25/30/40/50/60fps`；输出画布 `1280x1088`/`640x480`/`720x480`/`1280x720`。 |
-| Trigger | `vin_lpwm` 是 V2.0.0 默认 trigger（VIN 硬件触发）；`none` 仅用于显式 free-run 诊断；`software_gpio` 仅主仓内部调试。 |
+| Trigger | 所有相机入口仅支持 `vin_lpwm`（VIN LPWM 硬件触发）；不提供 free-run 或软件 GPIO 触发。 |
 
 ROS2 路径不提供 RTSP；需要 RTSP 时使用 non-ROS 路径。当前不提供TF、外参、相机内参或畸变标定；CameraInfo 只有宽高，IMU orientation 不可用。
 

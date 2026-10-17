@@ -32,7 +32,7 @@ Do not mix directories, headers, or `.so` files between the two paths. Run only 
 | ROS2 | Humble underlay; load the environment via `robobaton_ros2_env.bash`. |
 | Cross compilation | Only use the X5 cross-compilation package on the host; native compilation on the X5 is not recommended. |
 | non-ROS camera configuration | default `1280x1088@30fps`; supports `25/30/40/50/60fps`; output canvas `1280x1088`/`640x480`/`720x480`/`1280x720`. |
-| Trigger | `vin_lpwm` is the V2.0.0 default trigger (VIN hardware trigger); `none` is only for explicit free-run diagnostics; `software_gpio` is main-repo internal debug only. |
+| Trigger | All camera entries support only `vin_lpwm` (VIN LPWM hardware triggering); no free-run or software GPIO triggering. |
 
 The ROS2 path does not provide RTSP; use the non-ROS path when RTSP is needed. TF, extrinsics, camera intrinsics, and distortion calibration are not currently provided; CameraInfo only has width/height, and IMU orientation is unavailable.
 

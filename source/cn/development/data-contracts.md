@@ -8,12 +8,12 @@
 |---|---|
 | `libsc132.so` / camera callback 原始帧 | NV12；native `1280x1088` 或 VSE 缩放 `640x480`/`720x480`/`1280x720`；旋转 `0/180` 宽高不变，`90/270` 宽高交换 |
 | RTSP 对外流 | H.264 默认；支持 H.265 |
-| FOV | V1 A/B 相机曾标称水平 `148.4°`/`115.6°`、垂直 `126.6°`/`96.8°`、对角 `193.8°`/`157.2°`；V2 镜头/子板及 FOV 待核实。 |
+| FOV | 相机 A/B 保持水平 `148.4°`/`115.6°`、垂直 `126.6°`/`96.8°`、对角 `193.8°`/`157.2°`。 |
 | camera FPS | 默认`30fps`，支持`25fps`、`30fps`、`40fps`、`50fps`和`60fps`；其他值在启动副作用前拒绝 |
 | RTSP path | `/PRR` |
-| 端口映射 | 软件 cam0/cam1/cam2/cam3 -> `554/555/556/557`；V2 物理接口对应关系待核实。 |
+| 端口映射 | CAM1..CAM4 依次对应软件 cam0..cam3 与 `554/555/556/557`，物理映射与 V1 不变。 |
 
-`libsc132.so` callback 暴露 NV12 原始帧，RTSP 客户端接收 H.264/H.265 编码流。帧信息包含 `width`、`height`、`stride`、`vstride`、Y/UV 虚拟/物理地址及 size。旋转 `90/270` 会交换宽高；消费端须依每帧元数据与 stride/size 处理对齐，不要假设紧凑 `1280x1088`。V1 A/B FOV 不可直接套用 V2 子板。
+`libsc132.so` callback 暴露 NV12 原始帧，RTSP 客户端接收 H.264/H.265 编码流。帧信息包含 `width`、`height`、`stride`、`vstride`、Y/UV 虚拟/物理地址及 size。旋转 `90/270` 会交换宽高；消费端须依每帧元数据与 stride/size 处理对齐，不要假设紧凑 `1280x1088`。
 
 ## Frame Set 字段
 
@@ -23,20 +23,19 @@
 | `group_id` | 帧组序号。 |
 | `group_timestamp_ns` | 帧组时间戳，单位 `ns`。 |
 | `max_skew_ns` | 当前帧组实际观测到的最大 timestamp skew，单位 `ns`。 |
-| `items[i].camera_id` | 软件 camera ID，范围 `0..3`；V2 物理接口到软件 ID 的对应关系待实板核对，不沿用 V1 丝印映射。 |
+| `items[i].camera_id` | 软件 ID `0..3`，依次对应物理 CAM1..CAM4，与 V1 不变。 |
 | `items[i].frame_id` | 归一化后的帧 ID。 |
 | `items[i].timestamp_ns` | 单路帧时间戳，单位 `ns`。 |
 
-`sc132_frame_set_config_t.max_skew_ns` 才是配组放行上限；默认值为 `10000000 ns（10ms）`，用于覆盖四路曝光时间差。
+`sc132_frame_set_config_t.max_skew_ns` 才是配组放行上限；默认值为 `10000000 ns（10ms）`，限制触发捕获值差异，不代表曝光对齐精度。
 
 ## Trigger 模式
 
 | 模式 | 当前状态 | 公开合同 |
 |---|---|---|
-| `vin_lpwm` | 默认 VIN 硬件触发 | 走 VIN 硬件 `lpwm_attr` 输出，绕开 FSYNC 软件 GPIO 路径。 |
-| `none` | 显式 free-run 诊断 | 不保证四路硬触发。 |
+| `vin_lpwm` | 所有相机应用及底层库唯一支持的 VIN 硬件触发 | 相机与 IMU FSYNC 共用 LPWM IO；相机 `timestamp_ns` 来自随帧传播的 `trig_tv` 硬件捕获，缺失则停止采集，不回退到到帧时间。 |
 
-`software_gpio`（仅主仓内部调试，不对外公开）模式下，demo 对外诊断的 `camera_ts_ns` 和 RTSP PTS 经启动时冻结的 offset 映射至 `system_realtime` epoch；`none` 诊断模式保留 SC132 原生时间域。底层 C API 的 `timestamp_ns` 不保证与墙上时钟同域。V1 对此时间语义的验收不能代替 V2 实板验收。
+LPWM `timestamp_ns` 是 SIF 硬件计数器时间，`trig_tv` 微秒值换算为 ns；不是 `CLOCK_MONOTONIC_RAW`、UTC 或曝光中心时刻。帧组时间取各路捕获值的最小值，各路保留独立捕获值；`max_skew_ns` 表示捕获值差异，不代表曝光或相机/IMU 对齐精度。non-ROS 相机诊断、RTSP PTS、保存图像时间和 ROS2 图像 `header.stamp` 保留该原生时间域。IMU FIFO TMST 映射至 RAW 后由 consumer 原样保留，不再转换至 realtime。相机 SIF→RAW 映射尚未实现，不能直接与 IMU 时间戳相减；共线 FSYNC 尚无公开样本关联接口。
 
 ## IMU
 
@@ -60,7 +59,7 @@
 | `gyro_rps` | `rad/s`。 |
 | `host_timestamp_ns` | 配对 INT1 边沿的主机 `CLOCK_MONOTONIC_RAW` 纳秒时间戳；不是样本时间戳。 |
 | `sample_timestamp_ns` | FIFO TMST 映射得到的逐 sample 时间戳；底层为 `CLOCK_MONOTONIC_RAW` 域。 |
-| demo `ts_ns` | 由冻结 `CLOCK_REALTIME - CLOCK_MONOTONIC_RAW` offset 映射到 `system_realtime` epoch 的 sample 时间戳。 |
+| demo `ts_ns` | 直接保留 `CLOCK_MONOTONIC_RAW` 域的 sample 时间戳，单位 ns；不加 realtime offset。`host_ts_ns` 同样保留 RAW 域。 |
 | `reserved0` | 当前会话观测到的 FIFO timestamp 低 16 位回绕次数；不表示 V1 20 位 SPI 快照回绕。 |
 | `timestamp_uncertainty_us` | 逐样本时间映射的不确定度，单位 us。 |
 | `gpio_event_gap_count` / `fifo_overflow_count` / `mapper_failure_count` | 当前会话的边沿缺口、FIFO 溢出与时间映射失败累计计数。 |
@@ -79,6 +78,8 @@ IMU 独立连续采样；V2 FSYNC 输入虽与相机触发共网，但当前公�
 | `.partial` | 保留 recovery namespace；`.partial` MP4 session 可提取排查，但不声明为 complete。 |
 
 MP4 模式只支持 H.264 和完整四路 camera mask `0x0f`，不能与 bag 保存或 frame-skip 同时启用。MP4 文件的帧时序是容器名义 timing；精确纳秒相机时间戳以同 session 的 `cameraN_timestamps.csv` 为准，按 `frame_index` 与 MP4 metadata 对齐。`published_complete` 源必须带有匹配的 `publication_receipt.json`，并且四路 MP4/index inventory 完整。
+
+bag 消息的 payload 与记录时刻分开：图像及首帧 CameraInfo 的 `header.stamp` 保留相机捕获值；IMU payload 保留 RAW sample stamp。bag record time 来自独立的 `CLOCK_MONOTONIC_RAW` 到达/写入时钟，按写入次序不递减，不把两个传感器 epoch 做数值比较。session config 声明 `camera_timestamp_domain="sc132_native"`、`imu_timestamp_domain="monotonic_raw"`、`record_timestamp_domain="monotonic_raw"`。
 
 ## ROS2 topics
 
@@ -102,7 +103,7 @@ ROS2 QoS：
 
 ROS2 raw `Image.step` 使用底层 DMA buffer 的 stride；`data.size()` 使用底层 Y/UV buffer size，可能大于紧凑 `width * height * 3 / 2`。订阅端不得按紧凑 NV12 假设直接索引 UV 平面。
 
-ROS2 `header.stamp` 不是发布时刻。节点在 `software_gpio` 模式冻结 `CLOCK_REALTIME - CLOCK_MONOTONIC_RAW` offset，把相机 SC132 raw timestamp 与 IMU `sample_timestamp_ns` 映射到 system realtime/ROS stamp；显式 `none` 诊断模式保留 SC132 原生时间域。IMU 不以 `host_timestamp_ns` 为消息时间；V1 时间验收不能证明 V2 相机与 IMU 对齐。
+ROS2 `header.stamp` 不是发布时刻：LPWM 相机保留 SIF 触发捕获时间域；IMU 直接保留 RAW 域的 `sample_timestamp_ns`，不以 `host_timestamp_ns` 为消息时间。两者尚不同域，不能直接做 ROS 时间同步配对；也不能与节点 `now()`、Unix 时间或仿真 `/clock` 相减。RAW 是本机本次启动的时钟，不是跨设备或跨重启 epoch。PTP 不会自动转换 SIF/RAW 计数器或建立 FSYNC 样本关联。
 
 ROS2 当前不发布 RTSP、TF 外参或标定；相机/IMU 硬同步仍不提供。需要通用可视化时优先订阅 `/image_raw/compressed`，不要假设 raw NV12 可被普通 RGB/BGR 工具直接显示。
 
@@ -112,11 +113,11 @@ ROS2 当前不发布 RTSP、TF 外参或标定；相机/IMU 硬同步仍不提�
 |---|---|
 | 默认设备 | `/dev/ttyS1` |
 | 可示例切换 | `/dev/ttyS7` 或其他现场设备 |
-| 波特率 | `serial_port_demo` 默认 `115200`；V2 DEBUG_UART 控制台参数待确认。 |
+| 波特率 | `serial_port_demo` 默认 `115200`；DEBUG_UART `921600`。 |
 | serial_port_demo 数据格式 | 8N1、raw、无 flow control |
 | demo 模式 | `tx`、`rx`、`txrx`、`echo` |
-| UART1/UART7 TX/RX 信号逻辑电平 | V2 实际 GPIO_VREF/BOM 和接口电平待确认；不得沿用 V1 `3.3V` 作为接线依据。 |
+| UART1/UART7 TX/RX 信号逻辑电平 | 保持 `3.3V`；DEBUG_UART 为 `1.8V`。 |
 | UART1/UART7 供电脚 | V2 CN2/CN3 的供电用途、电平、额定负载和热插拔边界待确认，勿引用 V1 合计 `500 mA` 限制。 |
 | V1 历史边界 | UART1/UART7 在 V1 板上曾验收；不构成 V2 电气或线束兼容证明。 |
 
-V2 UART1/UART7 对应 CN2/CN3 5P 接口；新增信号不能当作 RTS/CTS 或 PPS 接线。`serial_port_demo` 的软件默认设备是 `/dev/ttyS1`，可示例切换 `/dev/ttyS7`，但 V2 物理线序、tty 映射、TX/RX 电平和供电方向仍待现场确认。PPS 脚本的 V1 `/dev/pps2` 复用说明不构成 V2 已支持 PPS 的承诺。DEBUG_UART 非用户 UART；在核实 V2 电平前不接入外部适配器。默认断电接线，先确认板端 TX/RX/GND 和对端电平，禁止误接或反灌。参见[硬件连接与安全](../getting-started/hardware-and-safety.md#uart)。
+V2 UART1/UART7 对应 CN2/CN3 5pin 接口与 `/dev/ttyS1`、`/dev/ttyS7`。CN3 有独立 IO 默认作为 PPS 输入，不需要复用或切换 RX/TX；PPS 设备节点按系统枚举识别。完整线序及供电脚用途以正式 V2 标识为准。DEBUG_UART 非用户串口；默认断电接线，核实 TX/RX/GND、对端电平及共地，不接适配器 VCC，不反灌。见[硬件连接与安全](../getting-started/hardware-and-safety.md#uart)。

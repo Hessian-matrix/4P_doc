@@ -7,7 +7,7 @@
 | 方法 | 主要目的 | 当前公开入口 | 关键边界 |
 |---|---|---|---|
 | NTP | 通过网络服务器校准 X5 `CLOCK_REALTIME`，并运行 `ntpd` | [NTP 同步](ntp-sync.md) | 需要网络、DNS/路由和 UDP 123；执行时可能发生系统时间跳变 |
-| PPS | 把外部 PPS 边沿通过默认 UART7 RX 接入 Linux `/dev/pps2` | [PPS 同步](pps-sync.md) | 只建立 Linux PPS 输入事件源，不自动纪律系统时钟 |
+| PPS | 经 UART7 5pin 接口的独立 IO 接入 Linux PPS，系统默认启用 | [PPS 同步](pps-sync.md) | 不占用 UART7 RX/TX，不需配置；不自动纪律系统时钟 |
 | PTP | 让 X5 作为 LinuxPTP master，由 X5 系统时间经 PHC 为外部 PTP slave 提供时间 | [PTP 同步](ptp-sync.md) | 当前页面以 X5 master + Livox Mid-360 slave 为示例 |
 
 ## 如何选择
@@ -20,11 +20,11 @@
 
 1. 当前 PTP 示例的时间方向是 `CLOCK_REALTIME -> phc2sys -> eth0 PHC -> ptp4l master -> PTP slave`；PTP 不会反向校准 X5 的 `CLOCK_REALTIME`。
 2. NTP 可以作为 X5 `CLOCK_REALTIME` 的上游时间源，但当前 NTP 脚本会停止 `phc2sys`。执行 NTP 后，如需继续由 X5 提供 PTP master，必须重新确认并启动 `phc2sys`，再复核 PTP master 和从设备状态；不要把两个脚本未经检查地并行运行。
-3. PPS 页面只负责外部边沿进入 `/dev/pps2`；没有额外的 PPS consumer/clock discipline 配置时，PPS 不会自动校准 `CLOCK_REALTIME`。
+3. PPS 页面只负责外部边沿进入 Linux PPS；节点按系统枚举识别，不固定 `/dev/pps2`。没有额外 PPS consumer/clock discipline 时，不自动校准 `CLOCK_REALTIME`。
 4. 执行 NTP/PTP 配置前，应先退出 demo、ROS2 节点和其他时间戳敏感任务；保持 `cam-service` 运行。
-5. UART7 RX 切换 PPS 前，应停止使用 UART7 的程序，并准备 SSH 或其他恢复入口。
+5. V2 独立 PPS IO 无需切换 UART7 引脚；接线前确认正式 5pin 线序、电平和共地，断电操作。
 6. 系统时间同步不等于采样同步。相机、IMU、PPS、PTP 和 ROS `header.stamp` 属于不同层次，字段语义见[数据合同](../development/data-contracts.md)。
-7. 当前 demo 在进程启动时冻结 `CLOCK_REALTIME - CLOCK_MONOTONIC_RAW` offset；进程启动后再改变系统时间不会自动更新已经冻结的映射。需要校准系统时间时，应先校准，再启动采集程序。
+7. IMU consumer 和 bag record time 直接使用 `CLOCK_MONOTONIC_RAW`，不再冻结或应用 realtime offset；NTP/PTP 校准的系统时间不会把这些时间戳转换成 UTC。相机仍保留 SIF 原生 LPWM 触发捕获值，SIF→RAW 映射尚未实现。不能把系统校时当作相机/IMU 已同域或同步的证明。
 
 ## 三种同步方式
 

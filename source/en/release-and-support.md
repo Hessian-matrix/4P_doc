@@ -23,7 +23,7 @@ Feature additions, fixes, and compatibility changes are in [Changelog](changelog
 
 The online documentation continues to update based on user feedback; there is currently no separately pinned `stable` documentation version. Documentation revisions follow the policy above; Read the Docs `latest` is a deployment identifier, not a software version. An official software release does not mean target-board runtime checks can be skipped. The public camera parameter set supports `25/30/40/50/60fps`, default `30fps`; the saving and ROS2 paths should be judged by actual results, exit codes, manifest, and target-board environment checks.
 
-Current usage guides describe V2 source. Inherited software version values do not imply V1 binary compatibility: migrate ICM-42670-P headers, libraries, consumers, and configuration together. Native rates are `25/50/100/200/400/800/1600Hz`, default `800Hz`, with old `500/1000/2000Hz` values explicitly rejected. Historical V1 download URLs and changelogs are unchanged and cannot establish V2 board or system acceptance.
+Current usage guides describe V2 `2.0.0` software, not V1 binary compatibility: migrate ICM-42670-P headers, libraries, consumers, and configuration together. Native rates are `25/50/100/200/400/800/1600Hz`, default `800Hz`, with old `500/1000/2000Hz` values explicitly rejected. Historical V1 changelogs do not establish V2 board or system acceptance.
 
 ## Known Limitations
 
@@ -31,10 +31,10 @@ Current usage guides describe V2 source. Inherited software version values do no
 - ROS2 does not provide RTSP; use non-ROS `/root/demo` when RTSP is needed.
 - Camera applications exclusively hold camera/VIO/encoding resources; before switching, exit the old application and keep `cam-service` running.
 - non-ROS camera, RTSP, ROS1 bag, H.264 MP4, and the ROS2 image node publicly support `25/30/40/50/60fps`, default `30fps`; `--rotate 180` still supports only `30fps`.
-- `vin_lpwm` is the V2.0.0 default trigger (VIN hardware trigger); `none` is only for explicit free-run diagnostics; the `software_gpio` public entry is closed and kept only as a main-repo internal debug path.
+- Every camera acquisition entry supports only `vin_lpwm` (VIN LPWM hardware triggering); `none`, free-run, and `software_gpio` paths are no longer available.
 - CameraInfo only has width/height, and IMU orientation is unavailable.
 - H.265 or four-channel high-frame-rate playback depends on the client's decode and render capability.
-- V2 UART pinout, voltage, power/hot-plug boundaries, PPS mux, and physical mapping are pending confirmation; do not inherit the V1 `500 mA` limit or historical acceptance. See [Hardware Connection and Safety](getting-started/hardware-and-safety.md). IMU FSYNC shares the camera trigger net but does not provide camera/IMU hardware alignment.
+- UART1/UART7 retain `3.3V`, DEBUG_UART retains `1.8V`; camera mapping and FOV are unchanged, and independent PPS input defaults on. Use official V2 pin order, power ratings, and hot-plug conditions, not the V1 `500 mA` limit or historical acceptance; see [Hardware Connection and Safety](getting-started/hardware-and-safety.md). A shared camera/IMU trigger wire does not automatically associate samples and exposures.
 
 ## License and Support
 

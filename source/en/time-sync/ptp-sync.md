@@ -82,7 +82,7 @@ RESULT=PASS
 1. `eth0` supports PTP hardware TX/RX/raw timestamp.
 2. The X5 confirmed or added the PTP subnet address `192.168.1.12/24`.
 3. `ptp4l` started with the master configuration.
-4. `phc2sys` started, making the `eth0` PHC follow `CLOCK_REALTIME`.
+4. `phc2sys` started, making the `eth0` PHC follow `CLOCK_REALTIME` with the UTC offset from `ptp4l` applied for the PTP time scale.
 5. `pmc` saw `portState MASTER`.
 6. `tcpdump` captured PTP UDP 319/320 packets.
 7. `tcpdump` captured PTP UDP 319/320 packets involving the target slave IP.
@@ -102,6 +102,8 @@ masterOnly              1
 network_transport       UDPv4
 delay_mechanism         E2E
 time_stamping           hardware
+hwts_filter             full
+utc_offset              37
 step_threshold          1.0
 
 [eth0]
@@ -113,6 +115,7 @@ Key points:
 - `network_transport UDPv4`: matches Mid-360's official PTP UDP/IP.
 - `delay_mechanism E2E`: matches the official delay request-response mechanism.
 - `time_stamping hardware`: uses the X5 `eth0` hardware timestamp.
+- `hwts_filter full`: the X5 event-only RX filter misses hardware receive timestamps for Delay_Req. Full mode retains hardware timestamping and lets the master send Delay_Resp.
 
 ### 5.2 `/etc/default/ptp4l`
 
@@ -123,15 +126,17 @@ PTP4L_ARGS="-f /etc/linuxptp-mid360-master.cfg -i eth0"
 ### 5.3 `/etc/default/phc2sys`
 
 ```sh
-PHC2SYS_ARGS="-c eth0 -s CLOCK_REALTIME -O 0 -S 1.0"
+PHC2SYS_ARGS="-c eth0 -s CLOCK_REALTIME -w -S 1.0"
 ```
 
 Meaning:
 
 - `-s CLOCK_REALTIME`: the X5 system time is the source.
 - `-c eth0`: sync to the `eth0` PTP hardware clock.
-- `-O 0`: no fixed offset.
-- `-S 1.0`: step directly when the initial difference exceeds 1 second.
+- `-w`: wait for `ptp4l` and maintain the system UTC-to-PHC PTP/TAI offset and direction from its `currentUtcOffset`. Do not use `-O 0` to conflate the time scales.
+- `-S 1.0`: allow stepping when the offset exceeds one second; the target is the PHC, not the system clock.
+
+With hardware timestamps, PHC should equal system UTC plus the current TAI−UTC offset (currently `37 s`), matching `pmc`'s `currentUtcOffset`. `utc_offset` is not permanent and must track leap-second policy changes. This tool version reports REALTIME−PHC in `phc_ctl eth0 cmp`, so approximately `-37000000000 ns` is correct; the negative sign does not mean PHC is behind. Master state and packets do not prove UTC calibration: calibrate system time before starting this chain. It does not convert camera SIF captures to UTC.
 
 ### 5.4 ifupdown Address Hook
 
@@ -152,7 +157,9 @@ The script already ran these checks; run them on-device when manual re-verificat
 ethtool -T eth0
 ip -br addr show eth0
 ps w | sed -n '/[p]tp4l\|[p]hc2sys/p'
-pmc -u -b 0 'GET PORT_DATA_SET'
+pmc -u -b 0 'GET PORT_DATA_SET' 'GET TIME_PROPERTIES_DATA_SET'
+phc_ctl eth0 get
+phc_ctl eth0 cmp
 tcpdump -i eth0 -nn 'udp port 319 or udp port 320'
 tcpdump -i eth0 -nn 'host 192.168.1.100 and (udp port 319 or udp port 320)'
 ```
@@ -207,3 +214,4 @@ ip addr del 192.168.1.12/24 dev eth0 2>/dev/null || true
 
 - Livox Mid-360 sync modes and PoE warning: <https://livox-wiki-en.readthedocs.io/en/latest/tutorials/new_product/mid360/mid360.html>
 - LinuxPTP hardware/software timestamp capability and `ethtool -T` check: <https://raw.githubusercontent.com/richardcochran/linuxptp/master/README.org>
+- LinuxPTP clock direction, `-w`, and time scales: [phc2sys(8)](https://manpages.debian.org/bullseye/linuxptp/phc2sys.8.en.html#TIME_SCALE_USAGE).

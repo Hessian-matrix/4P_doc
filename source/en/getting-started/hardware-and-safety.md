@@ -1,12 +1,12 @@
 # Hardware Connection and Safety
 
 ```{warning}
-Handle V2 camera harnesses, UART, and all unconfirmed interfaces with power off. V2 pinout, electrical ratings, and hot-plug conditions are pending product confirmation; do not inherit V1 4-pin UART images, the `500 mA` limit, or hot-plug claims. Do not wire until connectors, signal order, voltage, common ground, and power direction are confirmed; prevent 5V TTL/RS-232 misconnection or reverse feed.
+Connect camera harnesses and UART with power off. UART1/UART7 retain `3.3V` logic; DEBUG_UART retains `1.8V`. Never apply 5V TTL or RS-232 levels or back-feed power. Use official V2 labeling for the 5-pin order, not V1 4-pin photographs. Use V2 hardware specifications for power ratings and hot-plug conditions; V1 `500 mA` or hot-plug acceptance does not carry over.
 ```
 
 ## Camera Interface
 
-The table retains only software ID, port, and topic associations; CAM1..CAM4 are historical V1 labels. V2 silkscreen and J4/J7/J5/J6-to-software mapping, camera sub-board/FPC revision, pin11/pin17 function, and electrical timing remain unverified.
+Camera hardware and physical mapping remain unchanged from V1:
 
 | Physical silkscreen | Software camera ID | Default RTSP port | ROS2 prefix |
 |---|---:|---:|---|
@@ -15,41 +15,41 @@ The table retains only software ID, port, and topic associations; CAM1..CAM4 are
 | CAM3 | cam2 / camera ID 2 | `556` | `/robobaton/cam2` |
 | CAM4 | cam3 / camera ID 3 | `557` | `/robobaton/cam3` |
 
-RTSP path is `/PRR`; H.264 is default and H.265 optional. Camera callbacks expose NV12: native `1280x1088`, VSE-scaled `640x480`/`720x480`/`1280x720`, with swapped dimensions at `90/270` rotation. V1 A/B FOV and connector illustrations do not establish V2 camera-sub-board, harness, or mechanical compatibility; actual models and connections need confirmation.
+RTSP uses `/PRR`, H.264 by default with optional H.265. NV12 native output is `1280x1088`, with VSE full-frame scaling to `640x480`/`720x480`/`1280x720`; rotation `90/270` swaps width and height. Camera A/B horizontal FOV remains `148.4°`/`115.6°`; see [Product Introduction](Product_Introduction.md) for the remaining camera specifications.
 
 ## Power, Hot-Plug, and Thermal
 
 | Item | Public conclusion |
 |---|---|
-| Main-board power | V2 rated input range, load, reverse-feed protection, and USB-C power/role boundaries pending confirmation; neither V1 DC `12V ~ 24V` nor “USB-C is not a power input” carries over. |
-| Camera FPC / coaxial cable | Power off before connecting; V2 harness and orientation pending confirmation. |
-| UART wiring | V2 actual voltage, signal order, power direction, and rated current pending confirmation; do not wire from old images or assume hot-plug support. |
-| Thermal | V2 fan/thermal thresholds and full-load thermal capability pending confirmation; keep heatsink and airflow clear. |
+| Main-board power | Use official V2 input, load, reverse-feed protection, and USB-C power-role specifications; do not inherit V1 DC `12V ~ 24V` claims. |
+| Camera FPC / coaxial cable | Connect with power off; hot-plug is not supported. |
+| UART | UART1/UART7 use `3.3V`; official V2 labeling defines the complete 5-pin order and power-pin load rating; no hot-plug promise. |
+| Thermal | Keep heatsink and airflow clear; verify V2 thermal control and full-load cooling on the actual system. |
 
 ## UART
 
 ```{figure} ../../image/uart.jpg
-:alt: Historical V1 UART top view, not applicable to V2 wiring
+:alt: Historical V1 UART photograph; replace before V2 product release
 
-Historical V1 photograph for old-product identification only; not a V2 UART position, voltage, or IMU-axis reference. V2 photographs and verified pinouts are pending publication.
+V1 interface image: replace with actual V2 5-pin interface views and pin order before release. Not V2 wiring or IMU-axis guidance.
 ```
 
-| Interface | Purpose | On-device node | Connector |
+| Interface | Purpose | On-device node | Logic level and connector |
 |---|---|---|---|
-| UART1 | Normal user UART; V2 pin voltage pending | Software example `/dev/ttyS1`; board mapping pending | V2 CN2 5-pin; full pinout pending |
-| UART7 | Normal user UART; V2 PPS mux pending | Software example `/dev/ttyS7`; board mapping pending | V2 CN3 5-pin; full pinout pending |
-| DEBUG_UART | System console/debug; not for `serial_port_demo` | V2 node, baud rate, and recovery channel pending | Schematic uses 3 pins; V2 hardware and signal order pending |
+| UART1 | Normal user serial port | `/dev/ttyS1` | `3.3V`, CN2 5-pin |
+| UART7 | Normal serial port, independent IO defaults to PPS input | `/dev/ttyS7` | `3.3V`, CN3 5-pin |
+| DEBUG_UART | System console; not for `serial_port_demo` | Debug terminal `921600` baud | `1.8V`, 3-pin |
 
-### Physical View, Signal Order, and Power Semantics
+The independent V2 UART7 PPS IO does not consume RX/TX. The system configures it as a PPS input by default, without UART-to-PPS multiplexing or pin switching. Use official V2 labeling for pin numbers and orientation; do not guess the added pin or treat it as RTS/CTS. Use a compatible PPS logic level and common ground, with level conversion when needed; see [PPS Sync](../time-sync/pps-sync.md).
 
-V2 CN2/CN3 changed to 5-pin connectors; added signals must not be assumed to provide hardware flow control or PPS. The V1 `GND/TX/RX/3V3` order is no longer a V2 pinout. The schematic retains `1.8V` for DEBUG_UART, but actual UART GPIO_VREF/BOM, adapter voltage, and connector direction still require confirmation.
+Generic USB-UART adapters connect only TX/RX/GND by default, not VCC. Check crossed TX/RX, adapter voltage, and common ground to prevent reverse feed into board power rails.
 
-Until the complete V2 pinout, voltage, and power semantics are confirmed, no rated output-current or hot-plug promise is made. Wire with power off by default and leave USB-UART VCC disconnected; confirm crossed TX/RX, common ground, and prevent reverse feed into board power rails.
+## Trigger and Sampling
 
-The producer resolves camera common trigger `34130000.gpio` offset `0` and drives it exclusively; IMU INT1 uses `34120000.gpio` offset `8`. V2 IMU FSYNC input shares the camera trigger net, but waveform/electrical limits and exposure correspondence still need acceptance; this does not establish camera/IMU hardware sample alignment.
+All camera acquisition entry points use VIN LPWM hardware triggering. Camera and IMU FSYNC physical trigger lines share the same IO; software GPIO triggering is not used. IMU INT1 uses `34120000.gpio` offset `8`. A shared trigger line does not automatically associate IMU FIFO samples one-to-one with image exposures. Verify clock domain, trigger capture, and sample association separately; frame arrival time is not LPWM trigger time.
 
 ## Camera Application Resource Constraints
 
-- `cam-service` is a dependency of camera operation; the user must not stop it.
-- Camera applications require exclusive camera/VIO/encoding resources; before switching between `sensor_demo`, `cam_demo`, ROS2 nodes, or a custom camera application, exit the old application normally first.
-- Single-sensor diagnostics use `cam_demo --camera-id 0/1/2/3 --diagnostics`; run only one camera demo at a time.
+- Keep the required `cam-service` running; do not stop or reconfigure it.
+- Exit the old application normally before switching between `sensor_demo`, `cam_demo`, ROS2, or custom camera applications. Do not share camera/VIO/encoding resources concurrently.
+- Use `cam_demo --camera-id 0/1/2/3 --diagnostics` for single-camera diagnostics, with only one camera demo running.

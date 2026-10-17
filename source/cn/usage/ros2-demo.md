@@ -26,7 +26,7 @@ ROS2 包名为 `robobaton_4p_ros2_demo`；软件版本以包内 `VERSION`/`packa
 
 当前不提供 RTSP、相机/IMU 硬同步、TF 外参、相机内参或畸变标定。`CameraInfo` 只发布当前帧宽高，标定字段为空；IMU orientation 不可用。
 
-软件 cam0..cam3 对应 `/robobaton/cam0..3`；V2 物理连接器/丝印对应关系待确认，不能直接套用 V1 CAM1..CAM4 映射；见[硬件连接与安全](../getting-started/hardware-and-safety.md#相机接口)。
+CAM1..CAM4 依次对应软件 cam0..cam3 与 `/robobaton/cam0..3`，物理映射与 V1 保持一致；见[硬件连接与安全](../getting-started/hardware-and-safety.md#相机接口)。
 
 ## Topics
 
@@ -156,7 +156,7 @@ FastDDS SHM 和环境变量检查：
 |---|---:|---|
 | `enable_camera` | `true` | 是否启动相机 publisher。 |
 | `enable_imu` | `true` | 是否启动 IMU publisher。 |
-| `camera.camera_mask` | `15` | bit0..bit3 对应软件 cam0..cam3；V2 物理映射待确认；只支持单颗或完整四路，不支持 2/3 路。 |
+| `camera.camera_mask` | `15` | bit0..bit3 依次对应 CAM1..CAM4 / 软件 cam0..cam3；只支持单颗或完整四路，不支持 2/3 路。 |
 | `camera.fps` | `30` | 支持`25/30/40/50/60fps`；其他值在启动相机前拒绝。 |
 | `camera.rotate_degrees` | `0` | 支持 `0/90/180/270`；`180` 只允许 `30fps`，`25/40/50/60fps`拒绝；`0/180` 输出 `1280x1088`，`90/270` 输出 `1088x1280`。 |
 | `camera.frame_set_max_skew_ns` | `10000000` | 帧组放行上限，单位 ns；默认覆盖四路曝光上限10ms。 |
@@ -168,7 +168,7 @@ FastDDS SHM 和环境变量检查：
 | `camera.publish_compressed_image` | `true` | 是否注册 raw 与 compressed image_transport 发布插件。 |
 | `camera.compressed_jpeg_quality` | `80` | JPEG quality，范围 `1..100`。 |
 | `camera.frame_id_prefix` | `robobaton_cam` | 生成 `robobaton_cam0_optical_frame` 等 frame_id。 |
-| `camera.trigger_mode` | `vin_lpwm` | VIN 硬件触发；公开只接受 `vin_lpwm` 或 `none`。`software_gpio` 已关闭公开入口，仅保留为主仓内部调试路径。 |
+| `camera.trigger_mode` | `vin_lpwm` | 仅支持 VIN LPWM 硬件触发；其他值拒绝。 |
 | `imu.sample_rate_hz` | `800` | 只接受原生 `25/50/100/200/400/800/1600`；旧 `500/1000/2000` 明确拒绝。 |
 | `imu.read_mode` | `sensor_timestamp_fifo` | 当前只支持该模式。 |
 | `imu.fifo_watermark_samples` | `1` | 当前固定为 `1`。 |
@@ -184,6 +184,6 @@ raw `Image` 使用 NV12。`Image.step` 保留底层 DMA buffer 的 stride；`dat
 compressed topic 是标准 `CompressedImage` JPEG payload。插件只在有 `/image_raw/compressed` 订阅者时执行压缩：它按 `Image.step` 和 `data.size()` 校验 NV12 布局，把有效 Y/UV 行复制到 X5 media-codec 输入 buffer，并通过 `MEDIA_CODEC_ID_JPEG` 生成 JPEG，保留原始消息的 `header`。
 
 
-`header.stamp` 不是发布时刻。在 `software_gpio` 模式（仅主仓内部调试，不对外公开）下，节点启动时冻结 `CLOCK_REALTIME - CLOCK_MONOTONIC_RAW` offset，并把相机 SC132 raw timestamp 映射到 system realtime/ROS stamp。显式 `none` 诊断模式保留底层 SC132 时间域，不声明为 V1 wall/realtime 合同。IMU `sample_timestamp_ns` 会通过同一个冻结 offset 映射到 system realtime/ROS 时间戳；IMU 不使用 `host_timestamp_ns` 作为消息时间。
+`header.stamp` 不是发布时刻。相机直接保留 SIF 原生计数器域的 LPWM `trig_tv` 触发捕获值；IMU 直接使用 RAW 域的 `sample_timestamp_ns`，不转换至 realtime，也不使用 `host_timestamp_ns`。相机 SIF→RAW 映射尚未实现，不能直接按图像/IMU stamp 同步配对；二者也不能与节点 `now()` 或 `/clock` 比较。RAW 只在同一设备、同次启动内有共同参考。共用 LPWM IO 不自动建立 FSYNC 样本/曝光关联，PTP 也不会自动转换这些时间域。
 
 `CameraInfo` 只带当前帧宽高，畸变模型和标定矩阵为空。IMU orientation 不可用，消息设置 `orientation_covariance[0] = -1.0`；gyro/accel 协方差当前不伪造。`robobaton_imu_link` 只标识 IMU 消息来源；它不建立到相机、base、optical frame 或其他坐标系的变换，也不声明 TF 或外参。

@@ -2,13 +2,20 @@
 
 This file records user-visible updates in the RoboBaton 4P public delivery, following the shared [Documentation Version Policy](release-and-support.md#documentation-version-policy). Documentation revisions on this page do not automatically change software versions and are distinct from SO SONAME/ABI versions.
 
+## Unreleased
+
+- IMU CLI, saving, and ROS2 stamps retain `CLOCK_MONOTONIC_RAW` sample times directly; bag record time uses RAW. The frozen RAW-to-realtime offset is removed. Consumers relying on the old UTC epoch must migrate and cannot compare stamps directly with ROS `now()` or `/clock`.
+- Cameras still retain SIF hardware trigger-edge captures; SIF-to-RAW mapping is not implemented. This consumer cutover does not establish a common camera/IMU domain or hardware synchronization.
+
 ## 2.0.0 - 2026-10-15
 
 V2.0.0 release: software and documentation versions unified to 2.0.0, with default trigger mode switched to LPWM.
 
-- Camera/ROS2 default trigger mode changes from `software_gpio` to `vin_lpwm` (VIN hardware trigger).
-- Closes the `software_gpio` public entry: non-ROS `--trigger-mode` and ROS2 `camera.trigger_mode` accept only `vin_lpwm` or `none`.
-- `software_gpio` remains a main-repo internal debug path, driven by presetting `SC132_TRIGGER_MODE` in the process environment; it is not publicly exposed.
+- All camera acquisition entries support only `vin_lpwm` (VIN LPWM hardware triggering); software GPIO and free-run paths are removed.
+- Camera timestamps preserve frame-propagated `trig_tv` trigger captures in the native SIF counter domain, not RAW/UTC. Sharing the camera/IMU wire does not establish sample/exposure association.
+- V2 images are explicitly unreleased. Remove V1 TF/fan device-tree repairs, ISP parameter replacement, and UART7-to-PPS mux steps; use the default independent PPS IO. Mark old product/interface images for replacement before release. Camera mapping, FOV, factory networking, and UART levels remain unchanged.
+- The PTP master PHC uses the PTP/TAI time scale; `phc2sys -w` follows the UTC offset from `ptp4l` instead of using `-O 0`. Hardware `hwts_filter full` lets the master receive Delay_Req timestamps and return Delay_Resp. Passing master/packet checks does not establish slave lock or absolute UTC accuracy.
+- Bags use a separate, nondecreasing common recording clock. Images and CameraInfo retain camera capture times; IMU messages retain sample times. Session configuration declares the three domains separately, preventing cross-domain numeric comparisons from corrupting record order. Missing LPWM captures produce at most one terminal callback, serialized by the dispatcher, with callback-side stop requests supported.
 
 ## 1.3.3 - 2026-10-11
 
@@ -48,7 +55,7 @@ This update revises build scripts and documentation within the 1.3 series. All s
 
 ### Improvements and Fixes
 
-- Releases the updated SC132GS ISP tuning parameter `patch/sc132gs_tuning.json`, improving image quality in some lighting scenarios; usage and rollback are in {ref}`Fixes and Upgrades: ISP Image Quality Fix <isp-image-quality-fix>`.
+- Releases the updated SC132GS ISP tuning parameter `patch/sc132gs_tuning.json`, improving image quality in some lighting scenarios.
 
 ## 1.2.0 - 2026-09-14
 

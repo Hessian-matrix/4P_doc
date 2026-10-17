@@ -2,95 +2,22 @@
 
 (system-flashing)=
 
-```{note}
-系统烧录是把 RoboBaton 4P 出厂系统镜像写入板载EMMC的整机级操作，用于恢复出厂系统、升级系统版本或修复无法正常启动的系统。该操作会覆盖板载系统分区，与运行包（`/root/demo`、`/root/ros2_demo`）的部署、升级与回滚不同，后者见 [部署、升级与回滚](../development/deployment-and-upgrade.md)。
-```
-
 ```{warning}
-烧录会覆盖板载 eMMC 并清除其中的全部用户数据。写入期间必须保持供电稳定，严禁断电、拔掉烧录介质或强制重启，否则设备可能无法启动。只使用本页发布的 `v1.3.0` 镜像，不要使用其他 X5 板型的镜像。
+V2 系统镜像尚未发布。本页仅保留发布占位，当前没有可用于 V2 的公开镜像下载、校验值或已确认的烧录步骤。不要将 V1 镜像、TF/风扇设备树修复包或其他 X5 板型镜像写入 V2。
 ```
 
-## 1. 适用范围
+## V2 镜像发布状态
 
-本烧录流程只适用于本产品原装板卡；出厂系统镜像只适用于原产品原板，不保证其他目标板的兼容性，见 [产品版本与兼容性](../getting-started/product-and-compatibility.md)。
-
-需要系统烧录的典型场景：
-
-| 场景 | 说明 |
+| 项目 | 状态 |
 |---|---|
-| 系统无法正常启动 | 无法通过 [故障排查](../troubleshooting.md) 恢复，需要重新写入系统 |
-| 恢复出厂系统 | 把板载系统恢复到出厂状态 |
-| 系统版本升级 | 把系统升级到新的出厂镜像版本 |
+| V2 出厂系统镜像 | 待发布 |
+| 版本、包名与下载链接 | 待镜像完成后公布 |
+| SHA-256 与适用硬件 | 随正式镜像公布 |
+| 烧录工具、连接方式与步骤 | 随匹配 V2 镜像确认后公布 |
+| 烧录界面与接口图 | 发布前替换为实际 V2 资料 |
 
-只升级 non-ROS demo 或 ROS2 运行包时**不需要**烧录系统；运行包采用整包部署、校验和回滚流程，见 [部署、升级与回滚](../development/deployment-and-upgrade.md)。
+系统烧录会覆盖板载 eMMC 系统和用户数据；正式操作前必须备份。镜像未发布期间，不依据旧版截图、包名或烧录流程执行恢复操作；无法启动时联系[产品支持](../release-and-support.md)。
 
-## 2. 当前镜像发布状态
+## 运行包更新
 
-- 板端软件 `v1.3.0` 配套的系统镜像已随本版发布，镜像包名 `product-20260918-v1.3.0.tar.gz`。
-- 镜像只适用于原产品原板，不保证其他目标板的兼容性（[产品版本与兼容性](../getting-started/product-and-compatibility.md)）。
-
-## 3. 镜像与烧录工具下载
-
-- 镜像：[V1.3.0 镜像](https://www.hessian-matrix.com/wp-content/uploads/2026/automaticupdates/product-20260918-v1.3.0.tar.gz)
-- 烧录工具：[地瓜官方烧录工具](https://www.hessian-matrix.com/wp-content/uploads/2026/automaticupdates/xburn-gui_1.2.1_x64-setup.exe)
-
-## 4. 烧录前准备
-
-- 下载烧录工具和镜像文件，将 `product-20260918-v1.3.0.tar.gz` 解压到电脑本地目录。
-- 安装烧录工具，直接双击 xburn-gui_1.2.1_x64-setup.exe 安装到电脑本地。
-- 安装对应驱动：
-
-  ```{figure} ../../image/driver.png
-  :alt: xburn 烧录工具要求的驱动安装界面
-
-  xburn 烧录工具要求的驱动安装界面。
-  ```
-
-- 烧录会清除板载存储中的全部用户数据，先备份需要保留的数据（例如 `/userdata/` 下的现场配置和证据）。
-- 确认镜像与目标板匹配：镜像来自本页 `v1.3.0` 链接，板端为原装板卡。
-
-## 5. 烧录步骤
-
-1. 在板卡断电状态下，将板端 DEBUG_UART（通过 `1.8V` USB-UART 适配器）和 USB-C 连接到电脑。USB-C 仅用于数据连接，不作为供电口；准备好符合供电要求的 DC 电源，待第 3 步提示时再上电。接口与接线要求见 [硬件连接与安全](../getting-started/hardware-and-safety.md)。
-2. 选择对应的串口号，波特率设为 `921600`；在 **Image Directories** 中选择解压后的镜像目录，而不是 `.tar.gz` 压缩包：
-
-   ```{figure} ../../image/burn.png
-   :alt: xburn 烧录工具主界面，配置串口号与镜像路径
-
-   xburn 烧录工具主界面，配置串口号与镜像路径。
-   ```
-
-3. 点击 **Start Burn**，按照工具提示通过 DC 接口给设备上电，然后等待烧录完成。确认进度达到 **100%**、状态显示 **Success**，且日志显示 `Process terminated, exit code: 0`：
-
-   ```{figure} ../../image/Flashing_complete.png
-   :alt: xburn 烧录完成界面，进度为 100%，状态为 Success，退出码为 0
-
-   烧录成功示例：进度为 100%，状态为 Success，退出码为 0。
-   ```
-
-4. 确认工具报告烧录成功后，再重启设备。
-
-注意：只使用本页发布的 `v1.3.0` 镜像，不要自行刷写未确认的镜像。
-
-## 6. 烧录后验收
-
-烧录完成后按 [首次上电与开机使用](../getting-started/first-boot.md) 完成最小系统检查：
-
-```bash
-hostname
-date
-df -h /
-pgrep -a cam-service
-```
-
-## 7. 问题未解决时
-
-烧录后无法启动或系统异常时，停止反复烧录、保留现场，并收集：
-
-- `board_id` 与 `/etc/version`；
-- 镜像来源与校验结果；
-- 烧录工具输出与退出码；
-- 是否实际执行过重启及重启后的现象；
-- 如可获得，DEBUG_UART/串口现场信息。
-
-连同 [发布、授权与支持](../release-and-support.md) 的反馈清单提交产品支持。不要在没有产品支持确认的情况下使用其他 X5 镜像重复烧录。
+只更新 non-ROS 或 ROS2 运行包不需要烧录系统，使用[部署、升级与回滚](../development/deployment-and-upgrade.md)。软件版本、文档修订号与系统镜像版本分别识别，不因本页占位自动改变。

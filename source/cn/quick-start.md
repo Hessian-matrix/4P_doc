@@ -31,7 +31,7 @@ CAM3 / cam2 -> rtsp://192.168.1.12:556/PRR
 CAM4 / cam3 -> rtsp://192.168.1.12:557/PRR
 ```
 
-CAM1/CAM2/CAM3/CAM4 是 V1 图中的物理丝印；这里的 cam0/cam1/cam2/cam3 是软件 ID，V2 物理接口与软件 ID 的对应关系尚待核实；上述 IP 是 V1 出厂默认示例，V2 上应换成已确认的实际地址。
+CAM1/CAM2/CAM3/CAM4 依次对应软件 cam0/cam1/cam2/cam3，物理映射与 V1 保持一致。出厂地址保持 `192.168.1.12/24`；如已修改地址，使用设备实际地址。
 
 Windows 上可使用 EasyPlayer 查看四路 RTSP 画面。
 
@@ -95,4 +95,5 @@ pgrep -af 'sensor_demo|cam_demo|robobaton_sensors_node|ros2 launch|ros2 run' || 
 usage/non-ros-demo
 usage/save-data-guide
 usage/ros2-demo
+usage/usb-gadget-switch
 ```

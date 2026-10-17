@@ -25,6 +25,8 @@ ROS1 bag 与 MP4 是两种互斥的保存模式，当前不能在同一个进程
 
 只有进程退出码为 0 且对应 `SENSOR_*_RESULT` 明确报告完整，才可把数据作为正式完整数据使用。`.partial`、非零退出码或 `data_complete=no` 只能作为恢复或诊断数据。
 
+图像、frame metadata 和 MP4 精确索引保留 SIF 原生 LPWM `trig_tv` 捕获值，不是 UTC；IMU CSV/bag 时间直接保留 FIFO TMST→RAW 映射结果，不加 realtime offset。bag record time 也使用 RAW。相机 SIF→RAW 映射尚未实现，不能直接按相机/IMU时间戳配对。MP4 相对播放时间不建立跨传感器时钟映射，详见[数据合同](../development/data-contracts.md)。
+
 ## 2. 版本与运行包一致性
 
 每次部署都必须复制完整 `demo/` 运行包，不能只替换 `sensor_demo` 或某一个 `.so`。

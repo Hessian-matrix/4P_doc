@@ -144,7 +144,7 @@ pgrep -a cam-service
 --rotate <0|90|180|270>
 --bps <kbps>
 --url <path>
---trigger-mode <vin_lpwm|none>
+--trigger-mode vin_lpwm
 --diagnostics
 --max-skew-ns <ns>
 --frame-timeout-ms <ms>
@@ -154,8 +154,7 @@ Trigger 模式状态：
 
 | 模式 | 当前状态 |
 |---|---|
-| `vin_lpwm` | 默认，VIN 硬件触发。 |
-| `none` | 显式 free-run 诊断。 |
+| `vin_lpwm` | 唯一支持的模式，VIN LPWM 硬件触发；其他值拒绝。 |
 
 限制：`--width/--height` 接受 `1280x1088`（默认）、`640x480`、`720x480`、`1280x720`，两种轴向写法均合法，其余组合拒绝；缩放由 `libsc132` VSE 硬件整幅拉伸完成，不改变 FOV。`--rotate 180`只支持`30fps`，不支持`25fps`、`40fps`、`50fps`和`60fps`。对外 NV12/RTSP 画布在旋转 `0/180` 时宽高不变（如 `1280x1088`、`640x480`），旋转 `90/270` 时宽高交换（如 `1088x1280`、`480x640`）。相机、RTSP、ROS1 bag和H.264 MP4使用同一`25/30/40/50/60fps`公开帧率集合。
 
@@ -238,19 +237,19 @@ cd /root/demo
 
 关键字段：
 
-- `ts_ns`：映射到 `system_realtime` epoch 的 IMU sample 时间戳，单位 `ns`。
+- `ts_ns`：`CLOCK_MONOTONIC_RAW` 域的 IMU sample 时间戳，单位 `ns`，不再转换至 realtime。`TIME_BASE domain=monotonic_raw monotonic_raw_start_ns=...` 声明本机 RAW 启动参考，不是相机 SIF→RAW 映射或 UTC 锚点。
 - `accel_mps2`：加速度，单位 `m/s^2`。
 - `gyro_rps`：角速度，单位 `rad/s`。
 - `uncertainty_us`、`gpio_gap_count`、`fifo_overflow_count`、`mapper_failure_count`：时间戳映射和采集链路诊断。
 
 V2 `accel_mps2` 按 `[X, Y, Z]` 输出；PCB 安装方向和符号尚待实板六面/旋转验证，不以 V1 顶视图推断正负轴或相机坐标变换。
 
-IMU INT1 使用 `34120000.gpio` offset `8`，FIFO TMST 为逐样本时间；相机触发由 producer 独占 `34130000.gpio` offset `0`。V2 IMU FSYNC 输入虽与相机触发共网，当前不提供样本/曝光对齐。
+IMU INT1 使用 `34120000.gpio` offset `8`，FIFO TMST 为逐样本时间；相机使用 LPWM，输出时间来自 VIN 随帧传播的触发捕获，不是到帧时间。相机和 IMU FSYNC 共用同一物理 IO；这不自动提供 FIFO 样本与曝光的一一对应。
 
 ## 8. 串口 Demo
 
 
-V1 UART1/UART7 的 3.3V 通信和热插拔属于历史验收，不适用于 V2 接线。V2 CN2/CN3 为 5P，实际 pinout、电平、设备节点和供电脚限值待确认；额外脚不默认为流控或 PPS。`serial_port_demo` 不适用于 DEBUG_UART。断电接线、先核实线序和对端电平，不要依据 V1 的 GH1.25-4P、`500 mA`、热插拔或顶视图接线；见[硬件连接与安全](../getting-started/hardware-and-safety.md#uart)。
+UART1/UART7 逻辑电平保持 `3.3V`，设备节点为 `/dev/ttyS1`、`/dev/ttyS7`；DEBUG_UART 为 `1.8V`，不适用于 `serial_port_demo`。V2 CN2/CN3 为 5pin；CN3 的独立 IO 默认作为 PPS 输入，无需切换 UART7 RX/TX。完整线序和供电脚额定值以正式 V2 资料为准，断电接线，不继承 V1 `500 mA` 或热插拔承诺；见[硬件连接与安全](../getting-started/hardware-and-safety.md#uart)。
 
 ```bash
 cd /root/demo
