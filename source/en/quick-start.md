@@ -22,6 +22,8 @@ cd /root/demo
 
 `sensor_demo` runs four SC132 cameras, PRRTSP v2 H.264 RTSP streaming, and ICM-42670-P IMU acquisition (native default `800Hz`). The default image is `1280x1088@30fps`, supporting `25/30/40/50/60fps`; the output canvas supports `1280x1088`/`640x480`/`720x480`/`1280x720`. V2 on-board acceptance is still pending.
 
+Saving and FSYNC default off. See [non-ROS Demo Usage](usage/non-ros-demo.md) and [Saving Data](usage/save-data-guide.md) for bag/MP4 recording, explicit `--fsync --sample-rate-hz 1600`, and per-frame ISP exposure estimates. Cameras need read-only `/dev/mem` and realtime scheduling permission; configuration failure rejects startup. Exposure estimates do not change trigger stamps.
+
 Four-channel RTSP URLs:
 
 ```text
@@ -75,7 +77,7 @@ ros2 topic echo /robobaton/cam0/camera_info --once
 ros2 run robobaton_4p_ros2_demo robobaton_imu_rate_monitor
 ```
 
-Expect the topic list to include `/robobaton/cam0..3/image_raw`, `/robobaton/cam0..3/image_raw/compressed`, `/robobaton/cam0..3/camera_info`, `/robobaton/imu/data`, and `/robobaton/imu/temperature`. raw/compressed image QoS is Reliable + KeepLast(8); CameraInfo is Reliable + Transient Local + KeepLast(1). ROS2 does not provide RTSP; use non-ROS `/root/demo` when RTSP is needed.
+Expect `/robobaton/cam0..3/image_raw`, `/robobaton/cam0..3/image_raw/compressed`, `/robobaton/cam0..3/camera_info`, `/robobaton/cam0..3/exposure`, `/robobaton/imu/data`, and `/robobaton/imu/temperature`. raw/compressed images and exposure use Reliable + KeepLast(8); CameraInfo uses Reliable + Transient Local + KeepLast(1). Exposure JSON `status=1` is only an estimate. `/robobaton/fsync` defaults off; see [ROS2 Demo Usage](usage/ros2-demo.md) for enabling and checking it. ROS2 does not provide RTSP; use non-ROS `/root/demo` when RTSP is needed.
 
 ## 4. Stop the Program
 

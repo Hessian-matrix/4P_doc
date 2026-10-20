@@ -6,7 +6,7 @@
 
 当前文档修订号、软件发布版本和统一版本定义见 [发布、授权与支持](../release-and-support.md#文档版本政策)。文档修订不要求软件版本同步递增。
 
-V2 IMU 为 ICM-42670-P，API `icm42670_*`，real SO `libicm42670.so.2.0.0`、SONAME `libicm42670.so.2`、节点 `ICM42670_X5_2.0`。不兼容 V1 ICM 库；头文件、库、consumer 和配置必须成套更新。原生 ODR `25/50/100/200/400/800/1600Hz`，默认 `800Hz`；旧 `500/1000/2000Hz` 明确拒绝，不静默重采样。
+V2 IMU 为 ICM-42670-P，API `icm42670_*`，real SO `libicm42670.so.2.0.0`、SONAME `libicm42670.so.2`；当前 ABI 2.1 的基础函数节点为 `ICM42670_X5_2.0`，新增 FSYNC callback 为 `ICM42670_X5_2.1`。不兼容 V1 ICM 库；头文件、库、consumer 和配置必须成套更新。原生 ODR `25/50/100/200/400/800/1600Hz`，默认 `800Hz`；旧 `500/1000/2000Hz` 明确拒绝，不静默重采样。
 
 | 交付物 | 用户入口 |
 |---|---|
@@ -19,8 +19,8 @@ V2 IMU 为 ICM-42670-P，API `icm42670_*`，real SO `libicm42670.so.2.0.0`、SON
 
 | 路径 | 主要能力 | 运行目录 | 备注 |
 |---|---|---|---|
-| non-ROS | 四路 RTSP、IMU、UART 示例、公开 C ABI | `/root/demo` | RTSP 端口 `554..557`，path `/PRR`；H.264 默认，H.265 可选。 |
-| ROS2 | raw/compressed 图像、CameraInfo、IMU、温度 topic | `/root/ros2_demo/install` | ROS2 Humble；compressed 使用 X5 `MEDIA_CODEC_ID_JPEG` 硬件编码；不提供 RTSP。 |
+| non-ROS | 四路 RTSP、IMU、UART、互斥 bag/MP4 保存、可选 FSYNC 与曝光观测 | `/root/demo` | RTSP `554..557/PRR`，H.264 默认、H.265 可选；四路拼接示例为 `558/PRR`。 |
+| ROS2 | raw/compressed 图像、CameraInfo、逐帧曝光观测、IMU、温度与可选 FSYNC | `/root/ros2_demo/install` | ROS2 Humble；compressed 使用 X5 `MEDIA_CODEC_ID_JPEG` 硬件编码；不提供 RTSP。 |
 
 两条路径不要混用目录、头文件或 `.so`，同一时间只运行一个占用 camera/VIO/编码资源的应用。
 
@@ -33,8 +33,11 @@ V2 IMU 为 ICM-42670-P，API `icm42670_*`，real SO `libicm42670.so.2.0.0`、SON
 | 交叉编译 | 只在开发机使用 X5 交叉编译包；不建议在 X5 板端原生编译。 |
 | non-ROS相机配置 | 默认`1280x1088@30fps`；支持`25/30/40/50/60fps`；输出画布 `1280x1088`/`640x480`/`720x480`/`1280x720`。 |
 | Trigger | 所有相机入口仅支持 `vin_lpwm`（VIN LPWM 硬件触发）；不提供 free-run 或软件 GPIO 触发。 |
+| 权限与调度 | 相机需要只读 `/dev/mem`，捕获和 IMU 实时线程需要调度权限，失败拒绝启动；详见[数据合同](../development/data-contracts.md)。 |
 
 ROS2 路径不提供 RTSP；需要 RTSP 时使用 non-ROS 路径。当前不提供TF、外参、相机内参或畸变标定；CameraInfo 只有宽高，IMU orientation 不可用。
+
+当前相机 ABI 2.2 新增逐帧冻结的 ISP `exposure` 观测，保留旧 frame-info 前缀和 SONAME；估计值不证明该帧实际生效曝光。FSYNC 默认关闭，仅 `800/1600Hz` 可开启，提供触发—样本唯一关联而非曝光同步。软件版本相同不证明包内功能相同：按 [changelog](../changelog.md) 区分未发布更新，并核对 manifest、头文件和实际库。
 
 ## 出厂系统镜像与目标板兼容性
 

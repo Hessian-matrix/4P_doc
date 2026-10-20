@@ -6,6 +6,8 @@
 保持 `cam-service` 运行。更新前只退出旧的 `sensor_demo`、`cam_demo` 或其他相机应用，不停止 `cam-service`。
 ```
 
+当前源码包含未发布的 realtime、FSYNC 与曝光观测更新，软件版本字符串本身不能识别工件组成；按 [版本更新记录](../changelog.md) 与 manifest 选择整套头文件、库和 consumer。相机 ABI 2.2、IMU ABI 2.1 不改变当前 SONAME；部署后核对实际 `--version`、曝光 sidecar/topic 和 FSYNC 配置，不能仅凭旧包版本号推断具备这些功能。本页部署流程不升级 BSP、不修改 IRQ/debug 或实时配额，也不替代目标板功能验证。
+
 ## 1. non-ROS 预检
 
 开发机准备：

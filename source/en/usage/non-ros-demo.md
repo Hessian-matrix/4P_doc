@@ -54,7 +54,9 @@ On exit it prints an IMU summary:
 ```text
 SENSOR_IMU_RESULT samples=... invalid=... timestamp_duplicates=... timestamp_regressions=... effective_hz=...
 ```
-`timestamp_duplicates=0`, `timestamp_regressions=0` are the key observations for timestamp monotonicity.
+In a window without system-clock corrections, check `timestamp_duplicates=0` and `timestamp_regressions=0`. Public realtime stamps may move backward with clock corrections; a regression across such a window alone is not a hardware-ordering failure. Also inspect sequences, timing drops, final health counters, and actual payloads.
+
+`--imu-sample-drop-policy allow-counted` is the default: samples with provable identity but inadmissible timing are counted and dropped while acquisition continues. `strict` fails on timing/invalid-packet rejection. Unprovable identity, an invalid clock certificate, or hardware errors stop both policies. `--imu-start-order camera-first|imu-first` controls startup order, default `camera-first`, without changing timestamps or association contracts.
 
 ## 3. YAML Configuration
 
@@ -77,6 +79,7 @@ imu:
   sample_rate_hz: 800
   print_rate_hz: 10
   print_metrics: false
+  fsync_enabled: false
 save_data:
   save: false
   format: mp4
@@ -115,7 +118,7 @@ cd /root/demo
 
 MP4 mode requires `rtsp.codec: h264`, the full four-channel camera mask `0x0f`, and must not enable `--record-bag` or `record-frame-skip` at the same time. The configured final output directory must not end with `.partial`; if the target directory or a same-named `.partial` already exists, the program automatically writes to the sibling `<dirname>-YYYYMMDDTHHMMSSZ[-NNNN]`, and the exit summary `SENSOR_MP4_RESULT path=` gives the real directory.
 
-A complete MP4 session contains `camera0.mp4` through `camera3.mp4`, `camera0_timestamps.csv` through `camera3_timestamps.csv`, `imu.csv`, `camera_params.yaml`, `session_status.json`, and `publication_receipt.json`. MP4 files use nominal H.264 frame timing; precise nanosecond camera timestamps are in the same directory's `cameraN_timestamps.csv`. Incomplete runs are kept as `.partial` recovery directories and cannot be treated as complete data sources.
+Current MP4 sessions contain `camera0.mp4` through `camera3.mp4`, four `cameraN_timestamps.csv` files, `imu.csv`, `exposure.jsonl`, `fsync.jsonl`, `camera_params.yaml`, `session_status.json`, and `publication_receipt.json`. `fsync.jsonl` is always created but receives association records only with FSYNC enabled. MP4 uses nominal H.264 frame timing; timestamp CSV stores microsecond-quantized realtime group-trigger times expressed in ns. Original per-camera values are in the input exposure sidecar and, with FSYNC enabled, association records. Exposure `status=1` is an estimate, not certified applied exposure; the input sidecar may outnumber encoded frames. See [Data Contracts](../development/data-contracts.md) for joins. `.partial` is recovery-only, not a complete data source.
 
 To convert to a JPEG dataset offline, use the scripts in the public demo repository on the host:
 
@@ -237,7 +240,7 @@ It prints sampled records at `10Hz` by default; the program still consumes all I
 
 Key fields:
 
-- `ts_ns`: the IMU sample timestamp in `CLOCK_MONOTONIC_RAW`, in `ns`, without realtime conversion. `TIME_BASE domain=monotonic_raw monotonic_raw_start_ns=...` declares the local RAW startup reference, not a camera SIF-to-RAW mapping or UTC anchor.
+- `ts_ns`: IMU sample time in `CLOCK_REALTIME`, in `ns`, provided by the producer's FIFO TMST-to-RAW-to-realtime mapping; `host_ts_ns` is the INT1 edge in the same domain. `TIME_BASE domain=realtime realtime_start_ns=...` reports a startup system reference, not a frozen offset. Runtime clock corrections can move subsequent stamps backward.
 - `accel_mps2`: acceleration in `m/s^2`.
 - `gyro_rps`: angular velocity in `rad/s`.
 - `uncertainty_us`, `gpio_gap_count`, `fifo_overflow_count`, `mapper_failure_count`: timestamp mapping and acquisition-link diagnostics.
@@ -245,6 +248,10 @@ Key fields:
 V2 `accel_mps2` outputs `[X, Y, Z]`; PCB orientation and signs still need six-face/rotation board verification. Do not infer axis signs or camera-frame transforms from V1 top-view images.
 
 IMU INT1 uses `34120000.gpio` offset `8`, with per-sample FIFO TMST timing. Cameras use LPWM and the VIN-propagated trigger capture, not frame arrival time. Camera and IMU FSYNC share one physical IO; this does not automatically associate FIFO samples one-to-one with exposures.
+
+Use `sensor_demo --fsync --sample-rate-hz 1600` or YAML `imu.fsync_enabled: true` for explicit association (default off, only `800/1600Hz`). Without saving, stdout emits `robobaton_fsync_v1` JSON; saving stores bag `/robobaton/fsync` or MP4 `fsync.jsonl`. Only `status=1` is a unique match. Check timing drops, sequence gaps, and `SENSOR_FSYNC_RESULT`; sample correspondence is not exposure synchronization. See [Data Contracts](../development/data-contracts.md).
+
+Realtime scheduling permission is required: camera capture uses `SCHED_FIFO/60`, IMU owner `SCHED_FIFO/20`, INT1 observer `SCHED_FIFO/30`, and the combined application's IMU consumer `SCHED_RR/3`. Both observers inherit the allowed CPU mask and sleep `50µs` per iteration. Scheduling failure rejects startup. Applications do not automatically change IRQ/debug or realtime quotas; high load can cause counted drops or failure. Storage and association acceptance must also inspect `IMU_RUNTIME_HEALTH final=yes health_valid=yes` after successful stop, not merely continued terminal output.
 
 ## 8. Serial Demo
 

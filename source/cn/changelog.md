@@ -4,8 +4,25 @@
 
 ## 未发布
 
-- IMU CLI、保存和 ROS2 stamp 直接保留 `CLOCK_MONOTONIC_RAW` 样本时间；bag record time 使用 RAW，不再提供 RAW→realtime 冻结 offset。使用旧 UTC epoch 的消费端必须迁移，不能与 ROS `now()` 或 `/clock` 直接比较。
-- 相机仍保留 SIF 硬件触发沿捕获，SIF→RAW 映射尚未实现；本次消费链切换不代表相机/IMU 已同域或已硬件同步。
+- 相机、IMU、CLI、保存和 ROS2 对外传感器时间戳统一为 `CLOCK_REALTIME` 系统时间。相机通过有界 VSYNC 交叉采样及同计数器触发差值还原硬件触发沿，不使用 IRQ/到帧时间兜底；缺少有效映射即停止。
+- RAW 仅用于内部映射/配组；每次发布刷新 realtime 桥接，运行中校时允许回拨。bag record time 独立读取 realtime，不再强制递增，chunk index 按时间排序。统一时间域不代表相机/IMU 样本或曝光已硬件同步；旧 SIF/RAW 时间消费端必须成套迁移头文件、SO 和应用。
+- 新增显式开启的 LPWM→ICM-42670-P FSYNC 触发—样本关联：硬件 FIFO 标记、相邻绝对 TMST 有界重建、RAW 唯一候选匹配及缺失/歧义状态。non-ROS `--fsync`、YAML/ROS2 `imu.fsync_enabled` 默认关闭，仅支持 `800/1600Hz`；保留 `200µs` admission 策略，不保证所有触发均匹配或曝光同步。结果传至 stdout、bag `/robobaton/fsync`、MP4 `fsync.jsonl` 和 ROS2 同名 topic。
+- ICM ABI minor 为 `2.1`：新增独立 FSYNC callback 使用 `ICM42670_X5_2.1`，原函数节点、结构尺寸、real SO 文件名及 SONAME 不变。相机 frame-set reserved 字段提供 RAW 触发、组不确定度与 generation，外部时间仍为 realtime。
+- 关联结果保留逐路原始 realtime stamp，支持与 ROS2 Image/CameraInfo 精确核对；整数 JSON 需无损解析。MP4 timestamp CSV 是微秒量化的组触发时间（以 ns 表示），逐路原始值见开启 FSYNC 后的 `fsync.jsonl`，不再宣称 CSV 为逐路原始纳秒时间。
+- 修复跨优先级队列锁导致的采集阻塞；IMU consumer/ROS2 发布使用显式实时调度，SPI 为 `10MHz`，INT1 使用 `100µs` 异步复位脉冲。启动失败释放资源，最终健康快照保留尾部无效 FIFO 包计数。保持相位、唯一匹配和 `200µs` 检查；高负载仍受系统 IRQ/debug 与订阅端调度约束，不保证每个触发或任意负载零丢失。
+- 最终 IMU 健康行增加 timing drop 和 FSYNC captured/dropped 总数；non-ROS 终止摘要使用 stop 后的最终计数，无效 FIFO 包与 timing 拒绝重叠时不再漏计。
+- INT1→RAW 转换保留沿时观测历史，并按读取窗口与调速距离的完整不确定度选择证书；独立实时 observer 在 SPI/callback 阻塞期间继续观测，启动握手及优先级继承锁保证初始化和历史顺序，原相位与发布门限不变。
+- 相机 ABI 2.2 增加逐帧冻结的 ISP 曝光观测，保留旧 frame-info 前缀读取，SONAME 不变；bag/tee 元数据、MP4 `exposure.jsonl` 与 ROS2 `/robobaton/camN/exposure` 同步交付。估计值与不可用状态分开，不保证实际生效帧或误差上界，不改变触发时间戳、不宣称真实曝光中点。捕获 observer 继承允许 CPU 集合，不再强制 CPU0。
+- 修复 sensor 探测阶段重复申请 MCLK 引用未释放的问题；探测引用在 VIN 接管前释放，不清除历史遗留引用。相机捕获使用 FIFO/60 并正确处理扫描内 VSYNC 更新，INT1 observer 改为继承 CPU 集合的 FIFO/30，避免压过默认 GPIO IRQ。IMU 使用读取区间约束拟合、拒绝过宽观测污染解绕并保留更长沿时历史；`500µs`/`200µs` 门限不变，高负载仍可能显式拒绝或停止。
+- IMU 区间观测与旧时钟证书矛盾时立即使旧证书失效，禁止继续发布；过宽观测仍只拒绝该次观测。修复 bag 收尾时最终编码帧在预取后入队被误判为顺序缺口的竞态，真实缺口继续报错。实时线程仍受系统调度与 IRQ 延迟约束，不修改系统实时配额，不承诺任意负载零丢失。
+
+## 2.0.1 - 2026-10-20
+
+本次仅同步当前源码的用户文档，软件版本仍为 `2.0.0`；上述未发布功能不因文档修订变成正式软件发布或整机验收。
+
+- 对齐 realtime 时间域、可选 FSYNC、相机 ABI 2.2 曝光观测与 IMU ABI 2.1；补齐默认配置、topic 和保存 sidecar 的使用入口。
+- 区分 ISP 曝光估计、触发—样本关联、保存完整性及 DDS 实际送达；说明实时调度权限、最终健康计数和高负载拒绝边界。
+- 更正 MP4/bag 帧率完整性保证、`max_skew_ns` 的曝光精度误读和系统回拨下的时间戳检查；历史版本记录不改写。
 
 ## 2.0.0 - 2026-10-15
 

@@ -22,6 +22,8 @@ cd /root/demo
 
 `sensor_demo` 默认运行四路 SC132 相机、PRRTSP v2 H.264 RTSP 推流和 ICM-42670-P IMU（原生默认 `800Hz`）采集。默认图像为 `1280x1088@30fps`，支持 `25/30/40/50/60fps`；输出画布支持 `1280x1088`/`640x480`/`720x480`/`1280x720`。V2 实板验收仍待完成。
 
+默认不保存、不开启 FSYNC。保存 bag/MP4、显式 `--fsync --sample-rate-hz 1600` 及逐帧 ISP 曝光估计见 [non-ROS Demo 使用](usage/non-ros-demo.md) 和[数据保存](usage/save-data-guide.md)。相机需要只读 `/dev/mem` 和实时调度权限，设置失败拒绝启动；曝光估计不改变触发时间戳。
+
 四路 RTSP URL：
 
 ```text
@@ -75,7 +77,7 @@ ros2 topic echo /robobaton/cam0/camera_info --once
 ros2 run robobaton_4p_ros2_demo robobaton_imu_rate_monitor
 ```
 
-期望 topic list 中出现 `/robobaton/cam0..3/image_raw`、`/robobaton/cam0..3/image_raw/compressed`、`/robobaton/cam0..3/camera_info`、`/robobaton/imu/data` 和 `/robobaton/imu/temperature`。raw/compressed 图像 QoS 为 Reliable + KeepLast(8)；CameraInfo 为 Reliable + Transient Local + KeepLast(1)。ROS2 不提供 RTSP；需要 RTSP 时使用 non-ROS `/root/demo`。
+期望 topic list 中出现 `/robobaton/cam0..3/image_raw`、`/robobaton/cam0..3/image_raw/compressed`、`/robobaton/cam0..3/camera_info`、`/robobaton/cam0..3/exposure`、`/robobaton/imu/data` 和 `/robobaton/imu/temperature`。raw/compressed 图像与 exposure 为 Reliable + KeepLast(8)；CameraInfo 为 Reliable + Transient Local + KeepLast(1)。曝光 JSON 的 `status=1` 仅为估计；`/robobaton/fsync` 默认关闭，启用方式与验证见 [ROS2 Demo 使用](usage/ros2-demo.md)。ROS2 不提供 RTSP；需要 RTSP 时使用 non-ROS `/root/demo`。
 
 ## 4. 停止程序
 

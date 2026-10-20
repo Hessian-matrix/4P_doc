@@ -54,7 +54,9 @@ cd /root/demo
 ```text
 SENSOR_IMU_RESULT samples=... invalid=... timestamp_duplicates=... timestamp_regressions=... effective_hz=...
 ```
-`timestamp_duplicates=0`、`timestamp_regressions=0` 是时间戳单调性的关键观察项。
+未发生系统校时的窗口应检查 `timestamp_duplicates=0`、`timestamp_regressions=0`；对外 realtime stamp 允许随系统校时回拨，不能把跨校时窗口的回退单独当作硬件时序错误。还须检查序号、timing drop、最终健康计数和实际载荷。
+
+`--imu-sample-drop-policy allow-counted` 为默认策略：身份可证明但 timing 预算不满足的样本计数丢弃，继续采集；`strict` 遇 timing/无效包拒绝即失败。身份无法唯一证明、时钟证书失效或硬件错误在两种策略下都停止。`--imu-start-order camera-first|imu-first` 控制启动顺序，默认 `camera-first`，不改变时间戳或关联合同。
 
 ## 3. YAML 配置
 
@@ -77,6 +79,7 @@ imu:
   sample_rate_hz: 800
   print_rate_hz: 10
   print_metrics: false
+  fsync_enabled: false
 save_data:
   save: false
   format: mp4
@@ -115,7 +118,7 @@ cd /root/demo
 
 MP4 模式要求 `rtsp.codec: h264`、完整四路 camera mask `0x0f`，且不能同时启用 `--record-bag` 或 `record-frame-skip`。配置的 final 输出目录不得以 `.partial` 结尾；如果目标目录或同名 `.partial` 已存在，程序会自动写入同级 `<目录名>-YYYYMMDDTHHMMSSZ[-NNNN]`，退出摘要 `SENSOR_MP4_RESULT path=` 给出真实目录。
 
-完整 MP4 session 包含 `camera0.mp4` 到 `camera3.mp4`、`camera0_timestamps.csv` 到 `camera3_timestamps.csv`、`imu.csv`、`camera_params.yaml`、`session_status.json` 和 `publication_receipt.json`。MP4 文件使用名义 H.264 frame timing；精确纳秒相机时间戳以同目录 `cameraN_timestamps.csv` 为准。不完整运行会保留为 `.partial` recovery 目录，不能当作 complete 数据源。
+当前 MP4 session 包含 `camera0.mp4`～`camera3.mp4`、四路 `cameraN_timestamps.csv`、`imu.csv`、`exposure.jsonl`、`fsync.jsonl`、`camera_params.yaml`、`session_status.json` 和 `publication_receipt.json`。`fsync.jsonl` 始终创建，仅启用 FSYNC 后写入关联记录。MP4 使用名义 H.264 帧时间；timestamp CSV 保存微秒量化、以 ns 表示的 realtime 组触发时间，逐路原始值可见输入曝光 sidecar，开启 FSYNC 后也在关联记录中。曝光 `status=1` 是估计，不能当实际生效曝光；输入 sidecar 可能多于已编码帧。关联方式见[数据合同](../development/data-contracts.md)。`.partial` 仅用于恢复，不能当完整数据源。
 
 离线转换 JPEG 数据集时，在开发机使用公开 demo 仓中的脚本：
 
@@ -237,7 +240,7 @@ cd /root/demo
 
 关键字段：
 
-- `ts_ns`：`CLOCK_MONOTONIC_RAW` 域的 IMU sample 时间戳，单位 `ns`，不再转换至 realtime。`TIME_BASE domain=monotonic_raw monotonic_raw_start_ns=...` 声明本机 RAW 启动参考，不是相机 SIF→RAW 映射或 UTC 锚点。
+- `ts_ns`：`CLOCK_REALTIME` 域的 IMU sample 时间戳，单位 `ns`，由 producer 的 FIFO TMST→RAW→realtime 映射提供；`host_ts_ns` 为同域 INT1 边沿。`TIME_BASE domain=realtime realtime_start_ns=...` 仅声明启动时系统参考，不会冻结 offset；运行中校时可使后续时间戳回拨。
 - `accel_mps2`：加速度，单位 `m/s^2`。
 - `gyro_rps`：角速度，单位 `rad/s`。
 - `uncertainty_us`、`gpio_gap_count`、`fifo_overflow_count`、`mapper_failure_count`：时间戳映射和采集链路诊断。
@@ -245,6 +248,10 @@ cd /root/demo
 V2 `accel_mps2` 按 `[X, Y, Z]` 输出；PCB 安装方向和符号尚待实板六面/旋转验证，不以 V1 顶视图推断正负轴或相机坐标变换。
 
 IMU INT1 使用 `34120000.gpio` offset `8`，FIFO TMST 为逐样本时间；相机使用 LPWM，输出时间来自 VIN 随帧传播的触发捕获，不是到帧时间。相机和 IMU FSYNC 共用同一物理 IO；这不自动提供 FIFO 样本与曝光的一一对应。
+
+显式关联使用 `sensor_demo --fsync --sample-rate-hz 1600` 或 YAML `imu.fsync_enabled: true`（默认关闭，仅支持 `800/1600Hz`）。不保存时 stdout 输出 `robobaton_fsync_v1` JSON；保存时进入 bag `/robobaton/fsync` 或 MP4 `fsync.jsonl`。仅 `status=1` 表示唯一匹配；检查 timing drop、序号缺口和 `SENSOR_FSYNC_RESULT`，不把样本对应误称为曝光同步，详见[数据合同](../development/data-contracts.md)。
+
+运行需要实时调度权限：相机捕获 `SCHED_FIFO/60`、IMU owner `SCHED_FIFO/20`、INT1 observer `SCHED_FIFO/30`，联合应用 IMU consumer `SCHED_RR/3`；两个 observer 继承允许 CPU 集合，每轮休眠 `50µs`。调度设置失败拒绝启动。应用不自动修改 IRQ/debug 或实时配额，高负载可能显式丢样或失败；保存及关联验收还须读取成功 stop 后的 `IMU_RUNTIME_HEALTH final=yes health_valid=yes`，不只观察仍有终端输出。
 
 ## 8. 串口 Demo
 

@@ -5,7 +5,7 @@
 This document explains how to use the non-ROS `sensor_demo` to save the following two kinds of data:
 
 1. ROS1 bag v2.0: four-channel synchronized images, camera info, frame metadata, and independent IMU;
-2. H.264 MP4 session: four MP4s, per-frame precise timestamp index, camera parameters, independent IMU, session status, and publication receipt.
+2. H.264 MP4 session: four MP4s, encoded-frame timestamp indexes, camera parameters, independent IMU, exposure and FSYNC sidecars, session status, and publication receipt.
 
 This document applies to runtime packages whose `sensor_demo --help` includes both of the following parameters:
 
@@ -16,7 +16,7 @@ This document applies to runtime packages whose `sensor_demo --help` includes bo
 
 ROS1 bag and MP4 are two mutually exclusive save modes and currently cannot be enabled simultaneously in the same process.
 
-H.264 MP4 saving is recommended first: the four `cameraN.mp4` files play directly, and all public frame-rate tiers can be saved completely (see section 9); ROS1 bag suits scenarios that need the raw message stream or later unpacking analysis. Startup and acceptance for the two modes are in sections 5/7 respectively.
+H.264 MP4 saving is recommended first: the four `cameraN.mp4` files play directly and reuse RTSP encoding. ROS1 bag stores JPEG messages for ROS1 tooling or later extraction. Supported frame rates are a parameter range, not a zero-loss guarantee; see section 9 for load boundaries. Startup and acceptance are in sections 5/7 respectively.
 
 | Mode | Entry | Main output | Complete-save criterion |
 |---|---|---|---|
@@ -25,7 +25,13 @@ H.264 MP4 saving is recommended first: the four `cameraN.mp4` files play directl
 
 Only when the process exit code is 0 and the corresponding `SENSOR_*_RESULT` explicitly reports completeness can the data be used as formally complete data. `.partial`, a nonzero exit code, or `data_complete=no` can only be used as recovery or diagnostic data.
 
-Images, frame metadata, and exact MP4 indexes preserve native SIF LPWM `trig_tv` captures, not UTC. IMU CSV/bag times retain FIFO TMST-to-RAW mapping results without a realtime offset; bag record time also uses RAW. Camera SIF-to-RAW mapping is not implemented, so camera/IMU timestamps cannot be paired directly. Relative MP4 playback time does not establish a cross-sensor clock mapping; see [Data Contracts](../development/data-contracts.md).
+Here, complete is first the individual recorder's publication result, not a universal proof that every hardware sample, exposure observation, or FSYNC association is complete. Default `--imu-sample-drop-policy allow-counted` continues after counted timing rejection when identity remains provable. Bag completeness checks the session and recorder queue/write errors; it does not independently require zero producer timing drops. MP4 completeness additionally requires valid final producer health, published=observed=admitted=written>0, continuous sequences, zero GPIO/FIFO/timing/invalid-packet drops, and maximum sample uncertainty at most `200µs`. For a zero-loss dataset, check final health and actual saved payloads in both modes. `strict` fails immediately on timing/invalid-packet rejection, but does not guarantee success under arbitrary load.
+
+Images, frame metadata, and IMU CSV/bag payloads preserve producer `CLOCK_REALTIME` capture/sample times (Unix epoch ns). MP4 timestamp CSV stores group-trigger times on the same timeline, quantized by the encoder to microseconds and expressed in ns, not original per-camera nanosecond stamps; with FSYNC enabled, original values are in `fsync.jsonl`. Bag record time independently reads system time at writing, not sampling; backward steps are preserved and bag indexes are time-sorted. MP4 container playback remains relative/nominal. Synchronize the system clock before acquisition. A common domain does not prove camera/IMU sample or exposure alignment; see [Data Contracts](../development/data-contracts.md).
+
+Add `--fsync --sample-rate-hz 1600` for trigger-to-sample association (default off, `800/1600Hz` supported). Bags add `/robobaton/fsync` as `std_msgs/String` JSON; MP4 sessions add `fsync.jsonl`. Cross-check `sample_sequence`, `group_id`, and `frame_ids` against saved data. Only `status=1` is valid. Container completeness does not prove association completeness: inspect missing/ambiguous records, sequence gaps, and final captured/dropped counts. See [Data Contracts](../development/data-contracts.md) for fields and uncertainty boundaries.
+
+Bag `/cameraN/frame_metadata`, tee `camN/frames.jsonl`, and MP4 `exposure.jsonl` save frozen per-frame `exposure`. `status=1` is a latest-ISP observation estimate, not certified applied exposure; `0` is unavailable, without carrying earlier values forward. The MP4 sidecar describes input frames and may outnumber encoded frames; join by camera and microsecond-quantized group-trigger time against timestamp CSV. See [Exposure Observations](../development/data-contracts.md#per-frame-exposure-observations) for fields, join keys, and limits.
 
 ## 2. Version and Runtime Package Consistency
 
@@ -230,12 +236,16 @@ run_30fps_mp4/
 ├── camera0.mp4 ... camera3.mp4
 ├── camera0_timestamps.csv ... camera3_timestamps.csv
 ├── imu.csv
+├── exposure.jsonl
+├── fsync.jsonl
 ├── camera_params.yaml
 ├── session_status.json
 └── publication_receipt.json
 ```
 
-The MP4 playback timeline uses the nominal frame rate; the nanosecond timestamps in `cameraN_timestamps.csv` are the authoritative per-frame camera times, aligned by `frame_index`.
+The MP4 playback timeline uses the nominal frame rate; `cameraN_timestamps.csv` aligns encoded frames by `frame_index`, providing realtime group-trigger times quantized to microseconds and expressed in ns, not original per-camera nanosecond stamps. With FSYNC enabled, cross-check CSV using group time in `fsync.jsonl` and read original per-camera values from `camera_timestamps_ns`; see [Data Contracts](../development/data-contracts.md).
+
+`exposure.jsonl` always stores input-frame observations, including `status=0`. `fsync.jsonl` is always created, with association records written only when FSYNC is enabled. An unavailable exposure estimate alone neither stops images nor changes complete to partial. If every saved frame must have an estimate, separately check `exposure.status` and input-to-encoded-frame joins rather than infer it from container completeness.
 
 Exit code 2, `published_partial`, a `.partial` directory, a marker, or a receipt mismatch is not a complete session.
 
@@ -356,8 +366,8 @@ success=yes
 And check:
 
 - `image_frames_by_camera=cam0:N,cam1:N,cam2:N,cam3:N` all equal and `N > 0`;
-- samples in `SENSOR_IMU_RESULT` are nonzero;
-- timestamp/sequence gap, duplicate, regression, and producer drop all meet the completeness requirement;
+- Successful stop yields `IMU_RUNTIME_HEALTH final=yes health_valid=yes` with nonzero generation; compare published, consumer-observed, recorder-admitted/written counts, and actual bag IMU messages;
+- A zero-loss requirement additionally needs zero sequence gaps/duplicates/regressions, invalid packets, GPIO gaps, FIFO overflows, and timing drops. Windows without clock corrections should have no timestamp duplicates/regressions; system corrections may move realtime backward. Do not fabricate increasing stamps or ignore other health errors;
 - The final path comes from `SENSOR_BAG_RESULT path=`, not from guessing the configured path.
 
 A nonzero exit, `published_partial`, `.partial.bag`, or quarantine is not formally complete data, but should be kept for diagnostics — do not auto-overwrite or delete it.
@@ -395,10 +405,11 @@ The output directory must not exist. The current tool supports uncompressed, ful
 
 ## 9. Frame Rate and Stress Boundaries
 
-Judge separately by save mode:
+Both modes accept `25/30/40/50/60fps`, but frame rate alone cannot guarantee complete saving:
 
-- H.264 MP4: the parameter set supports 25/30/40/50/60fps; all tiers can be saved completely and are recommended.
-- ROS1 bag: the parameter set supports 25/30/40/50/60fps; below 40fps can be saved completely, above 50 there will be a small amount of frame drops.
+- H.264 MP4 reuses RTSP-encoded access units. Completeness depends on encoding, storage, and final IMU health; high load or timing drops can produce `published_partial` even when all four MP4s play.
+- ROS1 bag uses separate JPEG encoding and queues. CPU, encoder throughput, storage, and RTSP preview load affect losses; no frame-rate threshold guarantees complete saving or only a small loss at higher rates.
+- After changing fps, IMU ODR, FSYNC, dimensions, storage, or system scheduling, check sustained four-channel rates, final health, and actual payloads on the target. Exposure `status=1` coverage, unique FSYNC matching, and storage completeness are separate checks.
 
 ## 10. Common Issues
 

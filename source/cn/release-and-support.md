@@ -15,7 +15,7 @@
 
 | 项目 | 当前版本 | 状态 |
 |---|---|---|
-| 文档修订 | `2.0.0` | 本站持续更新；修订内容见 [版本更新记录](changelog.md)，不表示软件版本升级。 |
+| 文档修订 | `2.0.1` | 本站持续更新；修订内容见 [版本更新记录](changelog.md)，不表示软件版本升级。 |
 | non-ROS demo/运行包 | `v2.0.0` | 部署到`/root/demo`，按`manifest.sha256`整包校验。 |
 | ROS2 package/install | `v2.0.0` | 软件包部署到`/root/ros2_demo/install`，包名`robobaton_4p_ros2_demo`。目标板使用前应按 [ROS2 Demo 使用](usage/ros2-demo.md)、[non-ROS Demo 使用](usage/non-ros-demo.md) 和 [保存数据](usage/save-data-guide.md) 完成对应路径的实际检查；软件包发布不替代目标板运行检查。 |
 
@@ -23,7 +23,7 @@
 
 在线文档会根据用户反馈继续更新；当前没有单独固定的 `stable` 文档版本。文档修订号按上述政策识别，Read the Docs 的 `latest` 是部署标识，不是软件版本。软件正式发布不等同于跳过目标板运行检查。相机参数集合公开支持 `25/30/40/50/60fps`，默认 `30fps`；保存和 ROS2 路径应以实际结果、退出码、manifest 和目标板环境检查判定。
 
-当前使用指南按 V2 `2.0.0` 软件描述，不表示 V1 二进制兼容：ICM-42670-P 的新头文件、库、consumer 与配置必须成套迁移。ICM 原生 `25/50/100/200/400/800/1600Hz`，默认 `800Hz`，旧 `500/1000/2000Hz` 明确拒绝。历史 V1 changelog 不改写，不能用于宣称 V2 实板或整机验收。
+当前使用指南覆盖标识为 `2.0.0` 的 V2 软件及 changelog 中明确列出的未发布源码更新；同一个版本字符串不证明工件组成相同，应核对运行包 manifest、实际链接库和对应说明。ICM-42670-P 头文件、库、consumer 与配置必须成套迁移，不兼容 V1。ICM 原生 `25/50/100/200/400/800/1600Hz`，默认 `800Hz`，旧 `500/1000/2000Hz` 明确拒绝。历史 V1 changelog 不改写，不能用于宣称 V2 实板或整机验收。
 
 ## 已知限制
 
@@ -33,6 +33,9 @@
 - non-ROS相机、RTSP、ROS1 bag、H.264 MP4和ROS2图像节点公开支持`25/30/40/50/60fps`，默认`30fps`；`--rotate 180` 仍只支持 `30fps`。
 - 所有相机采集入口仅支持 `vin_lpwm`（VIN LPWM 硬件触发）；不再提供 `none`、free-run 或 `software_gpio` 路径。
 - CameraInfo 只有宽高，IMU orientation 不可用。
+- 当前相机 ABI 2.2 的 `exposure` 是逐帧冻结的最新 ISP 观测；`status=1` 只是估计，`0` 表示不可用，不保证实际生效帧、误差上界或真实曝光中点。
+- FSYNC 默认关闭，仅 `800/1600Hz` 可显式开启；`status=1` 才是唯一触发—样本关联，不改变 IMU 相位，也不保证曝光同步。容器完整不等于关联完整或 DDS 全部送达。
+- 相机捕获、IMU owner/observer/consumer 需要实时调度权限；配置失败拒绝启动。饱和负载可能造成显式丢样或采集停止，应用不自动改变系统 IRQ、debug 或实时配额。完整性须结合最终健康记录及实际保存/接收载荷，见[数据合同](development/data-contracts.md)。
 - H.265 或四路高帧率播放依赖客户端解码和渲染能力。
 - UART1/UART7 电平保持 `3.3V`，DEBUG_UART 保持 `1.8V`；相机物理映射和 FOV 不变，独立 PPS IO 默认启用。V2 完整 5pin 线序、供电脚额定值和热插拔条件以正式硬件资料为准，不沿用 V1 `500 mA` 或历史验收；见[硬件连接与安全](getting-started/hardware-and-safety.md)。相机/IMU 共触发线不自动提供样本/曝光关联。
 

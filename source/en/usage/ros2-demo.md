@@ -24,7 +24,7 @@ Exposed capabilities:
 - IMU: `sensor_msgs/msg/Imu`.
 - Temperature: `sensor_msgs/msg/Temperature`.
 
-RTSP, camera/IMU hardware sync, TF extrinsics, camera intrinsics, and distortion calibration are currently not provided. `CameraInfo` only publishes the current frame width/height, with empty calibration fields; IMU orientation is unavailable.
+RTSP, exposure-sync guarantees, TF extrinsics, camera intrinsics, and distortion calibration are unavailable. FSYNC trigger-to-sample association is opt-in and does not change IMU sample phase. `CameraInfo` only publishes current width/height, with empty calibration fields; IMU orientation is unavailable.
 
 CAM1..CAM4 map respectively to software cam0..cam3 and `/robobaton/cam0..3`, unchanged from V1. See [Hardware Connection and Safety](../getting-started/hardware-and-safety.md#camera-interface).
 
@@ -46,6 +46,10 @@ CAM1..CAM4 map respectively to software cam0..cam3 and `/robobaton/cam0..3`, unc
 | `/robobaton/cam3/camera_info` | `sensor_msgs/msg/CameraInfo` | cam3 width/height info, empty calibration | Reliable + Transient Local, keep last 1 |
 | `/robobaton/imu/data` | `sensor_msgs/msg/Imu` | ICM-42670-P gyro/accel | `SensorDataQoS`, keep last 100 |
 | `/robobaton/imu/temperature` | `sensor_msgs/msg/Temperature` | ICM-42670-P temperature | `SensorDataQoS`, keep last 10 |
+| `/robobaton/cam0..3/exposure` | `std_msgs/msg/String` | `robobaton_exposure_v1` per-frame ISP observation JSON | Reliable, keep last 8 |
+| `/robobaton/fsync` | `std_msgs/msg/String` | Opt-in `robobaton_fsync_v1` trigger-to-sample association JSON | Reliable, keep last 256 |
+
+Exposure `timestamp_ns` equals that camera's Image trigger-edge stamp. `exposure.status=1` is an estimate, not certified applied exposure; `0` is unavailable. Source frame ID/opaque source time and RAW query-completion time are diagnostic only: image stamps do not change and no actual exposure midpoint is provided. See [Exposure Observations](../development/data-contracts.md#per-frame-exposure-observations).
 
 ## Safe Deployment
 
@@ -134,6 +138,7 @@ raw, compressed, and CameraInfo checks:
 /root/ros2_demo/install/robobaton_ros2_env.bash ros2 topic hz /robobaton/cam0/image_raw/compressed
 /root/ros2_demo/install/robobaton_ros2_env.bash ros2 topic echo /robobaton/cam0/camera_info --once
 /root/ros2_demo/install/robobaton_ros2_env.bash ros2 topic echo /robobaton/imu/temperature --once
+/root/ros2_demo/install/robobaton_ros2_env.bash ros2 topic echo /robobaton/cam0/exposure --once
 ```
 
 FastDDS SHM and environment variable checks:
@@ -159,7 +164,7 @@ Only when the launch has been stopped, `ros2 daemon stop` has run, and you have 
 | `camera.camera_mask` | `15` | bit0..bit3 map respectively to CAM1..CAM4 / software cam0..cam3; only single or full four-channel is supported, not 2/3 channels. |
 | `camera.fps` | `30` | Supports `25/30/40/50/60fps`; other values are rejected before the camera starts. |
 | `camera.rotate_degrees` | `0` | Supports `0/90/180/270`; `180` only allows `30fps`, `25/40/50/60fps` rejected; `0/180` output `1280x1088`, `90/270` output `1088x1280`. |
-| `camera.frame_set_max_skew_ns` | `10000000` | Frame-set admission upper bound in ns; by default covers the four-channel 10 ms exposure bound. |
+| `camera.frame_set_max_skew_ns` | `10000000` | Group admission bound on trigger-capture differences in ns, not exposure duration or synchronization accuracy. |
 | `camera.frame_set_timeout_ms` | `100` | Frame-set wait timeout in ms. |
 | `camera.queue_capacity` | `4` | Per-channel ROS publish queue capacity, must be greater than 0. |
 | `camera.queue_policy` | `block` | Supports `block`, `drop_newest`; `drop_newest` does not guarantee complete four-frame groups. |
@@ -172,10 +177,13 @@ Only when the launch has been stopped, `ros2 daemon stop` has run, and you have 
 | `imu.sample_rate_hz` | `800` | Only native `25/50/100/200/400/800/1600`; old `500/1000/2000` explicitly rejected. |
 | `imu.read_mode` | `sensor_timestamp_fifo` | Currently only this mode is supported. |
 | `imu.fifo_watermark_samples` | `1` | Currently fixed to `1`. |
+| `imu.fsync_enabled` | `false` | Opt-in `/robobaton/fsync` association JSON; requires both camera and IMU enabled, at `800/1600Hz` IMU rate. |
 | `imu.frame_id` | `robobaton_imu_link` | Message-source identifier; V2 physical axes pending confirmation, see [Data Contracts](../development/data-contracts.md#imu). |
 | `imu.publish_temperature` | `true` | Whether to publish `/robobaton/imu/temperature`. |
 
-By default, stable IMU monitor windows should approach configured `800Hz`, not old `1000Hz`; camera `30fps` and IMU rate are independent. INT1 uses `34120000.gpio` offset `8`. V2 IMU FSYNC input shares the camera trigger net but does not provide camera/IMU hardware alignment.
+Default stable IMU monitor windows should approach configured `800Hz`, not old `1000Hz`; camera `30fps` and IMU rate are independent. INT1 uses `34120000.gpio` offset `8`. V2 FSYNC shares the camera trigger net. Enable association with `--ros-args -p imu.fsync_enabled:=true -p imu.sample_rate_hz:=1600`, subscribe to `/robobaton/fsync`, and accept only `status=1`; see [Data Contracts](../development/data-contracts.md).
+
+The node requires realtime scheduling permission: camera capture uses `SCHED_FIFO/60`, IMU owner `SCHED_FIFO/20`, independent INT1 observer `SCHED_FIFO/30`, and IMU publication `SCHED_RR/3`. Observers inherit the allowed CPU mask; scheduling failure rejects startup. Applications do not automatically change IRQ/debug or system realtime quotas. Under load, inspect final post-stop `IMU_RUNTIME_HEALTH`, sustained four-channel rates, and actual DDS image/IMU payloads; topic existence, send counts, or association JSON alone do not prove delivery.
 
 ## Data Semantics
 
@@ -184,6 +192,6 @@ raw `Image` uses NV12. `Image.step` keeps the underlying DMA buffer's stride; `d
 The compressed topic is a standard `CompressedImage` JPEG payload. The plugin only performs compression when there is an `/image_raw/compressed` subscriber: it validates the NV12 layout per `Image.step` and `data.size()`, copies valid Y/UV rows into the X5 media-codec input buffer, and generates JPEG via `MEDIA_CODEC_ID_JPEG`, preserving the original message `header`.
 
 
-`header.stamp` is not publication time. Cameras retain the LPWM `trig_tv` trigger capture in the native SIF counter domain; IMU directly uses RAW `sample_timestamp_ns`, without realtime conversion or substituting `host_timestamp_ns`. Camera SIF-to-RAW mapping is not implemented, so image/IMU stamps cannot be paired directly or compared with node `now()` or `/clock`. RAW has a common reference only on the same device and boot. Sharing the LPWM IO does not associate FSYNC samples with exposures, and PTP does not automatically convert these domains.
+`header.stamp` is not publication time. Cameras map LPWM hardware trigger edges to `CLOCK_REALTIME`; IMU/Temperature use `sample_timestamp_ns` in the same domain, not `host_timestamp_ns`. ROS2 splits the producer nanoseconds unchanged, without another offset. Subsequent stamps follow system-clock corrections, including backward steps. They can be compared on the same calibrated system timeline, not simulation `/clock` even with `use_sim_time`. Neither shared LPWM IO nor a common domain establishes FSYNC sample/exposure associations or synchronization accuracy; cross-device accuracy still depends on system-clock calibration.
 
 `CameraInfo` only carries the current frame width/height, with the distortion model and calibration matrices empty. IMU orientation is unavailable, and messages set `orientation_covariance[0] = -1.0`; gyro/accel covariance is currently not fabricated. `robobaton_imu_link` only identifies the source of the IMU message; it does not establish a transform to the camera, base, optical frame, or other coordinate systems, nor declare TF or extrinsics.

@@ -16,7 +16,7 @@ const char *rtsp_version = prrtsp_get_version();
 
 ## `libsc132.so`
 
-头文件：`include/sc132camera.h`。ABI：`SC132_ABI_VERSION_MAJOR=2`，`SC132_ABI_VERSION_MINOR=0`；real SO 为 `libsc132.so.2.0.0`，SONAME 仍为 `libsc132.so.2`。
+头文件：`include/sc132camera.h`。ABI：`SC132_ABI_VERSION_MAJOR=2`，`SC132_ABI_VERSION_MINOR=2`；real SO 为 `libsc132.so.2.0.0`，SONAME 仍为 `libsc132.so.2`。
 
 状态码：
 
@@ -35,6 +35,12 @@ const char *rtsp_version = prrtsp_get_version();
 | `sc132_frame_set_item_t` | 帧组中的单路条目。 |
 | `sc132_frame_set_t` | 同一组四路帧、`group_id`、`group_timestamp_ns` 和实际观测到的 `max_skew_ns`。 |
 | `sc132_frame_set_config_t` | frame-set callback、相机数量、尺寸、超时和配组放行 skew 上限。 |
+
+所有公开相机 `timestamp_ns` 与 `group_timestamp_ns` 均为硬件触发沿映射后的 `CLOCK_REALTIME` Unix 纳秒时间，运行中跟随校时并允许回拨；不是到帧/IRQ 或曝光中心。需要 X5 `/dev/mem` 只读权限，映射缺失/超窗即停止。详见[时间数据合同](data-contracts.md)。
+
+ABI 2.2 在 `sc132_frame_info_t` 尾部增加 `exposure`（`sc132_exposure_info_t`）。`sc132_frame_get_info()` 接受当前 `sizeof(info)` 或不含 `exposure` 的旧前缀尺寸，只写调用方声明的尺寸并原样返回 `struct_size`；新 consumer 必须与新头文件/SO 成套使用。
+
+`exposure.status=1`（`SC132_EXPOSURE_ESTIMATED`）表示采集时冻结的最新 ISP 曝光观测，不证明该帧实际生效曝光，也没有误差上界；`0`（`SC132_EXPOSURE_UNAVAILABLE`）表示查询失败或数值非法，其余曝光字段全零，不沿用上一帧。`duration_ns` 是 SDK 积分秒数转换后的纳秒；`source_frame_id/source_timestamp` 是非原子查询返回的 SDK 当前标识，后者是 opaque 值，不是 RAW/realtime；`observed_raw_ns` 是查询完成时的 `CLOCK_MONOTONIC_RAW`，不是积分起止时间。详见[曝光观测合同](data-contracts.md#逐帧曝光观测)。
 
 配置函数：
 
@@ -96,7 +102,7 @@ int run_camera(void) {
 
 ## `libicm42670.so`
 
-non-ROS 头文件：`include/icm42670_driver.h`；ROS2：`include/robobaton_4p_ros2_demo/icm42670_driver.h`；producer：`include/icm42670_x5/icm42670_driver.h`。ABI：`ICM42670_ABI_VERSION_MAJOR=2`、`ICM42670_ABI_VERSION_MINOR=0`；real SO 为 `libicm42670.so.2.0.0`，SONAME 为 `libicm42670.so.2`，全部九个 C 函数使用 `ICM42670_X5_2.0` 节点。与 V1 ICM-42688 库不兼容，必须成套迁移 caller、头文件、SO 和配置。
+non-ROS 头文件：`include/icm42670_driver.h`；ROS2：`include/robobaton_4p_ros2_demo/icm42670_driver.h`；producer：`include/icm42670_x5/icm42670_driver.h`。ABI 为 `2.1`；real SO `libicm42670.so.2.0.0`、SONAME `libicm42670.so.2` 不变。原九个 C 函数保留 `ICM42670_X5_2.0` 节点，新增 `icm42670_set_fsync_callback()` 使用 `ICM42670_X5_2.1`。与 V1 ICM-42688 不兼容；头文件、SO 和 consumer 必须成套迁移。
 
 状态码：
 
@@ -112,14 +118,18 @@ non-ROS 头文件：`include/icm42670_driver.h`；ROS2：`include/robobaton_4p_r
 
 - `icm42670_config_t` 默认 `sample_rate_hz=800`、`fifo_watermark_samples=1`、`read_mode=ICM42670_READ_MODE_SENSOR_TIMESTAMP_FIFO`。
 - `sample_rate_hz` 只接受原生 `25/50/100/200/400/800/1600`；旧 `500/1000/2000Hz` 和其他非法值明确拒绝，不会自动重采样；当前只接受 sensor timestamp FIFO 读取模式。
+- `sample_timestamp_ns` 为 FIFO TMST→RAW→`CLOCK_REALTIME`，`host_timestamp_ns` 为同域 INT1 边沿；发布时刷新桥接，不冻结 offset，允许系统校时回拨。同域不保证 FSYNC 样本/曝光同步。
 - callback 由采集线程串行调用；`sample` 是借用引用。
 - `stop/destroy` 会等待采集线程，不得从 callback 中调用。
 - `user_data` 必须保持有效直到 `icm42670_stop()` 返回。
 - `icm42670_get_runtime_health()` 只在最近一次 start generation 成功 stop 后读取；未成功 stop 时不应把输出结构当作有效快照。
 - `icm42670_is_running()` 返回当前 handle 是否处于运行状态，可用于状态查询；它不替代 `icm42670_stop()`/`destroy()` 的生命周期顺序。
 - `icm42670_status_message(status)` 把状态码映射为进程静态只读文本；返回指针不得修改或释放。
+- `config.reserved[ICM42670_CONFIG_FSYNC_ENABLE_INDEX]=1` 显式开启上升沿 FSYNC，默认 `0`；开启仅支持 `800/1600Hz`。调用 `icm42670_set_fsync_callback(handle, callback, user_data)` 接收独立 `icm42670_fsync_event_t`，不改变 sample/config 结构尺寸。
+- FSYNC callback 在同一已接纳样本的 sample callback 之后串行调用，事件为借用引用，异常与 stop/destroy 规则相同。`sample_sequence` 和 `sample_timestamp_ns` 标识该实际样本；`fsync_to_sample_ns` 为硬件 delay，`uncertainty_ns` 包含缺失 TMST 重建误差。RAW 字段只用于关联；对外时间仍为 realtime。
+- 成功 stop 后，health `reserved[ICM42670_HEALTH_FSYNC_CAPTURED_INDEX]` 表示捕获硬件标记数，`reserved[ICM42670_HEALTH_FSYNC_DROPPED_INDEX]` 表示未发布关联的标记数（含退出时缺少后继绝对 TMST 的尾包）。`fsync_sequence` 计入丢弃标记，不保证连续；匹配与状态合同见[数据合同](data-contracts.md)。
 
-`icm42670_runtime_health_t` 使用 `ICM42670_RUNTIME_HEALTH_INIT` 初始化。字段含义为：`session_generation`（最近一次 start generation）、`published_samples`（producer 发布样本数）、`gpio_event_gap_count`（GPIO 边沿缺口）、`fifo_overflow_count`（FIFO 溢出）、`mapper_failure_count`（时间映射失败）、`uncertainty_over_200_drop_count`（不确定度超过 200 us 而丢弃的样本数）和 `max_consecutive_timing_drop_count`（连续 timing drop 最大值）。调用返回非 `ICM42670_STATUS_OK` 时，不要读取输出结构作为有效快照。
+`icm42670_runtime_health_t` 使用 `ICM42670_RUNTIME_HEALTH_INIT` 初始化。字段含义为：`session_generation`（最近一次 start generation）、`published_samples`（producer 发布样本数）、`gpio_event_gap_count`（GPIO 边沿缺口）、`fifo_overflow_count`（FIFO 溢出）、`mapper_failure_count`（时间映射失败）、`uncertainty_over_200_drop_count`（不确定度超过 200 us 而丢弃的样本数）、`max_consecutive_timing_drop_count`（连续 timing drop 最大值）和 `invalid_packet_drop_count`（无效 FIFO 包丢弃数，包含最后一次样本发布后的尾部丢弃）。使用成功 stop 后的最终快照，不以最后一个 sample 的计数代替。调用返回非 `ICM42670_STATUS_OK` 时，不要读取输出结构作为有效快照。
 
 ```c
 icm42670_runtime_health_t health = ICM42670_RUNTIME_HEALTH_INIT;
@@ -137,7 +147,7 @@ if (health_ret != ICM42670_STATUS_OK) {
 
 static void on_imu_sample(const icm42670_sample_t *sample, void *user_data) {
   (void)user_data;
-  /* sample_timestamp_ns/host_timestamp_ns 为底层时间域，demo 打印前会另行映射。 */
+  /* sample_timestamp_ns/host_timestamp_ns 已为 CLOCK_REALTIME；消费端原样保留。 */
   (void)sample->sample_timestamp_ns;
   (void)sample->accel_mps2[0];
 }

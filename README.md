@@ -17,7 +17,7 @@
 ## 代码仓库
 
 - [RoboBaton_4p_demo](https://github.com/Hessian-matrix/RoboBaton_4p_demo)：non-ROS 用户交付仓和 `/root/demo` 运行包。
-- [RoboBaton_4P_ROS2_demo](https://github.com/Hessian-matrix/RoboBaton_4P_ROS2_demo)：ROS2 四目 NV12/raw+compressed 图像、CameraInfo、IMU 和温度 topic demo，部署目录为 `/root/ros2_demo`。
+- [RoboBaton_4P_ROS2_demo](https://github.com/Hessian-matrix/RoboBaton_4P_ROS2_demo)：ROS2 四目 NV12/raw+compressed 图像、CameraInfo、曝光观测、IMU、温度与可选 FSYNC topic demo，部署目录为 `/root/ros2_demo`。
 - [4P_doc](https://github.com/Hessian-matrix/4P_doc)：本公开在线文档仓。
 
 公开 shell 示例使用合法变量和示例值，并在相邻注释中说明需要按现场环境修改。官方出厂默认地址为 `192.168.1.12`，默认账号为 `root`。
@@ -61,8 +61,7 @@ API 参考
 “修复和升级”子页面：
 
 ```text
-X5 TF 卡无法识别的内核修复（需产品支持授权）
-ISP 图像质量修复
+V2 修复与升级边界
 系统烧录
 ```
 
@@ -72,7 +71,7 @@ ISP 图像质量修复
 source/
 ├── requirements.txt   # 中英共享依赖
 ├── image/             # 中英共享图片
-├── ch/                # 中文文档（Sphinx srcdir）
+├── cn/                # 中文文档（Sphinx srcdir）
 │   ├── index.rst
 │   ├── conf.py
 │   ├── getting-started/   # 产品介绍、版本兼容、硬件安全、首次上电、Wi-Fi
@@ -84,7 +83,7 @@ source/
 │   ├── development/       # 部署、源码编译、数据合同、API 参考
 │   ├── changelog.md
 │   └── release-and-support.md
-└── en/                # 英文文档（Sphinx srcdir，与 ch/ 目录结构一一对应）
+└── en/                # 英文文档（Sphinx srcdir，与 cn/ 目录结构一一对应）
 ```
 
 正文引用共享图片时，树根页用 `../image/`，子目录页用 `../../image/`。

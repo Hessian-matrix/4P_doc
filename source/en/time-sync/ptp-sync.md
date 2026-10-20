@@ -136,7 +136,7 @@ Meaning:
 - `-w`: wait for `ptp4l` and maintain the system UTC-to-PHC PTP/TAI offset and direction from its `currentUtcOffset`. Do not use `-O 0` to conflate the time scales.
 - `-S 1.0`: allow stepping when the offset exceeds one second; the target is the PHC, not the system clock.
 
-With hardware timestamps, PHC should equal system UTC plus the current TAI−UTC offset (currently `37 s`), matching `pmc`'s `currentUtcOffset`. `utc_offset` is not permanent and must track leap-second policy changes. This tool version reports REALTIME−PHC in `phc_ctl eth0 cmp`, so approximately `-37000000000 ns` is correct; the negative sign does not mean PHC is behind. Master state and packets do not prove UTC calibration: calibrate system time before starting this chain. It does not convert camera SIF captures to UTC.
+With hardware timestamps, PHC should equal system UTC plus the current TAI−UTC offset (currently `37 s`), matching `pmc`'s `currentUtcOffset`. `utc_offset` is not permanent and must track leap-second policy changes. This tool version reports REALTIME−PHC in `phc_ctl eth0 cmp`, so approximately `-37000000000 ns` is correct; the negative sign does not mean PHC is behind. Master state and packets do not prove UTC calibration: calibrate system time before starting this chain. The camera library separately maps SIF trigger captures to realtime; PTP neither performs that mapping nor establishes FSYNC sample or exposure synchronization.
 
 ### 5.4 ifupdown Address Hook
 

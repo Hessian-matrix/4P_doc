@@ -150,7 +150,7 @@ For the full upload, interactive configuration, and log paths see [Wi-Fi Configu
 | Symptom | After MP4/rosbag saving, there is no expected final output, or the offline extraction script rejects the input. |
 | Check | View `SENSOR_MP4_RESULT` or `SENSOR_BAG_RESULT`; confirm `outcome`, `data_complete`, `path`, and `configured_path`. MP4 complete also requires `session_status.json`, `publication_receipt.json`, four MP4s, and four timestamp CSVs. |
 | Normal result | A complete run exits `0`, `data_complete=yes`, and `path` is the real output. If the configured directory already exists, MP4 automatically writes to a sibling timestamped directory. |
-| Common causes | The configured path already exists so output switched to a timestamped directory; the input is `.partial` recovery data; MP4 used H.265, non-four-channel, or frame-skip; the Host lacks a full `ffmpeg`/`ffprobe`. |
+| Common causes | Path conflicts selected a timestamped sibling; `.partial` recovery input; encoder/queue/storage losses or final IMU timing/invalid-packet drops; MP4 used H.265, non-four-channel, or frame-skip; the Host lacks full `ffmpeg`/`ffprobe`. Four playable MP4s do not prove complete final health; see [Saving Data](usage/save-data-guide.md). |
 | Recovery / info to collect | Re-extract using the real directory from `SENSOR_MP4_RESULT path=`; `.partial` is recovery-only; collect the exit summary, session directory listing, and extraction-script error text. |
 
 ## H.265 Client Stuttering
@@ -169,9 +169,17 @@ For the full upload, interactive configuration, and log paths see [Wi-Fi Configu
 |---|---|
 | Symptom | `imu_reader_demo` has no output, fails to start, or reports nonzero timestamp duplicate/regression. |
 | Check | `ls -l /dev/spidev2.0`; `./imu_reader_demo --sample-rate-hz 800 --print-metrics`; INT1 is `34120000.gpio` offset `8`, not old GPIO395. |
-| Normal result | Samples output continuously; `timestamp_duplicates=0`, `timestamp_regressions=0`. |
-| Common causes | SPI device missing, IMU power/soldering/device-tree abnormal, or sample-rate parameter not in the supported list. |
-| Recovery / info to collect | Collect the startup log, `SENSOR_IMU_RESULT` or demo exit summary, and `/dev/spidev2.0` state. |
+| Normal result | Samples continue; windows without clock corrections should have `timestamp_duplicates=0` and `timestamp_regressions=0`, while realtime may step backward during correction. Final health is valid and counters agree with actual payloads and application requirements. |
+| Common causes | SPI, power/soldering/device-tree, or sample-rate errors; missing realtime scheduling permission; long IRQ/SPI delays causing timing rejection, or invalid identity/clock certificates. Default counted drops are not zero loss. |
+| Recovery / info to collect | Keep full startup/exit logs, clock-correction state, `SENSOR_IMU_RESULT`, `IMU_RUNTIME_HEALTH final=yes health_valid=yes` after successful stop, and `/dev/spidev2.0` state. Do not widen uncertainty gates or fill gaps with old samples. |
+
+## Unavailable Exposure Observations or Incomplete FSYNC
+
+| Item | Content |
+|---|---|
+| Check | Read exposure from bag frame metadata, MP4 `exposure.jsonl`, or ROS2 `/robobaton/camN/exposure`. Check FSYNC enablement (`--fsync`/`imu.fsync_enabled`), `800/1600Hz`, and `/robobaton/fsync`/`fsync.jsonl`. |
+| Interpretation | Exposure `status=0` zeros other exposure fields while images continue; `1` is only the latest ISP estimate, not certified applied-frame exposure. Only FSYNC `status=1` is a unique correspondence; missing/ambiguous records, timing drops, and dropped FSYNC tags can be explicit. |
+| Recovery / info to collect | Use [Data Contracts](development/data-contracts.md) to compare camera/group/sample sequences, original stamps, generation, and final captured/dropped counts; retain actual image/IMU payloads. Do not hide missing data with nearest-neighbor matching, previous exposure values, or container completeness, or claim exposure synchronization. |
 
 ## UART Has No Data
 

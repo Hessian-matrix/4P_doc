@@ -150,7 +150,7 @@
 | 现象 | MP4/rosbag 保存后没有预期 final 输出，或离线提取脚本拒绝输入。 |
 | 检查 | 查看 `SENSOR_MP4_RESULT` 或 `SENSOR_BAG_RESULT`；确认 `outcome`、`data_complete`、`path` 和 `configured_path`。MP4 complete 还需要 `session_status.json`、`publication_receipt.json`、四路 MP4 和四路 timestamp CSV。 |
 | 正常结果 | complete 运行退出码为 `0`，`data_complete=yes`，且 `path` 是真实输出。若配置目录已存在，MP4 会自动写入同级时间戳目录。 |
-| 常见原因 | 配置路径已存在导致输出切到时间戳目录；输入是 `.partial` recovery 数据；MP4 使用了 H.265、非四路或 frame-skip；Host 缺少完整 `ffmpeg`/`ffprobe`。 |
+| 常见原因 | 路径冲突切到时间戳目录；`.partial` recovery 数据；编码/队列/存储丢帧或最终 IMU timing/无效包丢弃；MP4 使用 H.265、非四路或 frame-skip；Host 缺少完整 `ffmpeg`/`ffprobe`。四路 MP4 能播放不代表 final health 满足 complete；详见[数据保存](usage/save-data-guide.md)。 |
 | 恢复/需收集信息 | 使用 `SENSOR_MP4_RESULT path=` 指向的真实目录重新提取；`.partial` 只作为 recovery 数据；收集退出摘要、session 目录文件列表和提取脚本错误文本。 |
 
 ## H.265 客户端卡顿
@@ -169,9 +169,17 @@
 |---|---|
 | 现象 | `imu_reader_demo` 无输出、启动失败或 timestamp duplicate/regression 非零。 |
 | 检查 | `ls -l /dev/spidev2.0`；`./imu_reader_demo --sample-rate-hz 800 --print-metrics`；INT1 为 `34120000.gpio` offset `8`，不是旧 GPIO395。 |
-| 正常结果 | 能持续输出样本；`timestamp_duplicates=0`、`timestamp_regressions=0`。 |
-| 常见原因 | SPI 设备不存在、IMU 供电/焊接/设备树异常、采样率参数不在支持列表。 |
-| 恢复/需收集信息 | 收集启动日志、`SENSOR_IMU_RESULT` 或 demo 退出摘要、`/dev/spidev2.0` 状态。 |
+| 正常结果 | 能持续输出样本；无系统校时的窗口应 `timestamp_duplicates=0`、`timestamp_regressions=0`，校时允许 realtime 回拨。最终健康有效，计数与实际载荷符合业务要求。 |
+| 常见原因 | SPI 设备、供电/焊接/设备树或采样率错误；实时调度权限不足；IRQ/SPI 长延迟触发 timing 拒绝，或身份/时钟证书失效。默认 counted drop 不等于零丢失。 |
+| 恢复/需收集信息 | 保留完整启动/退出日志、校时状态、`SENSOR_IMU_RESULT` 和成功 stop 后 `IMU_RUNTIME_HEALTH final=yes health_valid=yes`、`/dev/spidev2.0` 状态。不要扩大不确定度门限或把旧样本填回。 |
+
+## 曝光观测不可用或 FSYNC 不完整
+
+| 项目 | 内容 |
+|---|---|
+| 检查 | 曝光读取 bag frame metadata、MP4 `exposure.jsonl` 或 ROS2 `/robobaton/camN/exposure`；FSYNC 检查 `--fsync`/`imu.fsync_enabled`、`800/1600Hz` 及 `/robobaton/fsync`/`fsync.jsonl`。 |
+| 解释 | 曝光 `status=0` 时其余曝光字段为零且图像继续；`1` 仅为最新 ISP 估计，不证明实际生效帧。FSYNC `status=1` 才是唯一对应；缺失/歧义、timing drop 或 FSYNC dropped 可显式存在。 |
+| 恢复/需收集信息 | 按[数据合同](development/data-contracts.md)核对相机/组/样本序号、原始 stamp、generation 和最终 captured/dropped；保留实际图像/IMU 载荷。不用最近邻、沿用上帧曝光或容器 complete 掩盖缺失，不据此宣称曝光同步。 |
 
 ## UART 无数据
 

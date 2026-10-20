@@ -24,7 +24,7 @@ This chapter uniformly explains the current public time-related configuration me
 4. Before running NTP/PTP configuration, exit demos, ROS2 nodes, and other timestamp-sensitive tasks first; keep `cam-service` running.
 5. V2 independent PPS input needs no UART7 pin switching. Confirm official 5-pin order, voltage, and common ground, and wire with power off.
 6. System time sync is not the same as sampling sync. Camera, IMU, PPS, PTP, and ROS `header.stamp` are different layers; field semantics are in [Data Contracts](../development/data-contracts.md).
-7. IMU consumers and bag record time use `CLOCK_MONOTONIC_RAW` directly, without freezing or applying a realtime offset. System time calibrated by NTP/PTP does not convert these timestamps to UTC. Cameras still retain native SIF LPWM trigger captures, with SIF-to-RAW mapping not implemented. System-clock synchronization is not evidence of a common camera/IMU domain or sampling synchronization.
+7. Camera, IMU, and bag record times use `CLOCK_REALTIME` system time. Hardware capture/sample times pass through internal RAW mappings and continuously refreshed realtime bridges, not a frozen startup offset. System corrections affect subsequent stamps, including backward steps; internal timeouts stay monotonic. Synchronize the clock before acquisition to avoid encoder/container limitations on backward timestamps. A common domain does not establish FSYNC sample/exposure synchronization, and an uncalibrated system clock is not accurate UTC.
 
 ## Three Sync Methods
 

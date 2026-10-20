@@ -24,7 +24,7 @@ ROS2 包名为 `robobaton_4p_ros2_demo`；软件版本以包内 `VERSION`/`packa
 - IMU：`sensor_msgs/msg/Imu`。
 - 温度：`sensor_msgs/msg/Temperature`。
 
-当前不提供 RTSP、相机/IMU 硬同步、TF 外参、相机内参或畸变标定。`CameraInfo` 只发布当前帧宽高，标定字段为空；IMU orientation 不可用。
+当前不提供 RTSP、曝光同步保证、TF 外参、相机内参或畸变标定。可显式开启 FSYNC 触发—样本关联；它不改变 IMU 采样相位。`CameraInfo` 只发布当前帧宽高，标定字段为空；IMU orientation 不可用。
 
 CAM1..CAM4 依次对应软件 cam0..cam3 与 `/robobaton/cam0..3`，物理映射与 V1 保持一致；见[硬件连接与安全](../getting-started/hardware-and-safety.md#相机接口)。
 
@@ -46,6 +46,10 @@ CAM1..CAM4 依次对应软件 cam0..cam3 与 `/robobaton/cam0..3`，物理映射
 | `/robobaton/cam3/camera_info` | `sensor_msgs/msg/CameraInfo` | cam3 宽高信息，标定字段为空 | Reliable + Transient Local，keep last 1 |
 | `/robobaton/imu/data` | `sensor_msgs/msg/Imu` | ICM-42670-P gyro/accel | `SensorDataQoS`，keep last 100 |
 | `/robobaton/imu/temperature` | `sensor_msgs/msg/Temperature` | ICM-42670-P 温度 | `SensorDataQoS`，keep last 10 |
+| `/robobaton/cam0..3/exposure` | `std_msgs/msg/String` | `robobaton_exposure_v1` 逐帧 ISP 观测 JSON | Reliable，keep last 8 |
+| `/robobaton/fsync` | `std_msgs/msg/String` | 显式开启的 `robobaton_fsync_v1` 触发—样本关联 JSON | Reliable，keep last 256 |
+
+曝光消息中的 `timestamp_ns` 与该路 Image 触发沿 stamp 一致；`exposure.status=1` 是估计而非实际生效曝光证明，`0` 为不可用。源帧号/opaque 源时间和 RAW 查询完成时间仅用于追溯，不改变图像时间戳、不提供真实曝光中点，详见[逐帧曝光观测](../development/data-contracts.md#逐帧曝光观测)。
 
 ## 安全部署
 
@@ -134,6 +138,7 @@ raw、compressed 和 CameraInfo 检查：
 /root/ros2_demo/install/robobaton_ros2_env.bash ros2 topic hz /robobaton/cam0/image_raw/compressed
 /root/ros2_demo/install/robobaton_ros2_env.bash ros2 topic echo /robobaton/cam0/camera_info --once
 /root/ros2_demo/install/robobaton_ros2_env.bash ros2 topic echo /robobaton/imu/temperature --once
+/root/ros2_demo/install/robobaton_ros2_env.bash ros2 topic echo /robobaton/cam0/exposure --once
 ```
 
 FastDDS SHM 和环境变量检查：
@@ -159,7 +164,7 @@ FastDDS SHM 和环境变量检查：
 | `camera.camera_mask` | `15` | bit0..bit3 依次对应 CAM1..CAM4 / 软件 cam0..cam3；只支持单颗或完整四路，不支持 2/3 路。 |
 | `camera.fps` | `30` | 支持`25/30/40/50/60fps`；其他值在启动相机前拒绝。 |
 | `camera.rotate_degrees` | `0` | 支持 `0/90/180/270`；`180` 只允许 `30fps`，`25/40/50/60fps`拒绝；`0/180` 输出 `1280x1088`，`90/270` 输出 `1088x1280`。 |
-| `camera.frame_set_max_skew_ns` | `10000000` | 帧组放行上限，单位 ns；默认覆盖四路曝光上限10ms。 |
+| `camera.frame_set_max_skew_ns` | `10000000` | 组内触发捕获差异的放行上限，单位 ns；不表示曝光时长或同步精度。 |
 | `camera.frame_set_timeout_ms` | `100` | 帧组等待超时，单位 ms。 |
 | `camera.queue_capacity` | `4` | 每路 ROS 发布队列容量，必须大于 0。 |
 | `camera.queue_policy` | `block` | 支持 `block`、`drop_newest`；`drop_newest` 不保证完整四帧组。 |
@@ -172,10 +177,13 @@ FastDDS SHM 和环境变量检查：
 | `imu.sample_rate_hz` | `800` | 只接受原生 `25/50/100/200/400/800/1600`；旧 `500/1000/2000` 明确拒绝。 |
 | `imu.read_mode` | `sensor_timestamp_fifo` | 当前只支持该模式。 |
 | `imu.fifo_watermark_samples` | `1` | 当前固定为 `1`。 |
+| `imu.fsync_enabled` | `false` | 显式开启 `/robobaton/fsync` 关联 JSON；要求相机及 IMU 同时启用，IMU 为 `800/1600Hz`。 |
 | `imu.frame_id` | `robobaton_imu_link` | 消息来源标识；V2 物理轴向尚待确认，见[数据合同](../development/data-contracts.md#imu)。 |
 | `imu.publish_temperature` | `true` | 是否发布 `/robobaton/imu/temperature`。 |
 
-默认 IMU monitor 稳定窗口应接近配置的 `800Hz`，而非旧 `1000Hz`；相机 `30fps` 与 IMU 速率独立。INT1 使用 `34120000.gpio` offset `8`。V2 IMU FSYNC 输入共享相机触发网，但不提供相机/IMU 硬件对齐。
+默认 IMU monitor 稳定窗口应接近配置的 `800Hz`，而非旧 `1000Hz`；相机 `30fps` 与 IMU 速率独立。INT1 使用 `34120000.gpio` offset `8`。V2 FSYNC 共享相机触发网，可用 `--ros-args -p imu.fsync_enabled:=true -p imu.sample_rate_hz:=1600` 开启关联；订阅 `/robobaton/fsync`，仅接受 `status=1`，详见[数据合同](../development/data-contracts.md)。
+
+节点需要实时调度权限：相机捕获 `SCHED_FIFO/60`、IMU owner `SCHED_FIFO/20`、独立 INT1 observer `SCHED_FIFO/30`、IMU 发布线程 `SCHED_RR/3`；observer 继承允许 CPU 集合，调度设置失败拒绝启动。应用不自动修改 IRQ/debug 或系统实时配额。高负载下须结合 stop 后最终 `IMU_RUNTIME_HEALTH`、四路持续速率及实际 DDS 图像/IMU 载荷判断，不以 topic 存在、发送计数或关联 JSON 单独证明送达。
 
 ## 数据语义
 
@@ -184,6 +192,6 @@ raw `Image` 使用 NV12。`Image.step` 保留底层 DMA buffer 的 stride；`dat
 compressed topic 是标准 `CompressedImage` JPEG payload。插件只在有 `/image_raw/compressed` 订阅者时执行压缩：它按 `Image.step` 和 `data.size()` 校验 NV12 布局，把有效 Y/UV 行复制到 X5 media-codec 输入 buffer，并通过 `MEDIA_CODEC_ID_JPEG` 生成 JPEG，保留原始消息的 `header`。
 
 
-`header.stamp` 不是发布时刻。相机直接保留 SIF 原生计数器域的 LPWM `trig_tv` 触发捕获值；IMU 直接使用 RAW 域的 `sample_timestamp_ns`，不转换至 realtime，也不使用 `host_timestamp_ns`。相机 SIF→RAW 映射尚未实现，不能直接按图像/IMU stamp 同步配对；二者也不能与节点 `now()` 或 `/clock` 比较。RAW 只在同一设备、同次启动内有共同参考。共用 LPWM IO 不自动建立 FSYNC 样本/曝光关联，PTP 也不会自动转换这些时间域。
+`header.stamp` 不是发布时刻。相机输出 LPWM 硬件触发沿映射到 `CLOCK_REALTIME` 的时间；IMU/Temperature 使用同域 `sample_timestamp_ns`，不使用 `host_timestamp_ns`。ROS2 原样拆分 producer 的纳秒值，不再添加 offset。后续 stamp 跟随系统校时，允许回拨；可与同一已校准系统时间轴比较，不能当作仿真 `/clock`（即使设置 `use_sim_time`）。共用 LPWM IO 和统一时间域均不自动建立 FSYNC 样本/曝光关联或同步精度保证，跨设备精度仍取决于系统校时。
 
 `CameraInfo` 只带当前帧宽高，畸变模型和标定矩阵为空。IMU orientation 不可用，消息设置 `orientation_covariance[0] = -1.0`；gyro/accel 协方差当前不伪造。`robobaton_imu_link` 只标识 IMU 消息来源；它不建立到相机、base、optical frame 或其他坐标系的变换，也不声明 TF 或外参。

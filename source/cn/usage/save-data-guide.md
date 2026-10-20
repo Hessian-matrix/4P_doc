@@ -5,7 +5,7 @@
 本文说明如何使用 non-ROS `sensor_demo` 保存以下两类数据：
 
 1. ROS1 bag v2.0：四路同步图像、相机信息、帧元数据和独立 IMU；
-2. H.264 MP4 session：四路 MP4、逐帧精确时间戳索引、相机参数、独立 IMU、session status 和 publication receipt。
+2. H.264 MP4 session：四路 MP4、编码帧时间戳索引、相机参数、独立 IMU、曝光与 FSYNC sidecar、session status 和 publication receipt。
 
 本文适用于 `sensor_demo --help` 同时包含以下参数的运行包：
 
@@ -16,7 +16,7 @@
 
 ROS1 bag 与 MP4 是两种互斥的保存模式，当前不能在同一个进程中同时开启。
 
-推荐优先使用 H.264 MP4 保存：四路 `cameraN.mp4` 可直接播放，公开帧率档位均可完整保存（见第 9 节）；ROS1 bag 适合需要原始消息流或后续解包分析的场景。两种模式的启动与验收分别见第 5/7 节。
+推荐优先使用 H.264 MP4 保存：四路 `cameraN.mp4` 可直接播放，并复用 RTSP 编码结果；ROS1 bag 保存 JPEG 消息，适合 ROS1 消息工具或后续解包分析。支持的帧率是参数范围，不是零丢失保证，负载边界见第 9 节。两种模式的启动与验收分别见第 5/7 节。
 
 | 模式 | 入口 | 主要输出 | 完整保存判据 |
 |---|---|---|---|
@@ -25,7 +25,13 @@ ROS1 bag 与 MP4 是两种互斥的保存模式，当前不能在同一个进程
 
 只有进程退出码为 0 且对应 `SENSOR_*_RESULT` 明确报告完整，才可把数据作为正式完整数据使用。`.partial`、非零退出码或 `data_complete=no` 只能作为恢复或诊断数据。
 
-图像、frame metadata 和 MP4 精确索引保留 SIF 原生 LPWM `trig_tv` 捕获值，不是 UTC；IMU CSV/bag 时间直接保留 FIFO TMST→RAW 映射结果，不加 realtime offset。bag record time 也使用 RAW。相机 SIF→RAW 映射尚未实现，不能直接按相机/IMU时间戳配对。MP4 相对播放时间不建立跨传感器时钟映射，详见[数据合同](../development/data-contracts.md)。
+这里的 complete 首先是各 recorder 的发布结果，不是所有硬件样本、曝光或 FSYNC 关联都完整的统一证明。默认 `--imu-sample-drop-policy allow-counted` 允许可证明身份的 timing 拒绝计数后继续；bag 的 complete 判定检查会话和 recorder 队列/写入错误，不单独强制 producer timing drop 为零。MP4 的 complete 判定更严格：最终 producer 健康有效、published=observed=admitted=written>0、序号连续且 GPIO/FIFO/timing/invalid-packet drop 为零，最大样本不确定度不超过 `200µs`。若要求零丢失数据集，两种模式都要核对最终健康与实际保存载荷；`strict` 可使 timing/无效包拒绝立即失败，但不保证任意负载成功。
+
+图像、frame metadata 及 IMU CSV/bag payload 保留 producer 的 `CLOCK_REALTIME` 捕获/采样时间（Unix epoch ns）。MP4 timestamp CSV 保存同域组触发时间，经编码器微秒量化后以 ns 表示，不是逐路原始纳秒 stamp；开启 FSYNC 时逐路原始值在 `fsync.jsonl`。bag record time 独立读取写入时系统时间，不等于采样时间；系统回拨如实保留，bag index 按时间排序。MP4 容器仍使用相对/名义播放时间。采集前应先校时；同域不证明相机/IMU 的样本或曝光已对齐，详见[数据合同](../development/data-contracts.md)。
+
+需要触发—样本关联时增加 `--fsync --sample-rate-hz 1600`（默认关闭，支持 `800/1600Hz`）。bag 增加 `/robobaton/fsync` 的 `std_msgs/String` JSON，MP4 session 增加 `fsync.jsonl`；以 `sample_sequence`、`group_id`、`frame_ids` 对照实际保存数据。仅 `status=1` 有效；容器完整不代表关联完整，须检查缺失/歧义记录、序号缺口及最终 captured/dropped。字段及不确定度边界见[数据合同](../development/data-contracts.md)。
+
+bag `/cameraN/frame_metadata`、tee `camN/frames.jsonl` 和 MP4 `exposure.jsonl` 保存逐帧冻结的 `exposure`。`status=1` 是最新 ISP 观测估计，不是已证实的该帧实际曝光；`0` 是不可用，不沿用上一帧。MP4 sidecar 描述输入帧，可能多于实际编码帧，按相机及微秒量化的组触发时间对照 timestamp CSV。字段、关联键与误差边界见[逐帧曝光观测](../development/data-contracts.md#逐帧曝光观测)。
 
 ## 2. 版本与运行包一致性
 
@@ -232,12 +238,16 @@ run_30fps_mp4/
 ├── camera0.mp4 ... camera3.mp4
 ├── camera0_timestamps.csv ... camera3_timestamps.csv
 ├── imu.csv
+├── exposure.jsonl
+├── fsync.jsonl
 ├── camera_params.yaml
 ├── session_status.json
 └── publication_receipt.json
 ```
 
-MP4 的播放时间轴使用名义帧率；`cameraN_timestamps.csv` 中的纳秒时间戳才是每帧权威相机时间，按 `frame_index` 对齐。
+MP4 的播放时间轴使用名义帧率；`cameraN_timestamps.csv` 按 `frame_index` 对齐编码帧，提供微秒量化、以 ns 表示的 realtime 组触发时间，不是各路原始纳秒 stamp。开启 FSYNC 时，用 `fsync.jsonl` 的组时间核对 CSV，以 `camera_timestamps_ns` 读取各路原始值，详见[数据合同](../development/data-contracts.md)。
+
+`exposure.jsonl` 始终保存输入帧的观测（包括 `status=0`）；`fsync.jsonl` 始终创建，只有启用 FSYNC 才写入关联。曝光估计不可用不会单独使图像停止或 complete 变成 partial；如果业务要求每帧有估计值，应另查 `exposure.status` 及输入到编码帧的对应，不用容器 complete 代替。
 
 退出码 2、`published_partial`、`.partial` 目录、marker 或 receipt 不匹配都不是完整 session。
 
@@ -358,8 +368,8 @@ success=yes
 并检查：
 
 - `image_frames_by_camera=cam0:N,cam1:N,cam2:N,cam3:N` 四路相等且 `N > 0`；
-- `SENSOR_IMU_RESULT` 中 samples 非零；
-- timestamp/sequence gap、duplicate、regression 和 producer drop 均符合完整性要求；
+- 成功 stop 后的 `IMU_RUNTIME_HEALTH final=yes health_valid=yes` 有非零 generation，核对 published 与 consumer observed、recorder admitted/written 及 bag 实际 IMU 消息数；
+- 零丢失要求额外检查 sequence gap/duplicate/regression、无效包、GPIO gap、FIFO overflow 和 timing drop 为零。未校时窗口应无 timestamp duplicate/regression；系统校时可使 realtime 回拨，不能据此伪造递增时间或忽略其他健康错误；
 - 最终路径来自 `SENSOR_BAG_RESULT path=`，不要只依赖配置路径猜测。
 
 非零退出、`published_partial`、`.partial.bag` 或 quarantine 都不是正式完整数据，但应保留用于诊断，不要自动覆盖或删除。
@@ -397,10 +407,11 @@ python3 scripts/rosbag_extract.py \
 
 ## 9. 帧率与压力边界
 
-按照保存模式分开判定：
+两种模式的参数集合均支持 `25/30/40/50/60fps`，但不能只按帧率承诺完整保存：
 
-- H.264 MP4：参数集合支持25/30/40/50/60fps；所有档位均可完整保存，推荐使用。
-- ROS1 bag：参数集合支持25/30/40/50/60fps；40fps以下可以完整保存，50以上会有少量丢帧情况。
+- H.264 MP4 复用 RTSP 编码 access unit，完整性同时受编码、存储和 IMU 最终健康约束；高负载或 timing drop 可以得到 `published_partial`，即使四路 MP4 均可播放。
+- ROS1 bag 使用独立 JPEG 编码和队列，CPU、编码吞吐、存储及 RTSP 预览负载均影响丢帧；不能承诺某个帧率以下必定 complete，或高帧率只有少量丢失。
+- 更换 fps、IMU ODR、FSYNC、尺寸、保存介质或系统调度后，应在目标环境核对四路速率、最终健康及实际载荷。曝光 `status=1` 覆盖率、FSYNC 唯一匹配率和完整保存分别检查，不相互代替。
 
 ## 10. 常见问题
 

@@ -6,6 +6,8 @@ This page gives the safe deployment flow for the non-ROS runtime package and the
 Keep `cam-service` running. Before updating, only exit the old `sensor_demo`, `cam_demo`, or other camera applications; do not stop `cam-service`.
 ```
 
+Current source includes unreleased realtime, FSYNC, and exposure-observation updates; software version strings alone do not identify artifact composition. Select matching headers, libraries, and consumers using [Changelog](../changelog.md) and manifests. Camera ABI 2.2 and IMU ABI 2.1 preserve current SONAMEs. After deployment, inspect actual `--version` output, exposure sidecars/topics, and FSYNC configuration rather than infer capabilities from an old package version. This flow neither upgrades the BSP nor changes IRQ/debug or realtime quotas, and does not replace target-board functional checks.
+
 ## 1. non-ROS Pre-Check
 
 Host preparation:

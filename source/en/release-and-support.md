@@ -15,7 +15,7 @@ This page defines the version policy for the entire public documentation set; [C
 
 | Item | Current version | Status |
 |---|---|---|
-| Documentation revision | `2.0.0` | This site updates continuously; see [Changelog](changelog.md) for revision details. This does not indicate a software version upgrade. |
+| Documentation revision | `2.0.1` | This site updates continuously; see [Changelog](changelog.md) for revision details. This does not indicate a software version upgrade. |
 | non-ROS demo/runtime package | `v2.0.0` | Deployed to `/root/demo`, whole-package verified by `manifest.sha256`. |
 | ROS2 package/install | `v2.0.0` | The package is deployed to `/root/ros2_demo/install`, package name `robobaton_4p_ros2_demo`. Before use on the target board, complete the corresponding path's actual checks per [ROS2 Demo Usage](usage/ros2-demo.md), [non-ROS Demo Usage](usage/non-ros-demo.md), and [Saving Data](usage/save-data-guide.md); package release does not replace target-board runtime checks. |
 
@@ -23,7 +23,7 @@ Feature additions, fixes, and compatibility changes are in [Changelog](changelog
 
 The online documentation continues to update based on user feedback; there is currently no separately pinned `stable` documentation version. Documentation revisions follow the policy above; Read the Docs `latest` is a deployment identifier, not a software version. An official software release does not mean target-board runtime checks can be skipped. The public camera parameter set supports `25/30/40/50/60fps`, default `30fps`; the saving and ROS2 paths should be judged by actual results, exit codes, manifest, and target-board environment checks.
 
-Current usage guides describe V2 `2.0.0` software, not V1 binary compatibility: migrate ICM-42670-P headers, libraries, consumers, and configuration together. Native rates are `25/50/100/200/400/800/1600Hz`, default `800Hz`, with old `500/1000/2000Hz` values explicitly rejected. Historical V1 changelogs do not establish V2 board or system acceptance.
+Current guides cover V2 software identified as `2.0.0` and the explicitly unreleased source updates in the changelog. An identical version string does not prove an identical artifact composition: check runtime manifests, actually linked libraries, and matching instructions. Migrate ICM-42670-P headers, libraries, consumers, and configuration together; they are incompatible with V1. Native rates are `25/50/100/200/400/800/1600Hz`, default `800Hz`, with old `500/1000/2000Hz` values explicitly rejected. Historical V1 changelogs do not establish V2 board or system acceptance.
 
 ## Known Limitations
 
@@ -33,6 +33,9 @@ Current usage guides describe V2 `2.0.0` software, not V1 binary compatibility: 
 - non-ROS camera, RTSP, ROS1 bag, H.264 MP4, and the ROS2 image node publicly support `25/30/40/50/60fps`, default `30fps`; `--rotate 180` still supports only `30fps`.
 - Every camera acquisition entry supports only `vin_lpwm` (VIN LPWM hardware triggering); `none`, free-run, and `software_gpio` paths are no longer available.
 - CameraInfo only has width/height, and IMU orientation is unavailable.
+- Camera ABI 2.2 `exposure` freezes the latest ISP observation per frame; `status=1` is only an estimate and `0` means unavailable. Applied-frame identity, an error bound, and actual exposure midpoint are not guaranteed.
+- FSYNC defaults off and can be enabled only at `800/1600Hz`; only `status=1` is a unique trigger-to-sample association. It changes neither IMU phase nor exposure-sync guarantees. Container completeness is not association completeness or full DDS delivery.
+- Camera capture and IMU owner/observer/consumer threads require realtime scheduling permission; configuration failure rejects startup. Saturated load can cause counted drops or acquisition failure; applications do not automatically change system IRQ, debug, or realtime quotas. Acceptance requires final health records and actual stored/received payloads; see [Data Contracts](development/data-contracts.md).
 - H.265 or four-channel high-frame-rate playback depends on the client's decode and render capability.
 - UART1/UART7 retain `3.3V`, DEBUG_UART retains `1.8V`; camera mapping and FOV are unchanged, and independent PPS input defaults on. Use official V2 pin order, power ratings, and hot-plug conditions, not the V1 `500 mA` limit or historical acceptance; see [Hardware Connection and Safety](getting-started/hardware-and-safety.md). A shared camera/IMU trigger wire does not automatically associate samples and exposures.
 

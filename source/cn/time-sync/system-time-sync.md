@@ -24,7 +24,7 @@
 4. 执行 NTP/PTP 配置前，应先退出 demo、ROS2 节点和其他时间戳敏感任务；保持 `cam-service` 运行。
 5. V2 独立 PPS IO 无需切换 UART7 引脚；接线前确认正式 5pin 线序、电平和共地，断电操作。
 6. 系统时间同步不等于采样同步。相机、IMU、PPS、PTP 和 ROS `header.stamp` 属于不同层次，字段语义见[数据合同](../development/data-contracts.md)。
-7. IMU consumer 和 bag record time 直接使用 `CLOCK_MONOTONIC_RAW`，不再冻结或应用 realtime offset；NTP/PTP 校准的系统时间不会把这些时间戳转换成 UTC。相机仍保留 SIF 原生 LPWM 触发捕获值，SIF→RAW 映射尚未实现。不能把系统校时当作相机/IMU 已同域或同步的证明。
+7. 相机、IMU 和 bag record time 均输出 `CLOCK_REALTIME` 系统时间；硬件触发/采样时间经内部 RAW 映射并持续刷新 realtime 桥接，不冻结启动 offset。系统校时会改变后续时间戳，允许回拨；内部超时仍使用单调时钟。先校时再采集，避免编码/容器遇到不支持的时间回退。统一时间域不代表 FSYNC 样本或曝光已同步；系统时间未校准时也不代表准确 UTC。
 
 ## 三种同步方式
 
