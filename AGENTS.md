@@ -1,6 +1,6 @@
 # Public Documentation Release Subrepository Rules
 
-本子仓受当前工作区主仓统一 Agent 规则约束。Agent 从本目录启动时也必须先读取主仓规则。
+本仓受所在工作区的统一 Agent 规则（`../../AGENTS.md`）约束。Agent 从本目录启动时也必须先读取该规则。
 
 
 ## 目录结构
@@ -38,12 +38,13 @@ cn/ 与 en/ 各自：
 ## 强制规则
 
 1. 本仓只保留面向用户的公开产品文档、Sphinx配置、公开示例和在线文档构建依赖。
-2. 内部测试、fake、probe、runner、matrix、原始证据、长测日志、Agent计划和失败记录全部归主仓；本仓不得新增这些内部资产。
+2. 内部测试、fake、probe、runner、matrix、原始证据、长测日志、Agent计划和失败记录全部放在所在工作区的工程维护目录；本仓不得新增这些内部资产。
 3. 技术事实以公开头文件、公开demo、默认配置和正式runtime manifest为依据；未确认的硬件、电气、兼容性、授权和支持信息必须明确标记待确认。
 4. 不公开用户修改后的板卡 IP、唯一设备数据、非默认账号/凭据、内部临时路径、内部日志包或交付前检查清单；产品负责人确认的官方出厂默认 IP、账号和密码可作为公开开机资料发布。
 5. cn/（中文）与 en/（英文）公开内容变更时必须保持技术信息一致、页面一一对应；新增页面必须同时更新两棵树的 Sphinx 目录和链接检查。
-6. 修改后至少对 cn/ 与 en/ 两棵树运行 Sphinx 严格 HTML 构建和 linkcheck，并运行 `git diff --check`；在主仓运行 `python3 tests/repository_policy_test.py`。
+6. 修改后至少对 cn/ 与 en/ 两棵树运行 Sphinx 严格 HTML 构建和 linkcheck，并运行 `git diff --check`；在工作区根目录（`../..`）运行 `python3 tests/repository_policy_test.py`。
 7. 默认不stage、不commit、不push、不tag；禁止无边界reset、clean或restore。
 8. 已发布的版本化下载 URL 及其工件内容不可变；更新工件必须使用新的版本化文件名和新 URL，禁止原地替换已发布 URL 对应的文件。
 9. 在线文档当前跟随用户反馈和文档/代码更新持续发布；在产品负责人变更策略前，不定义或承诺固定的 Read the Docs 文档版本或 `stable` 别名。
-10. 文档版本政策统一维护在中英文 `source/cn/release-and-support.md` 与 `source/en/release-and-support.md`：采用“主版本.次版本.修订号”，末位修订号用于同一版本系列内的小 bug 修复、构建脚本调整或文档修正，不自动改变软件版本。本仓 `VERSION` 是文档修订号的唯一来源，中英文 `conf.py` 必须读取它，最新版本化 changelog 条目必须与其一致；更新时同步两棵树。不得因文档修订联动修改主仓、Demo、ROS2 的 `VERSION` 或 `package.xml`，不得要求文档版本与软件版本相等；SO 的 SONAME/ABI 独立。
+10. 文档版本政策统一维护在中英文 `source/cn/release-and-support.md` 与 `source/en/release-and-support.md`：采用“主版本.次版本.修订号”，末位修订号用于同一版本系列内的小 bug 修复、构建脚本调整或文档修正，不自动改变软件版本。本仓 `VERSION` 是文档修订号的唯一来源，中英文 `conf.py` 必须读取它，最新版本化 changelog 条目必须与其一致；更新时同步两棵树。不得因文档修订联动修改任何软件仓库的 `VERSION` 或 `package.xml`，不得要求文档版本与软件版本相等；SO 的 SONAME/ABI 独立。
+11. 面向用户的正文与 README 只描述公开文档、non-ROS 和 ROS2 交付物，不引入内部仓库层级、组合关系或仅在内部提供的程序与门禁命令。

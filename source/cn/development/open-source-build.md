@@ -152,7 +152,7 @@ TOOLCHAIN_FILE="$TOOLCHAIN_FILE" scripts/package_runtime.sh
 1. 重新配置并编译五个 consumer demo。
 2. 从当前仓库的 `lib/` 复制匹配的运行库。
 3. 生成顶层启动脚本、`env.sh`、`config/sensor_config.yaml` 和 `bin/`。
-4. 写入并校验 `manifest.sha256` 和 `runtime-provenance.json`；独立克隆仓库绑定当前源提交及文件哈希，组合仓库还绑定父仓 gitlink。
+4. 写入并校验 `manifest.sha256` 和 `runtime-provenance.json`，记录所用源码提交及文件哈希。
 5. 输出 `Runtime package generated and verified: <demo-dir>`。
 
 手动校验已生成运行包：

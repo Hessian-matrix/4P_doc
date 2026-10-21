@@ -152,7 +152,7 @@ The script:
 1. Reconfigures and builds the five consumer demos.
 2. Copies matching runtime libraries from the current repository's `lib/`.
 3. Generates the top-level launcher scripts, `env.sh`, `config/sensor_config.yaml`, and `bin/`.
-4. Writes and verifies `manifest.sha256` and `runtime-provenance.json`; standalone clones bind the source commit and file hashes, while composition checkouts also bind the parent gitlink.
+4. Writes and verifies `manifest.sha256` and `runtime-provenance.json`, recording the source commit and file hashes.
 5. Outputs `Runtime package generated and verified: <demo-dir>`.
 
 Manually verify the generated runtime package:

@@ -8,7 +8,7 @@ This page defines the version policy for the entire public documentation set; [C
 
 - Documentation versions use major.minor.revision. The final revision number identifies small bug fixes, build-script adjustments, or documentation corrections within the same release series, without automatically changing individual software versions.
 - `4P_doc/VERSION` is the sole source of the documentation revision; both Sphinx language configurations read it directly. Each revision updates the latest versioned changelog entry and this page's version information in both languages.
-- Software versions in the main, non-ROS, and ROS2 repositories remain identified by their own `VERSION`, ROS2 `package.xml`, package version, and `--version` output. Documentation revisions must not change these versions or require them to equal the documentation revision.
+- Software versions in the non-ROS and ROS2 repositories remain identified by their own `VERSION`, ROS2 `package.xml`, package version, and `--version` output. Documentation revisions must not change these versions or require them to equal the documentation revision.
 - SO SONAME/ABI versions are independent of documentation revisions and software versions: for example, the `2` in `libicm42688.so.2` is the ABI major. A documentation revision does not imply an ABI change, a software re-release, or an update on the target board.
 
 ## Version Set

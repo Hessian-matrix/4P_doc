@@ -24,9 +24,9 @@
 
 ## 文档版本政策
 
-文档版本采用“主版本.次版本.修订号”，末位修订号用于同一版本系列内的小 bug 修复、构建脚本调整或文档内容修正，不自动改变各软件版本。`4P_doc/VERSION` 是文档修订号的唯一来源，中英文 `conf.py` 直接读取它；修改时同步两棵树的最新版本化 changelog 条目和发布说明，不联动修改主仓、non-ROS、ROS2 的 `VERSION` 或 `package.xml`。软件版本与 SO 的 SONAME/ABI 独立识别。
+文档版本采用“主版本.次版本.修订号”，末位修订号用于同一版本系列内的小 bug 修复、构建脚本调整或文档内容修正，不自动改变各软件版本。`4P_doc/VERSION` 是文档修订号的唯一来源，中英文 `conf.py` 直接读取它；修改时同步两棵树的最新版本化 changelog 条目和发布说明，不联动修改 non-ROS、ROS2 的 `VERSION` 或 `package.xml`。软件版本与 SO 的 SONAME/ABI 独立识别。
 
-完整公开政策见 [中文发布说明](source/cn/release-and-support.md#文档版本政策) 和 [English release policy](source/en/release-and-support.md#documentation-version-policy)。主仓门禁命令为 `python3 -B tests/version_reporting_contract_test.py`；中英文仍须分别通过严格 HTML 构建和 linkcheck。
+完整公开政策见 [中文发布说明](source/cn/release-and-support.md#文档版本政策) 和 [English release policy](source/en/release-and-support.md#documentation-version-policy)。中英文须分别通过严格 HTML 构建和 linkcheck，命令见下文“本地预览与验证”。
 
 ## 当前在线文档目录
 
