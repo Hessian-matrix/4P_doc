@@ -304,7 +304,7 @@ cd /root/demo
 
 ## 11. CAN Demo
 
-`can_demo` 使用 Linux SocketCAN `CAN_RAW` 接口操作 TCAN4550 驱动注册的网络设备。仅支持经典 CAN：发送 11-bit 标准或 29-bit 扩展数据帧，接收标准/扩展数据帧和远程帧，载荷 `0..8` 字节；不支持 CAN FD、错误帧订阅或自动回包。它不直接访问 SPI、不修改设备树、GPIO、bitrate 或接口状态，也不依赖相机/IMU 运行库或 `cam-service`。
+`can_demo` 使用 Linux SocketCAN `CAN_RAW` 接口操作 TCAN4550 驱动注册的网络设备。默认使用经典 CAN（载荷 `0..8` 字节）；`--fd` 显式开启 CAN FD 发送（最长 `64` 字节）或经典/FD 混合接收。两种格式均支持 11-bit 标准和 29-bit 扩展 ID；经典 CAN 可接收远程帧，FD 没有远程帧。不支持错误帧订阅或自动回包。程序不直接访问 SPI、不修改设备树、GPIO、bitrate 或接口状态，也不依赖相机/IMU 运行库或 `cam-service`。
 
 ### 前置条件与接口配置
 
@@ -321,6 +321,17 @@ ip link set dev can0 type can bitrate 500000 fd off
 ip link set dev can0 up
 ip -details -statistics link show can0
 ```
+
+使用 CAN FD 时，两端均须支持 FD，并匹配仲裁段和数据段速率、ISO/non-ISO 模式；下面 `500000` / `2000000` 只是示例。确认接口没有其他业务使用后，手动将其配置为 FD，再运行带 `--fd` 的 demo：
+
+```bash
+ip link set dev can0 down
+ip link set dev can0 type can bitrate 500000 dbitrate 2000000 fd on
+ip link set dev can0 up
+ip -details -statistics link show can0
+```
+
+FD 接口的 MTU 应为 `72`；`--fd` 遇到经典接口 MTU `16` 会失败，不自动重配置。`--brs` 决定发送帧是否在数据段切换速率，对端需能接收对应帧。经典 CAN 默认模式也可以在 FD 接口上发送/接收经典帧，但不会接收 FD 帧。
 
 若命令不支持 CAN 参数，需安装支持 CAN 的 iproute2；若驱动探测失败、接口未注册或处于 BUS-OFF，先检查 BSP、接线、终端、对端和 bitrate，不停止或重配 `cam-service`。程序遇到接口不存在、非 CAN 设备或未 UP 会明确失败。
 
@@ -344,22 +355,37 @@ cd /root/demo
 ./can_demo --interface can0 --mode tx --id 123 --data ''
 ```
 
+CAN FD 示例（先完成 FD 接口配置，外部节点先准备好接收）：
+
+```bash
+# 混合接收经典数据/远程帧与 FD 数据帧；不是只接收 FD 的过滤器
+./can_demo --interface can0 --mode rx --fd --count 10 --timeout-ms 5000
+# 12 字节 FD，不切换数据段速率
+./can_demo --interface can0 --mode tx --fd --id 123 --data 000102030405060708090A0B
+# 16 字节扩展 ID FD，开启 BRS
+./can_demo --interface can0 --mode tx --fd --brs --extended --id 1ABCDE --data 000102030405060708090A0B0C0D0E0F
+```
+
 | 参数 | 语义 |
 |---|---|
 | `--interface <name>` | 默认 `can0`；仅操作已注册且 UP 的 CAN 设备 |
 | `--mode <rx\|tx>` | 默认 `rx`；不会默认发帧 |
 | `--id <hex>` | TX ID，默认 `123`；可带 `0x`，标准范围 `0..7FF`，扩展范围 `0..1FFFFFFF` |
 | `--extended` | 显式选择 TX 29-bit ID；数值大小不会自动切换格式 |
-| `--data <hexbytes>` | TX `0..8` 字节，默认 `0102030405060708`；偶数个 hex 字符，无分隔符，空字符串表示零载荷 |
+| `--fd` | TX 使用 FD 帧；RX 接收经典与 FD 混合帧；要求接口启用 FD、MTU `72` |
+| `--brs` | TX 数据段速率切换，必须同时使用 `--mode tx --fd`；不是 RX 过滤器 |
+| `--data <hexbytes>` | TX 默认 `0102030405060708`；经典 `0..8` 字节；FD 接受 `0..8,12,16,20,24,32,48,64` 字节，其他长度拒绝且不隐式补零；偶数个 hex 字符，无分隔符，空字符串表示零载荷 |
 | `--count <n>` | RX 默认 `0`（持续）；TX 默认 `1`；显式 `0` 持续运行至 Ctrl-C |
 | `--interval-ms <n>` | TX 帧间等待，默认 `1000`，范围 `1..3600000` ms；不是实时发送周期保证 |
 | `--timeout-ms <n>` | RX 每次等待的空闲超时，默认 `0`（无限），范围 `0..3600000` ms；不是整个会话超时 |
 | `--help` / `--version` | 单独使用，不打开 CAN 硬件 |
 
-发送专用参数要求 `--mode tx`；非法参数退出 `2`，接口/I/O/接收超时失败退出 `1`，计数完成或 SIGINT/SIGTERM 正常中断退出 `0`。输出形如 `rx 123#0102030405060708`，扩展 ID 固定 8 位，远程帧如 `rx 123#R8`。
+发送专用参数要求 `--mode tx`；`--fd` 可用于收发，`--brs` 还要求 `--fd`。非法参数退出 `2`，接口/I/O/接收超时失败退出 `1`，计数完成或 SIGINT/SIGTERM 正常中断退出 `0`。经典输出不变，形如 `rx 123#0102030405060708`，扩展 ID 固定 8 位，远程帧如 `rx 123#R8`。FD 输出为 `ID##<flags><data>`，flags 是一个十六进制数字，bit 0 为 BRS、bit 1 为 ESI；例如 `rx 123##1000102030405060708090A0B` 表示 BRS 置位的 12 字节 FD 帧。ESI 由发送控制器报告，demo 不提供设置 ESI 的参数；`--extended` 只改变 ID 格式，不开启 FD。
 
 ### 验证与限制
 
 `tx_queued=N` 只表示 N 帧被内核接受，不表示对端收到或每帧已在总线上完成。默认 SocketCAN 本地回环可能让同机另一个接收进程看到发帧；这不能证明外部接线、收发器或 ACK 正常。外部验收须在第二个物理节点核对 ID、格式、载荷和计数，再反向发帧确认本板接收，同时检查 `ip -details -statistics link show can0` 的错误、丢帧和 BUS-OFF 状态。host 数据报逻辑测试、vcan 或 `--help` 不代替这一步。
+
+应用支持 FD 不等于当前 BSP 已通过实板完整性验收。受影响 BSP 的长 FD 载荷可能损坏，不能仅凭收齐帧数、没有总线错误或短帧通过认定可靠；须先修复底层问题，并在第二个物理节点逐字节核对长载荷、FD/BRS 标志及双向计数。
 
 单独编译使用 `scripts/build_can_demo.sh`，完整打包使用 `scripts/package_runtime.sh`，详见[公开 Demo 源码编译](../development/open-source-build.md)。

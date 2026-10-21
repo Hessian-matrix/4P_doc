@@ -304,7 +304,7 @@ Boot autostart is implemented through the on-device `/userdata/startup.sh`: the 
 
 ## 11. CAN Demo
 
-`can_demo` uses Linux SocketCAN `CAN_RAW` on network devices registered by the TCAN4550 driver. It supports classical CAN only: transmit 11-bit standard or 29-bit extended data frames, receive standard/extended data and remote frames, with `0..8` payload bytes. CAN FD, error-frame subscriptions, and automatic replies are not supported. It does not directly access SPI or change device tree, GPIO, bitrate, or interface state, and does not depend on camera/IMU runtime libraries or `cam-service`.
+`can_demo` uses Linux SocketCAN `CAN_RAW` on network devices registered by the TCAN4550 driver. Classical CAN is the default (`0..8` payload bytes); `--fd` explicitly enables CAN FD transmission (up to `64` bytes) or mixed classical/FD reception. Both formats support 11-bit standard and 29-bit extended IDs. Classical CAN can receive remote frames; FD has no remote frames. Error-frame subscriptions and automatic replies are not supported. The program does not directly access SPI or change device tree, GPIO, bitrate, or interface state, and does not depend on camera/IMU runtime libraries or `cam-service`.
 
 ### Prerequisites and Interface Setup
 
@@ -321,6 +321,17 @@ ip link set dev can0 type can bitrate 500000 fd off
 ip link set dev can0 up
 ip -details -statistics link show can0
 ```
+
+For CAN FD, both nodes must support FD and match arbitration/data bitrates and ISO/non-ISO mode. The `500000` / `2000000` values below are examples only. After ensuring no other workload uses the interface, configure FD manually before running the demo with `--fd`:
+
+```bash
+ip link set dev can0 down
+ip link set dev can0 type can bitrate 500000 dbitrate 2000000 fd on
+ip link set dev can0 up
+ip -details -statistics link show can0
+```
+
+An FD interface must have MTU `72`. `--fd` fails on a classical interface with MTU `16` rather than reconfiguring it. `--brs` selects whether transmitted frames switch bitrate in the data phase; the peer must accept that frame format. The default classical mode also works on an FD interface but does not receive FD frames.
 
 If CAN parameters are unsupported, install CAN-capable iproute2. For probe failures, absent interfaces, or BUS-OFF, check the BSP, wiring, terminators, peer, and bitrate first; do not stop or reconfigure `cam-service`. The program explicitly fails on absent, non-CAN, or non-UP interfaces.
 
@@ -344,22 +355,37 @@ cd /root/demo
 ./can_demo --interface can0 --mode tx --id 123 --data ''
 ```
 
+CAN FD examples (configure the FD interface and prepare the external receiver first):
+
+```bash
+# Receive mixed classical data/remote and FD data frames, not FD-only filtering.
+./can_demo --interface can0 --mode rx --fd --count 10 --timeout-ms 5000
+# 12-byte FD without a data-phase bit-rate switch.
+./can_demo --interface can0 --mode tx --fd --id 123 --data 000102030405060708090A0B
+# 16-byte extended-ID FD with BRS.
+./can_demo --interface can0 --mode tx --fd --brs --extended --id 1ABCDE --data 000102030405060708090A0B0C0D0E0F
+```
+
 | Option | Meaning |
 |---|---|
 | `--interface <name>` | Default `can0`; operates only on an existing, UP CAN device |
 | `--mode <rx\|tx>` | Default `rx`; no transmission by default |
 | `--id <hex>` | TX ID, default `123`; optional `0x`, standard range `0..7FF`, extended range `0..1FFFFFFF` |
 | `--extended` | Explicitly select the TX 29-bit format; numeric ID size does not select it automatically |
-| `--data <hexbytes>` | TX `0..8` bytes, default `0102030405060708`; even hex-digit count without separators; empty string means zero payload |
+| `--fd` | TX uses FD frames; RX accepts mixed classical/FD frames; requires an FD-enabled interface with MTU `72` |
+| `--brs` | TX data-phase bit-rate switch; requires both `--mode tx --fd`; not an RX filter |
+| `--data <hexbytes>` | TX default `0102030405060708`; classical `0..8` bytes; FD accepts `0..8,12,16,20,24,32,48,64` bytes, rejecting other lengths without implicit padding; even hex-digit count without separators; empty string means zero payload |
 | `--count <n>` | RX default `0` (continuous), TX default `1`; explicit `0` runs until Ctrl-C |
 | `--interval-ms <n>` | TX inter-frame wait, default `1000`, range `1..3600000` ms; not a realtime-period guarantee |
 | `--timeout-ms <n>` | RX idle timeout per wait, default `0` (infinite), range `0..3600000` ms; not a whole-session timeout |
 | `--help` / `--version` | Use alone; no CAN hardware access |
 
-TX-only options require `--mode tx`. Invalid arguments exit `2`; interface/I/O/receive-timeout failures exit `1`; count completion or normal SIGINT/SIGTERM interruption exits `0`. Output resembles `rx 123#0102030405060708`; extended IDs use 8 digits, and remote frames resemble `rx 123#R8`.
+TX-only options require `--mode tx`; `--fd` applies to TX or RX, and `--brs` also requires `--fd`. Invalid arguments exit `2`; interface/I/O/receive-timeout failures exit `1`; count completion or normal SIGINT/SIGTERM interruption exits `0`. Classical output is unchanged: `rx 123#0102030405060708`, 8-digit extended IDs, or remote frames such as `rx 123#R8`. FD output is `ID##<flags><data>`, with a single hex digit for flags: bit 0 is BRS and bit 1 is ESI. For example, `rx 123##1000102030405060708090A0B` is a 12-byte FD frame with BRS set. ESI is reported by the transmitting controller; the demo has no ESI-setting option. `--extended` changes only the ID format, not FD mode.
 
 ### Verification and Limits
 
 `tx_queued=N` means only that the kernel accepted N frames, not that the peer received them or each transmission completed on the bus. Default SocketCAN local loopback may let another receiver on the same host see transmitted frames; this does not prove external wiring, transceiver, or ACK operation. External acceptance requires a second physical node to verify ID, format, payload, and count, then reverse transmission to verify reception on this board. Also inspect errors, drops, and BUS-OFF with `ip -details -statistics link show can0`. Host datagram logic tests, vcan, and `--help` do not replace this step.
+
+Application FD support is not board-level BSP integrity acceptance. Long FD payloads may be corrupted on affected BSPs; complete frame counts, no bus errors, or passing short frames do not establish reliability. Fix the underlying issue and verify long payloads byte-for-byte, FD/BRS flags, and bidirectional counts at a second physical node.
 
 Use `scripts/build_can_demo.sh` for a standalone build and `scripts/package_runtime.sh` for a full package; see [Building the Public Demo Source](../development/open-source-build.md).

@@ -6,7 +6,7 @@
 
 ### 改进与修复
 
-- 新增独立 `can_demo`：通过 SocketCAN 发送/接收经典 CAN，支持标准/扩展 ID；接入构建、完整运行包和校验。接口配置仍由用户/BSP 完成，不支持 CAN FD；本机回环与排队成功不构成外部总线验收。
+- 新增独立 `can_demo`：默认经典 CAN，显式 `--fd` 支持最长 64 字节 FD 发送和经典/FD 混合接收，`--brs` 开启 TX 数据段速率切换，标准/扩展 ID 均可用。FD 发送采用可精确编码的长度且不隐式补零；接入构建、完整运行包和校验。接口配置仍由用户/BSP 完成；应用支持不代替 BSP 长载荷完整性验收，本机回环与排队成功不构成外部总线验收。
 - 相机、IMU、CLI、保存和 ROS2 对外传感器时间戳统一为 `CLOCK_REALTIME` 系统时间。相机通过有界 VSYNC 交叉采样及同计数器触发差值还原硬件触发沿，不使用 IRQ/到帧时间兜底；缺少有效映射即停止。
 - RAW 仅用于内部映射/配组；每次发布刷新 realtime 桥接，运行中校时允许回拨。bag record time 独立读取 realtime，不再强制递增，chunk index 按时间排序。统一时间域不代表相机/IMU 样本或曝光已硬件同步；旧 SIF/RAW 时间消费端必须成套迁移头文件、SO 和应用。
 - 新增显式开启的 LPWM→ICM-42670-P FSYNC 触发—样本关联：硬件 FIFO 标记、相邻绝对 TMST 有界重建、RAW 唯一候选匹配及缺失/歧义状态。non-ROS `--fsync`、YAML/ROS2 `imu.fsync_enabled` 默认关闭，仅支持 `800/1600Hz`；保留 `200µs` admission 策略，不保证所有触发均匹配或曝光同步。结果传至 stdout、bag `/robobaton/fsync`、MP4 `fsync.jsonl` 和 ROS2 同名 topic。
