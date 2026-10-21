@@ -15,7 +15,7 @@
 
 | 项目 | 当前版本 | 状态 |
 |---|---|---|
-| 文档修订 | `2.0.1` | 本站持续更新；修订内容见 [版本更新记录](changelog.md)，不表示软件版本升级。 |
+| 文档修订 | `2.0.3` | 本站持续更新；修订内容见 [版本更新记录](changelog.md)，不表示软件版本升级。 |
 | non-ROS demo/运行包 | `v2.0.0` | 部署到`/root/demo`，按`manifest.sha256`整包校验。 |
 | ROS2 package/install | `v2.0.0` | 软件包部署到`/root/ros2_demo/install`，包名`robobaton_4p_ros2_demo`。目标板使用前应按 [ROS2 Demo 使用](usage/ros2-demo.md)、[non-ROS Demo 使用](usage/non-ros-demo.md) 和 [保存数据](usage/save-data-guide.md) 完成对应路径的实际检查；软件包发布不替代目标板运行检查。 |
 

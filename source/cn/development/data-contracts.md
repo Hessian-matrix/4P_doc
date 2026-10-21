@@ -15,6 +15,8 @@
 
 `libsc132.so` callback 暴露 NV12 原始帧，RTSP 客户端接收 H.264/H.265 编码流。帧信息包含 `width`、`height`、`stride`、`vstride`、Y/UV 虚拟/物理地址及 size。旋转 `90/270` 会交换宽高；消费端须依每帧元数据与 stride/size 处理对齐，不要假设紧凑 `1280x1088`。
 
+完整 C 结构声明、逐字段解释、NV12 行布局与引用有效期见 {ref}`API 图像输出结构参考 <camera-output-structures>`。
+
 ## Frame Set 字段
 
 | 字段 | 含义 |
@@ -22,7 +24,7 @@
 | `camera_count` | 当前帧组内的相机数量，完整四目为 `4`。 |
 | `group_id` | 帧组序号。 |
 | `group_timestamp_ns` | 帧组时间戳，单位 `ns`。 |
-| `max_skew_ns` | 当前帧组实际观测到的最大 timestamp skew，单位 `ns`。 |
+| `max_skew_ns` | 当前帧组实际观测到的触发捕获时间跨度，单位 `ns`；测试曝光中点偏移不改变此值。 |
 | `items[i].camera_id` | 软件 ID `0..3`，依次对应物理 CAM1..CAM4，与 V1 不变。 |
 | `items[i].frame_id` | 归一化后的帧 ID。 |
 | `items[i].timestamp_ns` | 单路帧时间戳，单位 `ns`。 |
@@ -33,15 +35,15 @@
 
 | 模式 | 当前状态 | 公开合同 |
 |---|---|---|
-| `vin_lpwm` | 所有相机应用及底层库唯一支持的 VIN 硬件触发 | 相机与 IMU FSYNC 共用 LPWM IO；相机 `timestamp_ns` 来自随帧传播的 `trig_tv` 硬件捕获，缺失则停止采集，不回退到到帧时间。 |
+| `vin_lpwm` | 所有相机应用及底层库唯一支持的 VIN 硬件触发 | 相机与 IMU FSYNC 共用 LPWM IO；相机时间基准来自随帧传播的 `trig_tv` 硬件捕获，缺失则停止采集，不回退到到帧时间。 |
 
-所有对外传感器时间戳统一为 `CLOCK_REALTIME` 系统时间（Unix epoch，单位 ns）。相机仍表示 LPWM 硬件触发沿，而不是到帧、IRQ 或曝光中心：底层以 RAW 读数包围 SIF VSYNC 捕获寄存器更新，再减去同一 24 MHz 计数器中的 `VSYNC − trigger`，通过随帧 `trig_tv` 精确匹配历史记录。后台线程继承进程允许的 CPU 集合，使用 `SCHED_FIFO/60`，每轮休眠 `50µs`；扫描内更新使用本次扫描窗口，重读 TRIG 并确认 VSYNC 稳定。无法设置实时调度时启动失败。寄存器读取窗口超过 `500µs`、捕获缺失或匹配失败时停止采集，不回退到到帧时间。该实现需要 X5 固定寄存器映射、`/dev/mem` 只读访问及实时调度权限；窗口上限不是已验证的同步精度。
+所有对外传感器时间戳统一为 `CLOCK_REALTIME` 系统时间（Unix epoch，单位 ns）。默认相机表示 LPWM 硬件触发沿，而不是到帧、IRQ 或曝光中心；显式测试模式见 {ref}`曝光中点测试开关 <test-exposure-midpoint>`。底层以 RAW 读数包围 SIF VSYNC 捕获寄存器更新，再减去同一 24 MHz 计数器中的 `VSYNC − trigger`，通过随帧 `trig_tv` 精确匹配历史记录。后台线程继承进程允许的 CPU 集合，使用 `SCHED_FIFO/60`，每轮休眠 `50µs`；扫描内更新使用本次扫描窗口，重读 TRIG 并确认 VSYNC 稳定。无法设置实时调度时启动失败。寄存器读取窗口超过 `500µs`、捕获缺失或匹配失败时停止采集，不回退到到帧时间。该实现需要 X5 固定寄存器映射、`/dev/mem` 只读访问及实时调度权限；窗口上限不是已验证的同步精度。
 
-配组在内部 RAW 域完成，再为整组使用同一次新采样的 RAW→realtime 桥接；组时间为各路映射值的最小值，`max_skew_ns` 表示映射后的触发时间差异，不代表曝光或相机/IMU 对齐精度。non-ROS 诊断、RTSP 输入时间、保存图像时间和 ROS2 图像 `header.stamp` 均保留该 realtime 捕获时间。桥接随运行中的系统校时更新，允许回拨，不使用启动时冻结 offset 或强制递增。内部超时和队列计时仍使用单调时钟；可显式开启下述 FSYNC 触发—样本关联。
+配组在内部触发 RAW 域完成，再为整组使用同一次新采样的 RAW→realtime 桥接；组时间为各路交付时间戳的最小值，`max_skew_ns` 始终表示触发捕获时间差异，不代表曝光或相机/IMU 对齐精度。non-ROS 诊断、RTSP 输入时间、保存图像时间和 ROS2 图像 `header.stamp` 沿用该交付时间戳，默认是 realtime 触发时间，测试模式是估算曝光中点。桥接随运行中的系统校时更新，允许回拨，不使用启动时冻结 offset 或强制递增。内部超时和队列计时仍使用单调时钟；可显式开启下述 FSYNC 触发—样本关联。
 
 ### 逐帧曝光观测
 
-采集每帧后、输出变换前查询一次最新 ISP 状态，将结果冻结到 `sc132_frame_info_t.exposure`；保留帧引用后再次读取不会被后续查询覆盖。`status=1`（ESTIMATED）仅是该交付帧附带的曝光估计，不是已证实的传感器逐帧生效参数；源帧号相等也不能证明非原子 getter 的曝光与帧标识同步锁存。没有误差上界，AE 启动/光照突变时相邻值可能明显变化。查询失败、非法时长或 RAW 读时失败时 `status=0`（UNAVAILABLE），其余字段全零，不沿用旧值，图像照常交付。
+采集每帧后、输出变换前查询一次最新 ISP 状态，将结果冻结到 `sc132_frame_info_t.exposure`；保留帧引用后再次读取不会被后续查询覆盖。`status=1`（ESTIMATED）仅是该交付帧附带的曝光估计，不是已证实的传感器逐帧生效参数；源帧号相等也不能证明非原子 getter 的曝光与帧标识同步锁存。没有误差上界，AE 启动/光照突变时相邻值可能明显变化。查询失败、非法时长或 RAW 读时失败时 `status=0`（UNAVAILABLE），其余字段全零，不沿用旧值；默认图像照常交付，开启曝光中点测试时则停止采集。
 
 | 字段 | 语义 |
 |---|---|
@@ -50,9 +52,28 @@
 | `source_frame_id` / `source_timestamp` | SDK 当前帧标识；timestamp 为 opaque 源值，不当作 RAW 或 realtime。可与 `raw_frame_id` 对照，但不等于已证明参数生效帧。 |
 | `observed_raw_ns` | 查询完成时 `CLOCK_MONOTONIC_RAW`，不是曝光起点或终点。 |
 
-公开 `timestamp_ns` 仍是触发沿；不把“触发时间＋半曝光时长”宣称为真实曝光中点，因为触发到积分起点尚未校准。bag `/cameraN/frame_metadata` 和 tee `camN/frames.jsonl` 中的 `exposure` 保留这些字段。MP4 `exposure.jsonl` 记录输入帧的相机、原始/归一化帧号、组号、组/逐路触发时间及曝光；它可能包含未编码保存的输入帧，应按相机及 `group_timestamp_ns // 1000 * 1000` 对照该路 timestamp CSV，不直接把源帧号当文件帧索引。ROS2 `/robobaton/camN/exposure`（`std_msgs/msg/String`，Reliable KeepLast(8)）发布 `robobaton_exposure_v1` JSON，含 `camera_id/sequence/frame_id/raw_frame_id/timestamp_ns/exposure`；按相机与 `timestamp_ns` 对照 Image `header.stamp`。系统回拨可能重复 stamp，需保留序列与采集边界，不能承诺仅靠 stamp 全局唯一。整数 JSON 必须无损解析。
+默认公开 `timestamp_ns` 是触发沿；测试开关可改为“触发时间＋半曝光时长”，但不宣称真实曝光中点，因为触发到积分起点尚未校准。bag `/cameraN/frame_metadata` 和 tee `camN/frames.jsonl` 中的 `exposure` 保留这些字段。MP4 `exposure.jsonl` 记录输入帧的相机、原始/归一化帧号、组号、组/逐路交付时间及曝光；它可能包含未编码保存的输入帧，应按相机及 `group_timestamp_ns // 1000 * 1000` 对照该路 timestamp CSV，不直接把源帧号当文件帧索引。ROS2 `/robobaton/camN/exposure`（`std_msgs/msg/String`，Reliable KeepLast(8)）发布 `robobaton_exposure_v1` JSON，含 `camera_id/sequence/frame_id/raw_frame_id/timestamp_ns/exposure`；按相机与 `timestamp_ns` 对照 Image `header.stamp`。系统回拨可能重复 stamp，需保留序列与采集边界，不能承诺仅靠 stamp 全局唯一。整数 JSON 必须无损解析。
 
-MP4 sidecar 的顶层键为 `camera_id/raw_frame_id/frame_id/group_id/group_timestamp_ns/camera_timestamp_ns/exposure`；逐路触发时间字段名是 `camera_timestamp_ns`，不同于 ROS2 JSON 的 `timestamp_ns`。读取时先判断 `exposure.status`，再取 `duration_ns`；`source_timestamp` 不用于对齐 Unix 时间。
+MP4 sidecar 的顶层键为 `camera_id/raw_frame_id/frame_id/group_id/group_timestamp_ns/camera_timestamp_ns/exposure`；逐路交付时间字段名是 `camera_timestamp_ns`，不同于 ROS2 JSON 的 `timestamp_ns`。读取时先判断 `exposure.status`，再取 `duration_ns`；`source_timestamp` 不用于对齐 Unix 时间。
+
+(test-exposure-midpoint)=
+### 曝光中点时间戳测试开关
+
+仅当前源码重建的 `libsc132.so` 支持 `SC132_TEST_EXPOSURE_MIDPOINT`，已有交付二进制不自动更新。默认关闭；启动前设为 `1` 开启，设为 `0` 或取消变量恢复原逻辑，无 C ABI、SONAME 或软件版本变更。
+
+```bash
+SC132_TEST_EXPOSURE_MIDPOINT=1 ./cam_demo
+SC132_TEST_EXPOSURE_MIDPOINT=0 ./cam_demo
+```
+
+每次 `sc132_start_frame_set()` 启动时读取一次，运行中不切换。未设置、空值、`0/false/FALSE/off/OFF/no/NO` 均关闭，其他非空值开启。改变环境后须停止并重新启动进程/采集；ROS2 需把该变量传入节点或 launch 进程。
+
+non-ROS 联合入口 `sensor_demo` 也可在 `config/sensor_config.yaml` 中设置 `camera.test_exposure_midpoint: true|false`，随包及自动生成的配置默认 `false`。显式 YAML 值覆盖环境变量；省略该键才保留环境变量控制。需重建 `sensor_demo` 与支持此开关的库，改配置后重启；`cam_demo` 不读取该 YAML，ROS2 仍使用环境变量。见 {ref}`non-ROS YAML 配置 <non-ros-yaml>`。
+
+开启时逐路 `timestamp_ns = realtime 触发时间 + floor(exposure.duration_ns / 2)`，使用该帧冻结的最新 ISP 观测，忽略触发到积分起点的延迟，不用主机当前时间、到帧时间或 opaque 源时间。frame info 与 frame-set item 一致；组时间取调整后各路时间的最小值。non-ROS 保存/RTSP、ROS2 Image/CameraInfo 和 exposure 消息沿用这些值，消费端不得再加一次半曝光。曝光不可用、时长为零或加法溢出时停止采集，不静默退回触发时间。
+
+配组放行和 `max_skew_ns` 仍使用原触发 RAW，reserved RAW/generation/uncertainty 及 FSYNC 对应也不偏移；因此测试模式的组时间与 RAW 审计时间有意表示不同事件。此模式只是未补偿延迟的曝光中点估计，不保证实际生效曝光、误差上界或硬件同步精度。
+
 
 ## IMU
 
@@ -96,9 +117,9 @@ IMU 独立连续采样；FSYNC 关联识别触发之后的首个硬件标记样�
 | `status` | `1` 唯一匹配；`2` 无对应事件或组；`3` 歧义。仅 `1` 可作为有效关联。 |
 | `camera_generation` / `group_id` / `frame_ids` / `camera_mask` | 相机会话、组号、cam0..3 帧号及有效相机位图。 |
 | `imu_generation` / `fsync_sequence` / `sample_sequence` | IMU 会话、硬件触发序号和已发布样本序号；允许缺口。 |
-| `group_timestamp_ns` / `sample_timestamp_ns` / `fsync_timestamp_ns` | realtime 组触发、IMU 样本及 FSYNC 沿时间，单位 ns。 |
+| `group_timestamp_ns` / `sample_timestamp_ns` / `fsync_timestamp_ns` | realtime 组交付、IMU 样本及 FSYNC 沿时间，单位 ns；组时间默认是触发时间，测试模式为各路估算曝光中点的最小值。 |
 | `camera_timestamps_ns` | cam0..3 各帧的原始 realtime stamp；按 `camera_mask` 取有效项，可精确匹配各 ROS2 Image/CameraInfo 的 `header.stamp`。组时间是各项最小值，不能代替所有相机时间。 |
-| `group_raw_ns` / `sample_raw_ns` / `fsync_raw_ns` | 仅供关联审计的内部 RAW 值，不是 UTC。 |
+| `group_raw_ns` / `sample_raw_ns` / `fsync_raw_ns` | 仅供关联审计的内部 RAW 值，不是 UTC；组 RAW 始终是最早触发，曝光中点测试不偏移它。 |
 | `fsync_to_sample_ns` | FSYNC 沿至其后硬件标记样本的实测 delay。 |
 | `group_uncertainty_ns` / `uncertainty_ns` | 相机组与 IMU 事件各自的映射不确定度，不是曝光同步精度承诺。 |
 
@@ -159,7 +180,7 @@ ROS2 QoS：
 
 ROS2 raw `Image.step` 使用底层 DMA buffer 的 stride；`data.size()` 使用底层 Y/UV buffer size，可能大于紧凑 `width * height * 3 / 2`。订阅端不得按紧凑 NV12 假设直接索引 UV 平面。
 
-ROS2 `header.stamp` 不是发布时刻：相机使用 realtime 触发沿时间，IMU/Temperature 使用 realtime `sample_timestamp_ns`，不以 `host_timestamp_ns` 代替。ROS2 只把纳秒值拆成 `sec`/`nanosec`，不再添加 offset。可与同一已校准系统时间轴比较，但同域不保证硬件采样或曝光对齐；跨设备仍依赖系统校时质量。`use_sim_time` 不会把这些传感器 stamp 改为仿真 `/clock`。NTP/PTP 调整系统时钟后后续 stamp 跟随变化；它们不会建立 FSYNC 样本关联。
+ROS2 `header.stamp` 不是发布时刻：相机默认使用 realtime 触发沿时间，显式测试模式使用上述估算曝光中点；IMU/Temperature 使用 realtime `sample_timestamp_ns`，不以 `host_timestamp_ns` 代替。ROS2 只把纳秒值拆成 `sec`/`nanosec`，不再添加 offset。可与同一已校准系统时间轴比较，但同域不保证硬件采样或曝光对齐；跨设备仍依赖系统校时质量。`use_sim_time` 不会把这些传感器 stamp 改为仿真 `/clock`。NTP/PTP 调整系统时钟后后续 stamp 跟随变化；它们不会建立 FSYNC 样本关联。
 
 ROS2 当前不发布 RTSP、TF 外参或标定；FSYNC 只提供触发—样本对应，不改变采样相位，也不保证曝光同步。通用可视化优先订阅 `/image_raw/compressed`，不要假设 raw NV12 可被普通 RGB/BGR 工具直接显示。
 

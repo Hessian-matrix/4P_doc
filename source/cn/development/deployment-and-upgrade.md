@@ -56,7 +56,7 @@ if ! ssh "root@${X5_IP}" "set -e; \
       command_path=\$(tr '\\0' '\\n' < \"\$proc/cmdline\" | sed -n '1p'); \
       command_name=\${command_path##*/}; \
       case \"\$command_name\" in \
-        sensor_demo|cam_demo|imu_reader_demo|serial_port_demo) return 0 ;; \
+        sensor_demo|cam_demo|mosaic_rtsp_demo|imu_reader_demo|serial_port_demo|can_demo) return 0 ;; \
       esac; \
     done; \
     return 1; \
@@ -66,7 +66,7 @@ if ! ssh "root@${X5_IP}" "set -e; \
   fi; \
   if [ -d /root/demo ]; then mv /root/demo '${REMOTE_BACKUP}'; fi; \
   mv '${REMOTE_NEW}' /root/demo; \
-  chmod +x /root/demo/cam_demo /root/demo/sensor_demo /root/demo/imu_reader_demo /root/demo/serial_port_demo /root/demo/bin/*"; then
+  chmod +x /root/demo/cam_demo /root/demo/sensor_demo /root/demo/imu_reader_demo /root/demo/serial_port_demo /root/demo/mosaic_rtsp_demo /root/demo/can_demo /root/demo/bin/*"; then
   ssh "root@${X5_IP}" "rm -rf '${REMOTE_NEW}'"
   exit 1
 fi
@@ -88,6 +88,7 @@ X5_IP=192.168.1.12  # 改成实际板卡地址
 ssh "root@${X5_IP}" "cd /root/demo && ./cam_demo --help >/tmp/cam_demo.help"
 ssh "root@${X5_IP}" "cd /root/demo && ./imu_reader_demo --help >/tmp/imu_reader_demo.help"
 ssh "root@${X5_IP}" "cd /root/demo && ./serial_port_demo --help >/tmp/serial_port_demo.help"
+ssh "root@${X5_IP}" "cd /root/demo && ./can_demo --help >/tmp/can_demo.help"
 ssh "root@${X5_IP}" "cd /root/demo && ./sensor_demo --help >/tmp/sensor_demo.help"
 ```
 

@@ -15,6 +15,8 @@ This page records the data formats, fields, and time semantics that users can re
 
 The `libsc132.so` callback exposes NV12 raw frames, while RTSP carries H.264/H.265 encoded video. Frame information includes `width`, `height`, `stride`, `vstride`, Y/UV virtual/physical addresses, and sizes. Rotation `90/270` swaps dimensions; consumers must use each frame's metadata and stride/size rather than assume compact `1280x1088`.
 
+For complete C declarations, field-by-field meanings, NV12 row layout, and reference lifetime, see the {ref}`API Image Output Structure Reference <camera-output-structures>`.
+
 ## Frame Set Fields
 
 | Field | Meaning |
@@ -22,7 +24,7 @@ The `libsc132.so` callback exposes NV12 raw frames, while RTSP carries H.264/H.2
 | `camera_count` | Number of cameras in the current frame group; full four-camera is `4`. |
 | `group_id` | Frame-group sequence number. |
 | `group_timestamp_ns` | Frame-group timestamp in `ns`. |
-| `max_skew_ns` | The maximum timestamp skew actually observed in the current frame group, in `ns`. |
+| `max_skew_ns` | Observed trigger-capture span of the group in `ns`; test exposure-midpoint offsets do not change it. |
 | `items[i].camera_id` | Software ID `0..3`, mapping respectively to physical CAM1..CAM4, unchanged from V1. |
 | `items[i].frame_id` | Normalized frame ID. |
 | `items[i].timestamp_ns` | Single-channel frame timestamp in `ns`. |
@@ -33,15 +35,15 @@ The `libsc132.so` callback exposes NV12 raw frames, while RTSP carries H.264/H.2
 
 | Mode | Current status | Public contract |
 |---|---|---|
-| `vin_lpwm` | The only supported trigger for all camera applications and the library | Camera and IMU FSYNC share the LPWM IO; camera `timestamp_ns` is the frame-propagated `trig_tv` hardware capture. Missing capture stops acquisition rather than falling back to frame arrival time. |
+| `vin_lpwm` | The only supported trigger for all camera applications and the library | Camera and IMU FSYNC share the LPWM IO; the camera time base is the frame-propagated `trig_tv` hardware capture. Missing capture stops acquisition rather than falling back to frame arrival time. |
 
-All public sensor timestamps use `CLOCK_REALTIME` system time (Unix epoch, in ns). Camera stamps still represent the LPWM hardware trigger edge, not frame arrival, IRQ, or exposure midpoint. The library brackets a SIF VSYNC capture-register transition with RAW reads, subtracts `VSYNC − trigger` in the shared 24 MHz counter, and exactly matches the frame's `trig_tv` against capture history. The background thread inherits the process's allowed CPU mask, uses `SCHED_FIFO/60`, and sleeps `50µs` between scans. An in-scan transition uses that scan's bracket, rereads TRIG, and verifies stable VSYNC. Failure to enable realtime scheduling rejects startup. A register window exceeding `500µs`, missing capture, or failed match stops acquisition without an arrival-time fallback. This implementation requires the fixed X5 register map, read-only `/dev/mem` access, and realtime scheduling permission; the rejection window is not demonstrated synchronization accuracy.
+All public sensor timestamps use `CLOCK_REALTIME` system time (Unix epoch, in ns). By default camera stamps represent the LPWM hardware trigger edge, not frame arrival, IRQ, or exposure midpoint; see the opt-in {ref}`Exposure-Midpoint Test Switch <test-exposure-midpoint>`. The library brackets a SIF VSYNC capture-register transition with RAW reads, subtracts `VSYNC − trigger` in the shared 24 MHz counter, and exactly matches the frame's `trig_tv` against capture history. The background thread inherits the process's allowed CPU mask, uses `SCHED_FIFO/60`, and sleeps `50µs` between scans. An in-scan transition uses that scan's bracket, rereads TRIG, and verifies stable VSYNC. Failure to enable realtime scheduling rejects startup. A register window exceeding `500µs`, missing capture, or failed match stops acquisition without an arrival-time fallback. This implementation requires the fixed X5 register map, read-only `/dev/mem` access, and realtime scheduling permission; the rejection window is not demonstrated synchronization accuracy.
 
-Grouping remains in internal RAW time, followed by one freshly sampled RAW-to-realtime bridge for the entire group. Group time is the minimum mapped channel time; `max_skew_ns` measures mapped trigger-time differences, not exposure or camera/IMU alignment accuracy. Non-ROS diagnostics, RTSP input times, saved images, and ROS2 image stamps preserve realtime captures. Bridges follow runtime clock corrections, including backward steps, without a frozen offset or monotonic clamp. Internal timeouts remain monotonic; the FSYNC trigger-to-sample association below is explicitly opt-in.
+Grouping remains in internal trigger RAW time, followed by one freshly sampled RAW-to-realtime bridge for the entire group. Group time is the minimum delivered channel timestamp; `max_skew_ns` always measures trigger-capture differences, not exposure or camera/IMU alignment accuracy. Non-ROS diagnostics, RTSP input times, saved images, and ROS2 image stamps use the delivered timestamp: realtime trigger time by default, estimated exposure midpoint in test mode. Bridges follow runtime clock corrections, including backward steps, without a frozen offset or monotonic clamp. Internal timeouts remain monotonic; the FSYNC trigger-to-sample association below is explicitly opt-in.
 
 ### Per-frame Exposure Observations
 
-After acquiring each frame and before output transforms, query the latest ISP state once and freeze it in `sc132_frame_info_t.exposure`. Re-reading a retained frame is unaffected by subsequent queries. `status=1` (ESTIMATED) is an estimate attached to that delivered frame, not certified sensor-applied per-frame exposure. Even equal source/frame IDs do not prove atomic latching of exposure and identity. There is no error bound; AE convergence or lighting changes can produce substantial adjacent changes. A failed query, invalid duration, or failed RAW clock read produces `status=0` (UNAVAILABLE), with all other fields zero, never carried forward; image delivery continues.
+After acquiring each frame and before output transforms, query the latest ISP state once and freeze it in `sc132_frame_info_t.exposure`. Re-reading a retained frame is unaffected by subsequent queries. `status=1` (ESTIMATED) is an estimate attached to that delivered frame, not certified sensor-applied per-frame exposure. Even equal source/frame IDs do not prove atomic latching of exposure and identity. There is no error bound; AE convergence or lighting changes can produce substantial adjacent changes. A failed query, invalid duration, or failed RAW clock read produces `status=0` (UNAVAILABLE), with all other fields zero, never carried forward; default image delivery continues, but exposure-midpoint test mode stops acquisition.
 
 | Field | Meaning |
 |---|---|
@@ -50,9 +52,28 @@ After acquiring each frame and before output transforms, query the latest ISP st
 | `source_frame_id` / `source_timestamp` | Current SDK identity; timestamp is opaque, not RAW or realtime. Compare with `raw_frame_id` diagnostically, not as proof of the applied-parameter frame. |
 | `observed_raw_ns` | Query completion in `CLOCK_MONOTONIC_RAW`, not exposure start/end. |
 
-Public `timestamp_ns` remains the trigger edge. Trigger time plus half the duration is not an actual exposure midpoint: trigger-to-integration-start has not been calibrated. Bag `/cameraN/frame_metadata` and tee `camN/frames.jsonl` preserve `exposure`. MP4 `exposure.jsonl` records input-camera identity, raw/normalized frame IDs, group ID, group/per-camera trigger times, and exposure. It can contain input frames not saved by the encoder: join the camera's timestamp CSV using `group_timestamp_ns // 1000 * 1000`, not source frame ID as a file index. ROS2 `/robobaton/camN/exposure` (`std_msgs/msg/String`, Reliable KeepLast(8)) publishes `robobaton_exposure_v1` JSON with `camera_id/sequence/frame_id/raw_frame_id/timestamp_ns/exposure`; join by camera and Image `header.stamp`. Clock steps may repeat stamps: preserve sequence and acquisition boundaries, rather than assume stamps alone are globally unique. Parse integer JSON losslessly.
+Public `timestamp_ns` is the trigger edge by default. The test switch can select trigger time plus half the duration, but this is not a certified exposure midpoint: trigger-to-integration-start has not been calibrated. Bag `/cameraN/frame_metadata` and tee `camN/frames.jsonl` preserve `exposure`. MP4 `exposure.jsonl` records input-camera identity, raw/normalized frame IDs, group ID, group/per-camera delivered times, and exposure. It can contain input frames not saved by the encoder: join the camera's timestamp CSV using `group_timestamp_ns // 1000 * 1000`, not source frame ID as a file index. ROS2 `/robobaton/camN/exposure` (`std_msgs/msg/String`, Reliable KeepLast(8)) publishes `robobaton_exposure_v1` JSON with `camera_id/sequence/frame_id/raw_frame_id/timestamp_ns/exposure`; join by camera and Image `header.stamp`. Clock steps may repeat stamps: preserve sequence and acquisition boundaries, rather than assume stamps alone are globally unique. Parse integer JSON losslessly.
 
-MP4 sidecar top-level keys are `camera_id/raw_frame_id/frame_id/group_id/group_timestamp_ns/camera_timestamp_ns/exposure`. Its per-camera trigger field is named `camera_timestamp_ns`, unlike `timestamp_ns` in ROS2 JSON. Check `exposure.status` before using `duration_ns`; do not use `source_timestamp` to align Unix time.
+MP4 sidecar top-level keys are `camera_id/raw_frame_id/frame_id/group_id/group_timestamp_ns/camera_timestamp_ns/exposure`. Its per-camera delivered-time field is named `camera_timestamp_ns`, unlike `timestamp_ns` in ROS2 JSON. Check `exposure.status` before using `duration_ns`; do not use `source_timestamp` to align Unix time.
+
+(test-exposure-midpoint)=
+### Exposure-Midpoint Timestamp Test Switch
+
+Only `libsc132.so` rebuilt from current source supports `SC132_TEST_EXPOSURE_MIDPOINT`; existing delivered binaries are not updated automatically. Disabled by default; set `1` before startup to enable, or set `0`/unset it to restore the original logic. No C ABI, SONAME, or software-version change.
+
+```bash
+SC132_TEST_EXPOSURE_MIDPOINT=1 ./cam_demo
+SC132_TEST_EXPOSURE_MIDPOINT=0 ./cam_demo
+```
+
+Read once at each `sc132_start_frame_set()` startup, never toggled during acquisition. Unset, empty, or `0/false/FALSE/off/OFF/no/NO` disables it; any other nonempty value enables it. Stop and restart the process/acquisition after changing the environment; ROS2 must pass the variable to the node or launch process.
+
+The non-ROS combined entry `sensor_demo` also accepts `camera.test_exposure_midpoint: true|false` in `config/sensor_config.yaml`; packaged and auto-generated configurations default to `false`. Explicit YAML overrides the environment; only an omitted key preserves environment control. Rebuild `sensor_demo` and a supporting library, and restart after configuration changes. `cam_demo` does not read this YAML; ROS2 still uses the environment variable. See {ref}`non-ROS YAML Configuration <non-ros-yaml>`.
+
+When enabled, each `timestamp_ns = realtime trigger time + floor(exposure.duration_ns / 2)`, using that frame's frozen latest ISP observation. It ignores trigger-to-integration-start delay, not replacing time with host now, arrival time, or opaque source time. Frame info and frame-set items agree; group time is the minimum adjusted channel timestamp. Non-ROS saving/RTSP, ROS2 Image/CameraInfo, and exposure messages use these values; consumers must not add half exposure a second time. Unavailable exposure, zero duration, or addition overflow stops acquisition rather than silently reverting to trigger time.
+
+Group admission and `max_skew_ns` still use original trigger RAW; reserved RAW/generation/uncertainty and FSYNC correspondence are not shifted. Thus test-mode group time and RAW audit time intentionally describe different events. This is only an exposure-midpoint estimate without delay compensation, not a guarantee of applied exposure, error bounds, or hardware synchronization accuracy.
+
 
 ## IMU
 
@@ -96,9 +117,9 @@ Camera groups and FSYNC edges match only with a unique candidate in both directi
 | `status` | `1` unique match; `2` missing event or group; `3` ambiguous. Only `1` is valid. |
 | `camera_generation` / `group_id` / `frame_ids` / `camera_mask` | Camera session, group number, cam0..3 frame IDs, and active-camera bitmap. |
 | `imu_generation` / `fsync_sequence` / `sample_sequence` | IMU session, hardware trigger sequence, and published sample sequence; gaps are possible. |
-| `group_timestamp_ns` / `sample_timestamp_ns` / `fsync_timestamp_ns` | Realtime group trigger, IMU sample, and FSYNC-edge times, in ns. |
+| `group_timestamp_ns` / `sample_timestamp_ns` / `fsync_timestamp_ns` | Realtime delivered group, IMU sample, and FSYNC-edge times, in ns; group time defaults to trigger time and becomes the minimum estimated camera exposure midpoint in test mode. |
 | `camera_timestamps_ns` | Original realtime stamp for each cam0..3 frame; use `camera_mask` to select valid entries and join each ROS2 Image/CameraInfo `header.stamp` exactly. Group time is the minimum, not a replacement for every camera stamp. |
-| `group_raw_ns` / `sample_raw_ns` / `fsync_raw_ns` | Internal RAW values for association auditing only, not UTC. |
+| `group_raw_ns` / `sample_raw_ns` / `fsync_raw_ns` | Internal RAW values for association auditing only, not UTC; group RAW always means earliest trigger and is not shifted by exposure-midpoint test mode. |
 | `fsync_to_sample_ns` | Measured delay from the FSYNC edge to its subsequent hardware-tagged sample. |
 | `group_uncertainty_ns` / `uncertainty_ns` | Camera-group and IMU-event mapping uncertainties, not exposure-sync accuracy claims. |
 
@@ -159,7 +180,7 @@ ROS2 QoS:
 
 ROS2 raw `Image.step` uses the underlying DMA buffer's stride; `data.size()` uses the underlying Y/UV buffer size, which may be larger than the compact `width * height * 3 / 2`. Subscribers must not index the UV plane directly under the compact-NV12 assumption.
 
-ROS2 `header.stamp` is not publication time: cameras use realtime trigger-edge times, and IMU/Temperature use realtime `sample_timestamp_ns`, not `host_timestamp_ns`. ROS2 only splits nanoseconds into `sec`/`nanosec`, without another offset. Stamps can be compared on the same calibrated system timeline, but a common domain does not guarantee hardware sample/exposure alignment; cross-device accuracy still depends on clock synchronization. `use_sim_time` does not change sensor stamps to simulation `/clock`. Subsequent stamps follow NTP/PTP system-clock corrections; these services do not establish FSYNC sample associations.
+ROS2 `header.stamp` is not publication time: cameras use realtime trigger-edge times by default or the estimated exposure midpoint in opt-in test mode. IMU/Temperature use realtime `sample_timestamp_ns`, not `host_timestamp_ns`. ROS2 only splits nanoseconds into `sec`/`nanosec`, without another offset. Stamps can be compared on the same calibrated system timeline, but a common domain does not guarantee hardware sample/exposure alignment; cross-device accuracy still depends on clock synchronization. `use_sim_time` does not change sensor stamps to simulation `/clock`. Subsequent stamps follow NTP/PTP system-clock corrections; these services do not establish FSYNC sample associations.
 
 ROS2 does not publish RTSP, TF extrinsics, or calibration. FSYNC provides trigger-to-sample correspondence only, without changing sample phase or guaranteeing exposure synchronization. For general visualization, prefer `/image_raw/compressed`; ordinary RGB/BGR tools may not display raw NV12.
 

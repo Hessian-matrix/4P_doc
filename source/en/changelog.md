@@ -4,6 +4,9 @@ This file records user-visible updates in the RoboBaton 4P public delivery, foll
 
 ## Unreleased
 
+### Improvements and Fixes
+
+- Added standalone `can_demo` for classical CAN transmit/receive through SocketCAN with standard/extended IDs, integrated into builds, full runtime packaging, and verification. Users/BSP still configure the interface; no CAN FD. Local loopback and queued sends do not constitute external-bus acceptance.
 - Camera, IMU, CLI, saving, and ROS2 public sensor timestamps now use `CLOCK_REALTIME` system time. Bounded VSYNC cross-sampling and the same-counter trigger delta reconstruct camera hardware trigger edges, without IRQ/arrival-time fallbacks; missing valid mappings stop acquisition.
 - RAW remains internal to mapping/grouping. Realtime bridges refresh at publication and follow backward system-clock steps. Bag record time independently reads realtime without a monotonic clamp; chunk indexes are time-sorted. A common domain does not establish camera/IMU hardware sample/exposure synchronization. Consumers of old SIF/RAW times must migrate headers, SOs, and applications together.
 - Added opt-in LPWM-to-ICM-42670-P FSYNC trigger-to-sample association: hardware FIFO tags, bounded reconstruction from adjacent absolute TMSTs, unique RAW candidate matching, and missing/ambiguous statuses. Non-ROS `--fsync` and YAML/ROS2 `imu.fsync_enabled` default off and support only `800/1600Hz`; the `200µs` admission policy remains, without guaranteeing every trigger or exposure synchronization. Results reach stdout, bag `/robobaton/fsync`, MP4 `fsync.jsonl`, and the same ROS2 topic.
@@ -15,10 +18,45 @@ This file records user-visible updates in the RoboBaton 4P public delivery, foll
 - Camera ABI 2.2 adds frozen per-frame ISP exposure observations while preserving old frame-info prefix reads and SONAME. Bag/tee metadata, MP4 `exposure.jsonl`, and ROS2 `/robobaton/camN/exposure` carry estimates separately from unavailable values, without certifying applied-frame identity, an error bound, or actual exposure midpoint; trigger stamps remain unchanged. The capture observer inherits the allowed CPU mask rather than forcing CPU0.
 - Fixed an unreleased MCLK reference acquired during sensor probing: release it before VIN takes ownership without clearing historical references. Camera capture uses FIFO/60 and handles in-scan VSYNC transitions; the INT1 observer inherits the CPU mask at FIFO/30 to stay below the default GPIO IRQ. IMU fitting constrains read intervals, overwide observations cannot poison unwrapping, and longer edge-time history is retained. The `500µs`/`200µs` gates remain unchanged; high load can still cause explicit rejection or acquisition failure.
 - IMU interval observations that contradict the retained clock certificate now invalidate it before further publication; overwide observations remain individually rejected. Fixed a bag shutdown race that mistook a final encoded frame arriving after prefetch for an order gap; real gaps still fail. Realtime threads remain subject to system scheduling and IRQ latency; system realtime quotas are unchanged, without a zero-loss guarantee under arbitrary load.
+- Camera adds default-off `SC132_TEST_EXPOSURE_MIDPOINT`: test timestamps use trigger time plus half exposure duration, ignoring trigger-to-integration-start delay; unavailable exposure stops acquisition. Group admission, trigger skew, and FSYNC RAW audit remain unchanged; disabling restores original logic. Requires a current-source library rebuild, not a software release or hardware acceptance claim.
+
+## 2.0.5 - 2026-10-21
+
+This revision documents YAML configuration for the non-ROS exposure-midpoint test switch. Software versions and SO ABI are unchanged.
+
+### Improvements and Fixes
+
+- Non-ROS `sensor_demo` adds YAML `camera.test_exposure_midpoint`, default off in packaged and auto-generated configurations, with explicit YAML taking precedence over the environment. Document estimated midpoints, ROS1 bag image stamps, and rebuild/restart requirements.
+
+## 2.0.4 - 2026-10-21
+
+This bilingual documentation revision covers the exposure-midpoint test switch. Software versions and SO ABI are unchanged; no calibrated-exposure-midpoint or hardware acceptance claim.
+
+### Improvements and Fixes
+
+- Synchronize bilingual usage, default-off behavior, estimated midpoint formula, failure boundaries, and group/per-camera timestamp semantics for the test switch.
+
+## 2.0.3 - 2026-10-21
+
+This revision completes the bilingual API reference for public image output structures. Documentation only; software versions, SO ABI, and hardware acceptance scope are unchanged.
+
+### Improvements and Fixes
+
+- Complete per-frame, frame-group, and exposure fields, units, sequence/time semantics, NV12 padding, reference lifetime, and ROS2/encoded-output differences; add a direct link from Data Contracts.
+
+## 2.0.2 - 2026-10-20
+
+This revision adds bilingual CAN usage documentation. Software remains `2.0.0`; this does not declare CAN hardware or system acceptance.
+
+### Improvements and Fixes
+
+- Add CAN wiring prerequisites, manual interface setup, transmit/receive commands, options, build, and deployment entries.
 
 ## 2.0.1 - 2026-10-20
 
 Documentation-only synchronization with current source; software remains `2.0.0`. The unreleased changes above do not become a software release or system acceptance through this documentation revision.
+
+### Improvements and Fixes
 
 - Align realtime timestamps, opt-in FSYNC, camera ABI 2.2 exposure observations, and IMU ABI 2.1; complete configuration, topic, and saved-sidecar entry points.
 - Distinguish ISP exposure estimates, trigger-to-sample association, storage completeness, and actual DDS delivery; document realtime permissions, final health counters, and high-load rejection boundaries.
@@ -27,6 +65,8 @@ Documentation-only synchronization with current source; software remains `2.0.0`
 ## 2.0.0 - 2026-10-15
 
 V2.0.0 release: software and documentation versions unified to 2.0.0, with default trigger mode switched to LPWM.
+
+### Improvements and Fixes
 
 - All camera acquisition entries support only `vin_lpwm` (VIN LPWM hardware triggering); software GPIO and free-run paths are removed.
 - Camera timestamps preserve frame-propagated `trig_tv` trigger captures in the native SIF counter domain, not RAW/UTC. Sharing the camera/IMU wire does not establish sample/exposure association.
@@ -37,6 +77,8 @@ V2.0.0 release: software and documentation versions unified to 2.0.0, with defau
 ## 1.3.3 - 2026-10-11
 
 This bilingual documentation revision covers the V2 hardware migration; software VERSION files are unchanged, and this does not declare full V2 feature or system acceptance.
+
+### Improvements and Fixes
 
 - Current IMU guides, APIs, and examples move to ICM-42670-P, `icm42670_*`, and `icm42670_driver.h`; real SO `libicm42670.so.2.0.0`, SONAME `libicm42670.so.2`, node `ICM42670_X5_2.0`.
 - Native ODRs are `25/50/100/200/400/800/1600Hz`, default `800Hz`; old `500/1000/2000Hz` rates are explicitly rejected and require deliberate configuration migration.

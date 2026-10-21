@@ -15,7 +15,7 @@ This page defines the version policy for the entire public documentation set; [C
 
 | Item | Current version | Status |
 |---|---|---|
-| Documentation revision | `2.0.1` | This site updates continuously; see [Changelog](changelog.md) for revision details. This does not indicate a software version upgrade. |
+| Documentation revision | `2.0.3` | This site updates continuously; see [Changelog](changelog.md) for revision details. This does not indicate a software version upgrade. |
 | non-ROS demo/runtime package | `v2.0.0` | Deployed to `/root/demo`, whole-package verified by `manifest.sha256`. |
 | ROS2 package/install | `v2.0.0` | The package is deployed to `/root/ros2_demo/install`, package name `robobaton_4p_ros2_demo`. Before use on the target board, complete the corresponding path's actual checks per [ROS2 Demo Usage](usage/ros2-demo.md), [non-ROS Demo Usage](usage/non-ros-demo.md), and [Saving Data](usage/save-data-guide.md); package release does not replace target-board runtime checks. |
 

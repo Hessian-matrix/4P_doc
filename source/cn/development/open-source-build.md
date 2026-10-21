@@ -4,7 +4,7 @@
 
 适用范围：
 
-- [`RoboBaton_4p_demo`](https://github.com/Hessian-matrix/RoboBaton_4p_demo)：non-ROS 四目 RTSP、IMU 和 UART 示例。
+- [`RoboBaton_4p_demo`](https://github.com/Hessian-matrix/RoboBaton_4p_demo)：non-ROS 四目 RTSP、IMU、UART 和 SocketCAN CAN 示例。
 - [`RoboBaton_4P_ROS2_demo`](https://github.com/Hessian-matrix/RoboBaton_4P_ROS2_demo)：ROS2 四目 NV12/raw+compressed 图像、CameraInfo、IMU 和温度 topic 示例。
 
 ## 1. 编译边界
@@ -17,7 +17,8 @@ RoboBaton_4p_demo
 ├── mosaic_rtsp_demo
 ├── sensor_demo
 ├── imu_reader_demo
-└── serial_port_demo
+├── serial_port_demo
+└── can_demo
 
 RoboBaton_4P_ROS2_demo
 ├── robobaton_sensors_node
@@ -89,7 +90,7 @@ git clone https://github.com/Hessian-matrix/RoboBaton_4p_demo.git
 cd RoboBaton_4p_demo
 ```
 
-完整编译五个 demo：
+完整编译六个 demo：
 
 ```bash
 cmake -S . -B build_x5 \
@@ -105,6 +106,7 @@ cmake --build build_x5 --target mosaic_rtsp_demo -j
 cmake --build build_x5 --target sensor_demo -j
 cmake --build build_x5 --target imu_reader_demo -j
 cmake --build build_x5 --target serial_port_demo -j
+cmake --build build_x5 --target can_demo -j
 ```
 
 仓库也提供了等价脚本入口：
@@ -115,6 +117,7 @@ TOOLCHAIN_FILE="$TOOLCHAIN_FILE" scripts/build_mosaic_rtsp_demo.sh
 TOOLCHAIN_FILE="$TOOLCHAIN_FILE" scripts/build_sensor_demo.sh
 TOOLCHAIN_FILE="$TOOLCHAIN_FILE" scripts/build_imu_reader_demo.sh
 TOOLCHAIN_FILE="$TOOLCHAIN_FILE" scripts/build_serial_port_demo.sh
+TOOLCHAIN_FILE="$TOOLCHAIN_FILE" scripts/build_can_demo.sh
 ```
 
 编译产物位于：
@@ -125,6 +128,7 @@ build_x5/mosaic_rtsp_demo
 build_x5/sensor_demo
 build_x5/imu_reader_demo
 build_x5/serial_port_demo
+build_x5/can_demo
 ```
 
 检查目标架构：
@@ -135,6 +139,7 @@ file build_x5/mosaic_rtsp_demo
 file build_x5/sensor_demo
 file build_x5/imu_reader_demo
 file build_x5/serial_port_demo
+file build_x5/can_demo
 ```
 
 期望输出包含 `ARM aarch64`。如果输出是 `x86-64`，说明没有使用 X5 交叉 toolchain file。
@@ -149,7 +154,7 @@ TOOLCHAIN_FILE="$TOOLCHAIN_FILE" scripts/package_runtime.sh
 
 该脚本会：
 
-1. 重新配置并编译五个 consumer demo。
+1. 重新配置并编译六个 consumer demo。
 2. 从当前仓库的 `lib/` 复制匹配的运行库。
 3. 生成顶层启动脚本、`env.sh`、`config/sensor_config.yaml` 和 `bin/`。
 4. 写入并校验 `manifest.sha256` 和 `runtime-provenance.json`；独立克隆仓库绑定当前源提交及文件哈希，组合仓库还绑定父仓 gitlink。

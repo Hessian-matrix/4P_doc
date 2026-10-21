@@ -1,6 +1,6 @@
 # non-ROS Demo 使用
 
-[`RoboBaton_4p_demo`](https://github.com/Hessian-matrix/RoboBaton_4p_demo) 是面向用户的 V2 non-ROS 公开源码仓库，提供四目 SC132 RTSP、四路拼接 RTSP、ICM-42670-P IMU 和 UART 示例。旧 V1 下载包的硬件/API 不适用于 V2。
+[`RoboBaton_4p_demo`](https://github.com/Hessian-matrix/RoboBaton_4p_demo) 是面向用户的 V2 non-ROS 公开源码仓库，提供四目 SC132 RTSP、四路拼接 RTSP、ICM-42670-P IMU、UART 和 SocketCAN CAN 示例。旧 V1 下载包的硬件/API 不适用于 V2。
 
 ## 1. 目录和运行包
 
@@ -14,6 +14,7 @@
 │   ├── mosaic_rtsp_demo
 │   ├── imu_reader_demo
 │   ├── serial_port_demo
+│   ├── can_demo
 │   ├── start_sensor_demo.sh     # sensor_demo 开机自启动管理脚本
 │   ├── env.sh
 │   ├── config/sensor_config.yaml
@@ -26,7 +27,7 @@
 └── src/
 ```
 
-部署时完整复制 `demo/` 目录内容。顶层 `cam_demo`、`sensor_demo`、`mosaic_rtsp_demo`、`imu_reader_demo` 和 `serial_port_demo` 是启动脚本，会设置运行所需的 `LD_LIBRARY_PATH`；真实 ELF 位于 `bin/`。
+部署时完整复制 `demo/` 目录内容。顶层 `cam_demo`、`sensor_demo`、`mosaic_rtsp_demo`、`imu_reader_demo`、`serial_port_demo` 和 `can_demo` 是启动脚本，会设置运行所需的 `LD_LIBRARY_PATH`；真实 ELF 位于 `bin/`。
 
 ## 2. 运行联合入口 `sensor_demo`
 
@@ -58,6 +59,7 @@ SENSOR_IMU_RESULT samples=... invalid=... timestamp_duplicates=... timestamp_reg
 
 `--imu-sample-drop-policy allow-counted` 为默认策略：身份可证明但 timing 预算不满足的样本计数丢弃，继续采集；`strict` 遇 timing/无效包拒绝即失败。身份无法唯一证明、时钟证书失效或硬件错误在两种策略下都停止。`--imu-start-order camera-first|imu-first` 控制启动顺序，默认 `camera-first`，不改变时间戳或关联合同。
 
+(non-ros-yaml)=
 ## 3. YAML 配置
 
 `sensor_demo` 启动时读取 `${DEMO_DIR:-当前目录}/config/sensor_config.yaml`。命令行参数优先于 YAML。
@@ -71,6 +73,7 @@ camera:
   height: 1088
   fps: 30
   rotate: 0
+  test_exposure_midpoint: false
 rtsp:
   bps: 4000
   codec: h264
@@ -92,6 +95,7 @@ save_data:
 - `camera.width` / `camera.height` 支持 `1280x1088`（默认）、`640x480`、`720x480`、`1280x720`，两种轴向写法均合法，其余值在启动相机前拒绝。
 - 完整四目路径固定为四路；单颗 sensor 诊断使用 `cam_demo --camera-id`。
 - non-ROS公开帧率集合为25/30/40/50/60fps；默认`30`，其他值在启动相机前拒绝。
+- `camera.test_exposure_midpoint` 默认 `false`；改为 `true` 并重启 `sensor_demo`，图像时间戳使用“触发时间＋半曝光时长”的估算曝光中点。显式 YAML 值优先于 `SC132_TEST_EXPOSURE_MIDPOINT`；旧配置省略此字段时沿用环境变量（未设置则关闭）。需要同时重建应用和支持该开关的 `libsc132.so`；不影响 IMU 时间戳或 bag record time。ROS1 bag 对齐读取图像 `header.stamp`，不要再加半曝光。曝光不可用时停止采集，不宣称已校准的真实曝光中点，详见 {ref}`数据合同 <test-exposure-midpoint>`。
 - `rtsp.codec` 支持 `h264` 和 `h265`。
 - IMU 原生采样率支持 `25/50/100/200/400/800/1600Hz`，默认 `800Hz`；旧 `500/1000/2000Hz` 明确拒绝，不会重采样。
 - `save_data.format` 默认是 `mp4`，同时支持 `rosbag`；保存路径必须是绝对路径。
@@ -295,3 +299,67 @@ cd /root/demo
 ```
 
 开机自启动通过板端 `/userdata/startup.sh` 实现：系统 `S99auto_startup` 在 `/userdata` 挂载后执行该文件。脚本只追加/删除自己带 `SENSOR_DEMO_AUTOSTART_MANAGED` 标记的块，不会覆盖其它脚本（如 `wifi_setup.sh`）写入的内容；取消自启动时若文件只剩余注释/空行残留会整体删除。开机自启动使用运行包内默认配置，直接修改 `config/sensor_config.yaml` 即可调整，无需重新执行 `enable`。`enable`/`disable` 需要 root 权限。
+
+(non-ros-can)=
+
+## 11. CAN Demo
+
+`can_demo` 使用 Linux SocketCAN `CAN_RAW` 接口操作 TCAN4550 驱动注册的网络设备。仅支持经典 CAN：发送 11-bit 标准或 29-bit 扩展数据帧，接收标准/扩展数据帧和远程帧，载荷 `0..8` 字节；不支持 CAN FD、错误帧订阅或自动回包。它不直接访问 SPI、不修改设备树、GPIO、bitrate 或接口状态，也不依赖相机/IMU 运行库或 `cam-service`。
+
+### 前置条件与接口配置
+
+- BSP 已启用 CAN、CAN_RAW、M_CAN/TCAN4550 驱动，并正确配置 SPI、IRQ、时钟、供电与 pinmux。没有 `can0` 时先修复 BSP，不靠应用自动创建接口。
+- 按正式 V2 标识断电连接 CAN_H、CAN_L 与参考地；不要按 UART/TTL 接线。总线两端按规范配置 `120Ω` 终端，确认既有终端后再接入，不猜测连接器针序或板载终端状态。
+- 对端必须使用相同 bitrate，并处于可接收/ACK 的工作状态。下面的 `500000` 仅为示例，不是板卡固定默认值。接口名以现场枚举为准。
+
+以下配置需 root 或网络管理权限，且会中断该 CAN 接口；先确认没有其他 CAN 应用或控制业务正在使用，再手动执行：
+
+```bash
+ip -details -statistics link show can0
+ip link set dev can0 down
+ip link set dev can0 type can bitrate 500000 fd off
+ip link set dev can0 up
+ip -details -statistics link show can0
+```
+
+若命令不支持 CAN 参数，需安装支持 CAN 的 iproute2；若驱动探测失败、接口未注册或处于 BUS-OFF，先检查 BSP、接线、终端、对端和 bitrate，不停止或重配 `cam-service`。程序遇到接口不存在、非 CAN 设备或未 UP 会明确失败。
+
+### 收发示例
+
+终端 A 接收；默认持续等待，按 Ctrl-C 正常退出：
+
+```bash
+cd /root/demo
+./can_demo --interface can0 --mode rx
+# 有限接收：10 帧，每次等待的空闲超时为 5 秒
+./can_demo --interface can0 --mode rx --count 10 --timeout-ms 5000
+```
+
+发送示例（外部节点先准备好接收）：
+
+```bash
+cd /root/demo
+./can_demo --interface can0 --mode tx --id 123 --data 0102030405060708 --count 10 --interval-ms 100
+./can_demo --interface can0 --mode tx --extended --id 1ABCDE --data AABB
+./can_demo --interface can0 --mode tx --id 123 --data ''
+```
+
+| 参数 | 语义 |
+|---|---|
+| `--interface <name>` | 默认 `can0`；仅操作已注册且 UP 的 CAN 设备 |
+| `--mode <rx\|tx>` | 默认 `rx`；不会默认发帧 |
+| `--id <hex>` | TX ID，默认 `123`；可带 `0x`，标准范围 `0..7FF`，扩展范围 `0..1FFFFFFF` |
+| `--extended` | 显式选择 TX 29-bit ID；数值大小不会自动切换格式 |
+| `--data <hexbytes>` | TX `0..8` 字节，默认 `0102030405060708`；偶数个 hex 字符，无分隔符，空字符串表示零载荷 |
+| `--count <n>` | RX 默认 `0`（持续）；TX 默认 `1`；显式 `0` 持续运行至 Ctrl-C |
+| `--interval-ms <n>` | TX 帧间等待，默认 `1000`，范围 `1..3600000` ms；不是实时发送周期保证 |
+| `--timeout-ms <n>` | RX 每次等待的空闲超时，默认 `0`（无限），范围 `0..3600000` ms；不是整个会话超时 |
+| `--help` / `--version` | 单独使用，不打开 CAN 硬件 |
+
+发送专用参数要求 `--mode tx`；非法参数退出 `2`，接口/I/O/接收超时失败退出 `1`，计数完成或 SIGINT/SIGTERM 正常中断退出 `0`。输出形如 `rx 123#0102030405060708`，扩展 ID 固定 8 位，远程帧如 `rx 123#R8`。
+
+### 验证与限制
+
+`tx_queued=N` 只表示 N 帧被内核接受，不表示对端收到或每帧已在总线上完成。默认 SocketCAN 本地回环可能让同机另一个接收进程看到发帧；这不能证明外部接线、收发器或 ACK 正常。外部验收须在第二个物理节点核对 ID、格式、载荷和计数，再反向发帧确认本板接收，同时检查 `ip -details -statistics link show can0` 的错误、丢帧和 BUS-OFF 状态。host 数据报逻辑测试、vcan 或 `--help` 不代替这一步。
+
+单独编译使用 `scripts/build_can_demo.sh`，完整打包使用 `scripts/package_runtime.sh`，详见[公开 Demo 源码编译](../development/open-source-build.md)。

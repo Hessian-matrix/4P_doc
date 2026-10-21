@@ -4,7 +4,7 @@ This page explains how to cross-compile the example code in the public demo repo
 
 Scope:
 
-- [`RoboBaton_4p_demo`](https://github.com/Hessian-matrix/RoboBaton_4p_demo): non-ROS four-camera RTSP, IMU, and UART examples.
+- [`RoboBaton_4p_demo`](https://github.com/Hessian-matrix/RoboBaton_4p_demo): non-ROS four-camera RTSP, IMU, UART, and SocketCAN CAN examples.
 - [`RoboBaton_4P_ROS2_demo`](https://github.com/Hessian-matrix/RoboBaton_4P_ROS2_demo): ROS2 four-camera NV12/raw+compressed images, CameraInfo, IMU, and temperature topic examples.
 
 ## 1. Build Boundary
@@ -17,7 +17,8 @@ RoboBaton_4p_demo
 ├── mosaic_rtsp_demo
 ├── sensor_demo
 ├── imu_reader_demo
-└── serial_port_demo
+├── serial_port_demo
+└── can_demo
 
 RoboBaton_4P_ROS2_demo
 ├── robobaton_sensors_node
@@ -89,7 +90,7 @@ git clone https://github.com/Hessian-matrix/RoboBaton_4p_demo.git
 cd RoboBaton_4p_demo
 ```
 
-Build all five demos:
+Build all six demos:
 
 ```bash
 cmake -S . -B build_x5 \
@@ -105,6 +106,7 @@ cmake --build build_x5 --target mosaic_rtsp_demo -j
 cmake --build build_x5 --target sensor_demo -j
 cmake --build build_x5 --target imu_reader_demo -j
 cmake --build build_x5 --target serial_port_demo -j
+cmake --build build_x5 --target can_demo -j
 ```
 
 The repository also provides equivalent script entries:
@@ -115,6 +117,7 @@ TOOLCHAIN_FILE="$TOOLCHAIN_FILE" scripts/build_mosaic_rtsp_demo.sh
 TOOLCHAIN_FILE="$TOOLCHAIN_FILE" scripts/build_sensor_demo.sh
 TOOLCHAIN_FILE="$TOOLCHAIN_FILE" scripts/build_imu_reader_demo.sh
 TOOLCHAIN_FILE="$TOOLCHAIN_FILE" scripts/build_serial_port_demo.sh
+TOOLCHAIN_FILE="$TOOLCHAIN_FILE" scripts/build_can_demo.sh
 ```
 
 Build artifacts are at:
@@ -125,6 +128,7 @@ build_x5/mosaic_rtsp_demo
 build_x5/sensor_demo
 build_x5/imu_reader_demo
 build_x5/serial_port_demo
+build_x5/can_demo
 ```
 
 Check the target architecture:
@@ -135,6 +139,7 @@ file build_x5/mosaic_rtsp_demo
 file build_x5/sensor_demo
 file build_x5/imu_reader_demo
 file build_x5/serial_port_demo
+file build_x5/can_demo
 ```
 
 The expected output contains `ARM aarch64`. If the output is `x86-64`, the X5 cross toolchain file was not used.
@@ -149,7 +154,7 @@ TOOLCHAIN_FILE="$TOOLCHAIN_FILE" scripts/package_runtime.sh
 
 The script:
 
-1. Reconfigures and builds the five consumer demos.
+1. Reconfigures and builds the six consumer demos.
 2. Copies matching runtime libraries from the current repository's `lib/`.
 3. Generates the top-level launcher scripts, `env.sh`, `config/sensor_config.yaml`, and `bin/`.
 4. Writes and verifies `manifest.sha256` and `runtime-provenance.json`; standalone clones bind the source commit and file hashes, while composition checkouts also bind the parent gitlink.

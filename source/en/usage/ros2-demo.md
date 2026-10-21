@@ -49,7 +49,7 @@ CAM1..CAM4 map respectively to software cam0..cam3 and `/robobaton/cam0..3`, unc
 | `/robobaton/cam0..3/exposure` | `std_msgs/msg/String` | `robobaton_exposure_v1` per-frame ISP observation JSON | Reliable, keep last 8 |
 | `/robobaton/fsync` | `std_msgs/msg/String` | Opt-in `robobaton_fsync_v1` trigger-to-sample association JSON | Reliable, keep last 256 |
 
-Exposure `timestamp_ns` equals that camera's Image trigger-edge stamp. `exposure.status=1` is an estimate, not certified applied exposure; `0` is unavailable. Source frame ID/opaque source time and RAW query-completion time are diagnostic only: image stamps do not change and no actual exposure midpoint is provided. See [Exposure Observations](../development/data-contracts.md#per-frame-exposure-observations).
+Exposure `timestamp_ns` equals that camera's Image stamp, a trigger-edge time by default. `exposure.status=1` is an estimate, not certified applied exposure; `0` is unavailable. Source frame ID/opaque source time and RAW query-completion time are diagnostic only. For the opt-in {ref}`Exposure-Midpoint Test Switch <test-exposure-midpoint>`, set `SC132_TEST_EXPOSURE_MIDPOINT=1` before starting the node/launch: Image/CameraInfo/exposure use trigger time plus half exposure. Set `0` or unset it and restart to restore the original mode. No trigger-delay compensation or certified exposure midpoint; unavailable exposure stops acquisition. Only newly rebuilt libraries support the switch. See [Exposure Observations](../development/data-contracts.md#per-frame-exposure-observations).
 
 ## Safe Deployment
 

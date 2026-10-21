@@ -36,13 +36,165 @@ Core structures:
 | `sc132_frame_set_t` | The four frames of one group, `group_id`, `group_timestamp_ns`, and the actually observed `max_skew_ns`. |
 | `sc132_frame_set_config_t` | frame-set callback, camera count, size, timeout, and group-admission skew upper bound. |
 
-All public camera `timestamp_ns` and `group_timestamp_ns` values are hardware trigger-edge times mapped to `CLOCK_REALTIME` Unix nanoseconds, following runtime clock corrections including backward steps, not arrival/IRQ or exposure-midpoint times. Read-only X5 `/dev/mem` access is required; missing/out-of-window mappings stop acquisition. See [Time Data Contracts](data-contracts.md).
+By default public camera `timestamp_ns` and `group_timestamp_ns` values are hardware trigger-edge times mapped to `CLOCK_REALTIME` Unix nanoseconds, following runtime clock corrections including backward steps, not arrival/IRQ or exposure-midpoint times. The opt-in {ref}`Exposure-Midpoint Test Switch <test-exposure-midpoint>` adds half exposure duration. Read-only X5 `/dev/mem` access is required; missing/out-of-window mappings stop acquisition. See [Time Data Contracts](data-contracts.md).
 
 ABI 2.2 appends `exposure` (`sc132_exposure_info_t`) to `sc132_frame_info_t`. `sc132_frame_get_info()` accepts the current `sizeof(info)` or the old prefix size ending before `exposure`, writes only the declared size, and returns `struct_size` unchanged. New consumers require matching headers/SOs.
 
-`exposure.status=1` (`SC132_EXPOSURE_ESTIMATED`) is a frozen latest-ISP observation taken at acquisition, not certified applied exposure for that frame and without an error bound. `0` (`SC132_EXPOSURE_UNAVAILABLE`) means a failed query or invalid value; all other exposure fields are zero, never carried forward. `duration_ns` converts SDK integration seconds to nanoseconds; `source_frame_id/source_timestamp` are the non-atomically queried current SDK identity, with an opaque timestamp, not RAW/realtime. `observed_raw_ns` is query completion in `CLOCK_MONOTONIC_RAW`, not integration start/end. See [Exposure Observations](data-contracts.md#per-frame-exposure-observations).
+(camera-output-structures)=
+### Public Image Output Structures and Fields
 
-Configuration functions:
+The camera C acquisition API outputs **NV12 images**, not sensor RAW10 or H.264/H.265 bitstreams. The callback receives a frame group, `sc132_frame_set_t`; each entry carries an opaque `sc132_frame_t *` handle. Call `sc132_frame_get_info()` to obtain pixel addresses and per-frame metadata. The declarations below match the current public header; integrations should include the delivered header instead of copying these definitions.
+
+```c
+typedef struct sc132_frame sc132_frame_t;
+
+typedef struct sc132_exposure_info {
+  uint32_t status;
+  uint32_t source_frame_id;
+  uint64_t duration_ns;
+  uint64_t source_timestamp;
+  uint64_t observed_raw_ns;
+} sc132_exposure_info_t;
+
+typedef struct sc132_frame_info {
+  uint32_t struct_size;
+  uint32_t camera_id;
+  uint64_t sequence;
+  uint32_t frame_id;
+  uint32_t raw_frame_id;
+  uint64_t timestamp_ns;
+  const void *y_data;
+  const void *uv_data;
+  uint64_t y_phys;
+  uint64_t uv_phys;
+  uint64_t y_size;
+  uint64_t uv_size;
+  uint32_t width;
+  uint32_t height;
+  uint32_t stride;
+  uint32_t vstride;
+  sc132_exposure_info_t exposure;
+} sc132_frame_info_t;
+
+typedef struct sc132_frame_set_item {
+  sc132_frame_t *frame;
+  uint32_t camera_id;
+  uint32_t frame_id;
+  uint64_t sequence;
+  uint64_t timestamp_ns;
+  uint32_t width;
+  uint32_t height;
+} sc132_frame_set_item_t;
+
+typedef struct sc132_frame_set {
+  uint32_t struct_size;
+  uint32_t camera_count;
+  uint64_t group_id;
+  uint64_t group_timestamp_ns;
+  uint64_t max_skew_ns;
+  sc132_frame_set_item_t items[SC132_FRAME_SET_MAX_CAMERAS];
+  uint32_t reserved[8];
+} sc132_frame_set_t;
+
+typedef void (*sc132_frame_set_callback_t)(
+    const sc132_frame_set_t *frame_set, void *user_data);
+```
+
+#### Single-Frame Identity, Addresses, and Layout
+
+| `sc132_frame_info_t` field | Meaning and units |
+|---|---|
+| `struct_size` | Set to `sizeof(sc132_frame_info_t)` before calling; bounds library writes and returns the caller-declared size unchanged. See the old-prefix compatibility rule above. |
+| `camera_id` | Software camera ID; `0..3` maps to CAM1..CAM4, not the callback array index. |
+| `sequence` | Per-camera software acquisition counter; the current implementation resets it at startup and advances it before warmup/grouping. The first delivered value need not be zero, gaps are possible, and values can differ between cameras. |
+| `frame_id` | Normalized frame ID after grouping against each camera's original-frame baseline; identical within an output group. Not a saved-file frame index. |
+| `raw_frame_id` | Original frame ID from the SDK output-image metadata; raw here does not mean RAW10 pixels. |
+| `timestamp_ns` | This camera's LPWM trigger edge mapped to realtime Unix time in ns by default, allowing backward clock steps. Test mode adds half this frame's exposure duration; not arrival, callback, or IRQ time. |
+| `y_data` | Read-only CPU virtual address of the Y luma plane. |
+| `uv_data` | Read-only CPU virtual address of the UV chroma plane; NV12 interleaves U/V, unlike NV21's V/U. |
+| `y_phys` / `uv_phys` | Physical/DMA address of each plane for compatible hardware interfaces, not a dereferenceable CPU pointer. |
+| `y_size` / `uv_size` | Buffer size of each plane in bytes, possibly including alignment padding; not the effective pixel-byte count. |
+| `width` / `height` | Effective delivered width/height in pixels, using the current frame's actual output orientation and dimensions. |
+| `stride` | Byte distance between adjacent row starts; current NV12 Y/UV planes share this stride, which can exceed the effective width. |
+| `vstride` | Y-plane vertical layout in rows, possibly exceeding effective height for alignment; not the number of effective image rows. |
+| `exposure` | Latest ISP exposure observation frozen with the frame; fields and limitations follow below. |
+
+`sequence`, `raw_frame_id`, and `frame_id` describe the software counter, original SDK identity, and normalized grouping identity respectively. They are not interchangeable or directly usable as an MP4 `frame_index`.
+
+NV12 is 8-bit YUV420 semi-planar: the effective Y region has `height` rows of `width` bytes; the effective UV region has `height / 2` rows of `width` bytes, with each U/V pair corresponding to a 2×2 Y-pixel block. Compute effective row starts as follows, read only the effective width per row, and first check pointers and `y_size`/`uv_size` bounds:
+
+```c
+const uint8_t *y_row =
+    (const uint8_t *)info.y_data + (size_t)row * info.stride;
+const uint8_t *uv_row =
+    (const uint8_t *)info.uv_data + (size_t)row * info.stride;
+```
+
+Use separate addresses for Y and UV. Do not assume contiguous planes, UV starting at `y_data + width * height`, or an always-compact `width * height * 3 / 2` byte frame.
+
+#### Exposure Observation Fields
+
+| `sc132_exposure_info_t` field | Meaning and limitations |
+|---|---|
+| `status` | `0` (`SC132_EXPOSURE_UNAVAILABLE`) means unavailable, with all other exposure fields zero and no carry-forward; `1` (`SC132_EXPOSURE_ESTIMATED`) is the latest ISP estimate, without an error bound or applied-frame guarantee. |
+| `source_frame_id` | Current SDK frame identity returned by the ISP query; it can be compared with the original frame ID, but equality does not prove an atomic parameter-to-frame binding. |
+| `duration_ns` | SDK-reported integration seconds converted to ns, not host waiting or acquisition duration. |
+| `source_timestamp` | Opaque SDK source time, not defined as RAW/realtime and not usable for Unix-time alignment. |
+| `observed_raw_ns` | Query completion in `CLOCK_MONOTONIC_RAW`, in ns; not integration start or end. |
+
+Reading the same retained frame again does not replace the observation with a later frame's value; this still does not certify applied exposure. Trigger-to-integration-start delay is uncalibrated: test-mode trigger time plus half exposure is only an estimated midpoint, not a certified one. Do not add half exposure again to an already adjusted `timestamp_ns`. See [Exposure Observations](data-contracts.md#per-frame-exposure-observations).
+
+#### Frame-Group and Entry Fields
+
+| `sc132_frame_set_t` field | Meaning |
+|---|---|
+| `struct_size` | Frame-group structure size supplied by the library. |
+| `camera_count` | Number of valid entries in a normal frame group: `4` for all cameras, `1` for single-camera diagnostics. |
+| `group_id` | Output-group counter within the current acquisition session, currently starting at zero; not a hardware trigger count or single-frame ID. |
+| `group_timestamp_ns` | Minimum delivered per-camera realtime timestamp in this group, in ns: trigger time by default, estimated exposure midpoint in test mode. Not a substitute for all per-camera stamps. |
+| `max_skew_ns` | Actual trigger-capture span in this group, maximum minus minimum in ns; not a configuration threshold or exposure-sync error. |
+| `items` | At most four entries; only the first `camera_count` entries are valid, packed by enabled camera. |
+| `reserved` | Some slots are defined as group-time audit metadata; see below. |
+
+`sc132_frame_set_item_t.frame` is the opaque frame handle for metadata queries and reference management. The remaining `camera_id`, `frame_id`, `sequence`, `timestamp_ns`, `width`, and `height` are snapshots of the corresponding per-frame fields. With only cam2 enabled, the valid entry is `items[0]` with `camera_id == 2`, not `items[2]`.
+
+The output's actual skew differs from the configured admission limit: `sc132_frame_set_config_t.max_skew_ns` is the grouping threshold, default `10000000 ns (10ms)`, not exposure or camera/IMU alignment accuracy.
+
+| `reserved[]` slot | Public macro | Meaning |
+|---|---|---|
+| 0 | `SC132_GROUP_RAW_LO` | Low 32 bits of the earliest hardware-trigger RAW time in this group. |
+| 1 | `SC132_GROUP_RAW_HI` | High 32 bits of the same RAW time. |
+| 2 | `SC132_GROUP_UNCERTAINTY_NS` | Group-mapping uncertainty in ns, including group skew; not an exposure-accuracy guarantee. |
+| 3 | `SC132_GROUP_GENERATION` | Acquisition generation distinguishing sessions; never mix across generations. |
+| 4 | `SC132_GROUP_TIMING_VALID` | Must equal `SC132_GROUP_TIMING_MAGIC` before reading the extended time metadata above. |
+| 5..7 | — | Reserved, without a public business meaning. |
+
+After checking the validity marker, reconstruct RAW time as follows; it is not Unix time:
+
+```c
+uint64_t group_raw_ns =
+    ((uint64_t)set->reserved[SC132_GROUP_RAW_HI] << 32) |
+    (uint64_t)set->reserved[SC132_GROUP_RAW_LO];
+```
+
+#### Reading and Pixel Lifetime
+
+See the minimal skeleton below: initialize `struct_size` and use the output only after `sc132_frame_get_info()` returns `SC132_STATUS_OK`. Copying `sc132_frame_info_t` copies metadata/pointers, not pixels, and does not extend frame lifetime.
+
+Synchronous callback reads need no extra retain, and the library's borrowed reference must not be released. For asynchronous use, call `sc132_frame_retain()` inside the callback and `sc132_frame_release()` after the final use. Pixel addresses are always read-only and must not be freed by the consumer; do not pass them to `free()`. See lifecycle and ownership below for the complete stop order.
+
+#### Differences from ROS2 and Encoded Output
+
+| Public output | Structure and field mapping |
+|---|---|
+| SC132 C API | The frame-group/per-frame structures above, retaining separate Y/UV addresses, plane sizes, stride/vstride, and exposure observations. |
+| ROS2 `image_raw` | `sensor_msgs/msg/Image`: `header.stamp` is the delivered per-camera time (trigger by default, estimated exposure midpoint in test mode), `width/height` are effective dimensions, `encoding="nv12"`, `is_bigendian=false`, `step=stride`; `data` copies the full Y buffer followed by the full UV buffer. |
+| ROS2 `image_raw` layout limitation | No separate vstride/plane-size fields; do not infer the UV start or truncate data using compact-layout assumptions. See [ROS2 Data Contracts](data-contracts.md#ros2-topics). |
+| ROS2 exposure | Separate `/robobaton/camN/exposure` JSON, not embedded in standard Image. |
+| ROS2 `compressed` | `sensor_msgs/msg/CompressedImage`, currently JPEG, not an NV12 memory layout. |
+| PRRTSP encoded callback | `prrtsp_encoded_frame_v2` describes an H.264/H.265 encoded access unit; data is borrowed only until callback return. See the PRRTSP API on this page. |
+
+### Configuration, Lifecycle, and Integration Example
 
 | Function | Contract |
 |---|---|

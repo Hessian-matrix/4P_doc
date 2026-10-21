@@ -49,7 +49,7 @@ CAM1..CAM4 依次对应软件 cam0..cam3 与 `/robobaton/cam0..3`，物理映射
 | `/robobaton/cam0..3/exposure` | `std_msgs/msg/String` | `robobaton_exposure_v1` 逐帧 ISP 观测 JSON | Reliable，keep last 8 |
 | `/robobaton/fsync` | `std_msgs/msg/String` | 显式开启的 `robobaton_fsync_v1` 触发—样本关联 JSON | Reliable，keep last 256 |
 
-曝光消息中的 `timestamp_ns` 与该路 Image 触发沿 stamp 一致；`exposure.status=1` 是估计而非实际生效曝光证明，`0` 为不可用。源帧号/opaque 源时间和 RAW 查询完成时间仅用于追溯，不改变图像时间戳、不提供真实曝光中点，详见[逐帧曝光观测](../development/data-contracts.md#逐帧曝光观测)。
+曝光消息中的 `timestamp_ns` 与该路 Image stamp 一致，默认是触发沿时间；`exposure.status=1` 是估计而非实际生效曝光证明，`0` 为不可用。源帧号/opaque 源时间和 RAW 查询完成时间仅用于追溯。显式 {ref}`曝光中点测试开关 <test-exposure-midpoint>` 需在节点/launch 启动前设置 `SC132_TEST_EXPOSURE_MIDPOINT=1`，Image/CameraInfo/exposure 使用触发时间加半曝光的估算值；设 `0` 或取消变量后重启恢复。该模式不补偿触发延迟、不提供真实曝光中点，曝光不可用时停止采集；仅新重建的库支持。详见[逐帧曝光观测](../development/data-contracts.md#逐帧曝光观测)。
 
 ## 安全部署
 

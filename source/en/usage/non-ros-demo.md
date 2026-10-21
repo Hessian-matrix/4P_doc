@@ -1,6 +1,6 @@
 # non-ROS Demo Usage
 
-[`RoboBaton_4p_demo`](https://github.com/Hessian-matrix/RoboBaton_4p_demo) is the public V2 non-ROS source repository, providing four-camera SC132 RTSP, four-channel mosaic RTSP, ICM-42670-P IMU, and UART examples. Old V1 downloads do not provide the V2 hardware/API.
+[`RoboBaton_4p_demo`](https://github.com/Hessian-matrix/RoboBaton_4p_demo) is the public V2 non-ROS source repository, providing four-camera SC132 RTSP, four-channel mosaic RTSP, ICM-42670-P IMU, UART, and SocketCAN CAN examples. Old V1 downloads do not provide the V2 hardware/API.
 
 ## 1. Directory and Runtime Package
 
@@ -14,6 +14,7 @@ Common entries:
 │   ├── mosaic_rtsp_demo
 │   ├── imu_reader_demo
 │   ├── serial_port_demo
+│   ├── can_demo
 │   ├── start_sensor_demo.sh     # sensor_demo boot-autostart management script
 │   ├── env.sh
 │   ├── config/sensor_config.yaml
@@ -26,7 +27,7 @@ Common entries:
 └── src/
 ```
 
-Deploy the full contents of `demo/`. The top-level `cam_demo`, `sensor_demo`, `mosaic_rtsp_demo`, `imu_reader_demo`, and `serial_port_demo` are launcher scripts that set the required `LD_LIBRARY_PATH`; the real ELFs are under `bin/`.
+Deploy the full contents of `demo/`. The top-level `cam_demo`, `sensor_demo`, `mosaic_rtsp_demo`, `imu_reader_demo`, `serial_port_demo`, and `can_demo` are launcher scripts that set the required `LD_LIBRARY_PATH`; the real ELFs are under `bin/`.
 
 ## 2. Run the Combined Entry `sensor_demo`
 
@@ -58,6 +59,7 @@ In a window without system-clock corrections, check `timestamp_duplicates=0` and
 
 `--imu-sample-drop-policy allow-counted` is the default: samples with provable identity but inadmissible timing are counted and dropped while acquisition continues. `strict` fails on timing/invalid-packet rejection. Unprovable identity, an invalid clock certificate, or hardware errors stop both policies. `--imu-start-order camera-first|imu-first` controls startup order, default `camera-first`, without changing timestamps or association contracts.
 
+(non-ros-yaml)=
 ## 3. YAML Configuration
 
 `sensor_demo` reads `${DEMO_DIR:-current directory}/config/sensor_config.yaml` at startup. Command-line arguments take precedence over YAML.
@@ -71,6 +73,7 @@ camera:
   height: 1088
   fps: 30
   rotate: 0
+  test_exposure_midpoint: false
 rtsp:
   bps: 4000
   codec: h264
@@ -92,6 +95,7 @@ Boundaries:
 - `camera.width` / `camera.height` support `1280x1088` (default), `640x480`, `720x480`, `1280x720`, either axial orientation; other values are rejected before the camera starts.
 - The full four-camera path is fixed to four channels; single-sensor diagnostics use `cam_demo --camera-id`.
 - The non-ROS public frame-rate set is 25/30/40/50/60fps; default `30`, other values rejected before the camera starts.
+- `camera.test_exposure_midpoint` defaults to `false`; set `true` and restart `sensor_demo` to use estimated exposure-midpoint image timestamps: trigger time plus half exposure duration. An explicit YAML value overrides `SC132_TEST_EXPOSURE_MIDPOINT`; older files omitting the field preserve the environment setting (off when unset). Rebuild both the application and a supporting `libsc132.so`. IMU stamps and bag record time are unchanged. Use the image `header.stamp` for ROS1 bag alignment; do not add half exposure again. Unavailable exposure stops acquisition; this is not a calibrated actual midpoint. See {ref}`Data Contracts <test-exposure-midpoint>`.
 - `rtsp.codec` supports `h264` and `h265`.
 - IMU native sample rates are `25/50/100/200/400/800/1600Hz`, default `800Hz`; old `500/1000/2000Hz` values are rejected, not resampled.
 - `save_data.format` defaults to `mp4` and also supports `rosbag`; the save path must be an absolute path.
@@ -295,3 +299,67 @@ cd /root/demo
 ```
 
 Boot autostart is implemented through the on-device `/userdata/startup.sh`: the system `S99auto_startup` executes this file after `/userdata` is mounted. The script only appends/removes its own block marked with `SENSOR_DEMO_AUTOSTART_MANAGED` and does not overwrite content written by other scripts (e.g. `wifi_setup.sh`); when canceling autostart, if only comment/blank-line residue remains in the file, it is removed entirely. Boot autostart uses the runtime package's default configuration; edit `config/sensor_config.yaml` directly to adjust it without re-running `enable`. `enable`/`disable` require root privileges.
+
+(non-ros-can)=
+
+## 11. CAN Demo
+
+`can_demo` uses Linux SocketCAN `CAN_RAW` on network devices registered by the TCAN4550 driver. It supports classical CAN only: transmit 11-bit standard or 29-bit extended data frames, receive standard/extended data and remote frames, with `0..8` payload bytes. CAN FD, error-frame subscriptions, and automatic replies are not supported. It does not directly access SPI or change device tree, GPIO, bitrate, or interface state, and does not depend on camera/IMU runtime libraries or `cam-service`.
+
+### Prerequisites and Interface Setup
+
+- The BSP must enable CAN, CAN_RAW, and M_CAN/TCAN4550 drivers, with correct SPI, IRQ, clock, power, and pinmux configuration. If `can0` is absent, fix the BSP; the application does not create it.
+- With power off, connect CAN_H, CAN_L, and reference ground according to official V2 labels, not UART/TTL wiring. Use appropriate `120Ω` termination at both bus ends after checking existing terminators. Do not guess connector pin order or onboard termination state.
+- The peer must use the same bitrate and be able to receive/ACK. `500000` below is an example, not a fixed board default. Use the interface name actually enumerated on your system.
+
+The following commands require root or network-management privileges and interrupt that CAN interface. First ensure no other CAN application or control workload uses it, then execute manually:
+
+```bash
+ip -details -statistics link show can0
+ip link set dev can0 down
+ip link set dev can0 type can bitrate 500000 fd off
+ip link set dev can0 up
+ip -details -statistics link show can0
+```
+
+If CAN parameters are unsupported, install CAN-capable iproute2. For probe failures, absent interfaces, or BUS-OFF, check the BSP, wiring, terminators, peer, and bitrate first; do not stop or reconfigure `cam-service`. The program explicitly fails on absent, non-CAN, or non-UP interfaces.
+
+### Receive and Transmit Examples
+
+Receive in terminal A; wait indefinitely by default, and use Ctrl-C for normal shutdown:
+
+```bash
+cd /root/demo
+./can_demo --interface can0 --mode rx
+# Receive 10 frames, with a 5-second idle timeout for each wait.
+./can_demo --interface can0 --mode rx --count 10 --timeout-ms 5000
+```
+
+Transmit examples (prepare the external receiver first):
+
+```bash
+cd /root/demo
+./can_demo --interface can0 --mode tx --id 123 --data 0102030405060708 --count 10 --interval-ms 100
+./can_demo --interface can0 --mode tx --extended --id 1ABCDE --data AABB
+./can_demo --interface can0 --mode tx --id 123 --data ''
+```
+
+| Option | Meaning |
+|---|---|
+| `--interface <name>` | Default `can0`; operates only on an existing, UP CAN device |
+| `--mode <rx\|tx>` | Default `rx`; no transmission by default |
+| `--id <hex>` | TX ID, default `123`; optional `0x`, standard range `0..7FF`, extended range `0..1FFFFFFF` |
+| `--extended` | Explicitly select the TX 29-bit format; numeric ID size does not select it automatically |
+| `--data <hexbytes>` | TX `0..8` bytes, default `0102030405060708`; even hex-digit count without separators; empty string means zero payload |
+| `--count <n>` | RX default `0` (continuous), TX default `1`; explicit `0` runs until Ctrl-C |
+| `--interval-ms <n>` | TX inter-frame wait, default `1000`, range `1..3600000` ms; not a realtime-period guarantee |
+| `--timeout-ms <n>` | RX idle timeout per wait, default `0` (infinite), range `0..3600000` ms; not a whole-session timeout |
+| `--help` / `--version` | Use alone; no CAN hardware access |
+
+TX-only options require `--mode tx`. Invalid arguments exit `2`; interface/I/O/receive-timeout failures exit `1`; count completion or normal SIGINT/SIGTERM interruption exits `0`. Output resembles `rx 123#0102030405060708`; extended IDs use 8 digits, and remote frames resemble `rx 123#R8`.
+
+### Verification and Limits
+
+`tx_queued=N` means only that the kernel accepted N frames, not that the peer received them or each transmission completed on the bus. Default SocketCAN local loopback may let another receiver on the same host see transmitted frames; this does not prove external wiring, transceiver, or ACK operation. External acceptance requires a second physical node to verify ID, format, payload, and count, then reverse transmission to verify reception on this board. Also inspect errors, drops, and BUS-OFF with `ip -details -statistics link show can0`. Host datagram logic tests, vcan, and `--help` do not replace this step.
+
+Use `scripts/build_can_demo.sh` for a standalone build and `scripts/package_runtime.sh` for a full package; see [Building the Public Demo Source](../development/open-source-build.md).
