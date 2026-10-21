@@ -2,6 +2,18 @@
 
 This file records user-visible updates in the RoboBaton 4P public delivery, following the shared [Documentation Version Policy](release-and-support.md#documentation-version-policy). Documentation revisions on this page do not automatically change software versions and are distinct from SO SONAME/ABI versions.
 
+## 1.3.3 - 2026-10-21
+
+This documentation revision updates the software patch version, IMU behavior, and runtime-library descriptions. Documentation revisions and software releases are managed independently.
+
+### Improvements and Fixes
+
+Software patch `1.3.3` aligns the integration workspace, non-ROS Demo, and ROS2 package for IMU acquisition bug fixes, without new public functionality or ABI changes. The ICM real SO is `libicm42688.so.2.1.1`, with SONAME `libicm42688.so.2` and ABI 2.1 unchanged. A Git release does not automatically update a target board or replace target-board acceptance.
+
+These fixes move statistics and terminal output out of the integration workspace's `icm42688_reader` acquisition callback to reduce blocking from slow output; pair GPIO/FIFO samples incrementally to avoid unnecessary whole-batch resynchronization under backlog; wait within the existing timeout when FIFO data is not yet ready to avoid busy-spinning in the real-time thread; and finish TMST initialization after the first fit meeting the existing requirements. Checks for actual GPIO sequence gaps, pairing timeouts, FIFO overflow, and timestamp accuracy remain in place. Gap-free acquisition is not guaranteed under hardware sample loss or sustained consumer overload.
+
+ROS2 moves IMU/temperature publication to a separate thread so a slow publisher does not block acquisition callbacks. Normal shutdown, including `SIGINT`/`SIGTERM`, stops acquisition and drains admitted samples before closing the ROS context; a full queue or publication exception fails explicitly. The `source` metric counts acquisition callbacks rather than hiding input behind publication backlog. Message timestamps still come from acquisition samples rather than publication time; SensorDataQoS does not guarantee delivery of every message to subscribers.
+
 ## 1.3.2 - 2026-10-10
 
 This update revises build scripts and documentation within the 1.3 series. All software version numbers remain unchanged.

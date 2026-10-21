@@ -1,6 +1,6 @@
 # ROS2 Demo Usage
 
-The current `v1.3.0` ROS2 package has completed build and install-package verification; after deploying to the target board, you must still actually check topics, compressed images, and the required frame rate — do not infer runtime results from the install verifier alone.
+The current `v1.3.3` ROS2 package has completed local build and install-package verification; after deploying to the target board, you must still actually check topics, compressed images, and the required frame rate — do not infer runtime results from the install verifier alone.
 
 ```{important}
 ROS2 and non-ROS RTSP are two independent usage paths. The ROS2 demo does not provide RTSP; do not mix directories, headers, or `.so` between the non-ROS `/root/demo` runtime package and the ROS2 `/root/ros2_demo` install package.
@@ -8,7 +8,7 @@ ROS2 and non-ROS RTSP are two independent usage paths. The ROS2 demo does not pr
 
 ## Feature Boundary
 
-The ROS2 package is named `robobaton_4p_ros2_demo`, version `1.3.0`. Main artifacts:
+The ROS2 package is named `robobaton_4p_ros2_demo`, version `1.3.3`. Main artifacts:
 
 - Node: `robobaton_sensors_node`
 - IMU frequency check tool: `robobaton_imu_rate_monitor`

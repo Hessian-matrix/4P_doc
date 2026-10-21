@@ -49,7 +49,7 @@ cat VERSION
 
 `VERSION`, the program `--version`, and the actually loaded `libsc132`, `libprrtsp`, `libicm42688` product versions and ABI information must belong to the same package. Do not mix same-named dynamic libraries from system directories, old deployments, or other projects.
 
-The `v1.3.0` release uses the same set of AArch64 ELFs, `runtime-provenance.json`, and `manifest.sha256`; in use, follow the actual `VERSION` inside the deployment package, not the version inferred from the document title.
+The AArch64 ELFs, `runtime-provenance.json`, and `manifest.sha256` in the current `v1.3.3` runtime package are generated together; in use, follow the actual `VERSION` inside the deployment package, not the version inferred from the document title. This version identifier does not imply that a target board has been updated or passed hardware acceptance.
 
 ## 3. Pre-Run On-Device Checks
 

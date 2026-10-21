@@ -96,7 +96,7 @@ int run_camera(void) {
 
 ## `libicm42688.so`
 
-头文件：`include/icm42688_driver.h`。ABI：`ICM42688_ABI_VERSION_MAJOR=2`，`ICM42688_ABI_VERSION_MINOR=1`；real SO 为 `libicm42688.so.2.1.0`，SONAME 仍为 `libicm42688.so.2`。
+头文件：`include/icm42688_driver.h`。ABI：`ICM42688_ABI_VERSION_MAJOR=2`，`ICM42688_ABI_VERSION_MINOR=1`；real SO 为 `libicm42688.so.2.1.1`，SONAME 仍为 `libicm42688.so.2`。
 
 状态码：
 

@@ -15,9 +15,9 @@ This page defines the version policy for the entire public documentation set; [C
 
 | Item | Current version | Status |
 |---|---|---|
-| Documentation revision | `1.3.2` | This site updates continuously; see [Changelog](changelog.md) for revision details. This does not indicate a software version upgrade. |
-| non-ROS demo/runtime package | `v1.3.1` | Deployed to `/root/demo`, whole-package verified by `manifest.sha256`. |
-| ROS2 package/install | `v1.3.1` | The package is deployed to `/root/ros2_demo/install`, package name `robobaton_4p_ros2_demo`. Before use on the target board, complete the corresponding path's actual checks per [ROS2 Demo Usage](usage/ros2-demo.md), [non-ROS Demo Usage](usage/non-ros-demo.md), and [Saving Data](usage/save-data-guide.md); package release does not replace target-board runtime checks. |
+| Documentation revision | `1.3.3` | This site updates continuously; see [Changelog](changelog.md) for revision details. This does not indicate a software version upgrade. |
+| non-ROS demo/runtime package | `v1.3.3` | Software patch version; the runtime package targets `/root/demo` and is whole-package verified by `manifest.sha256`. |
+| ROS2 package/install | `v1.3.3` | Software patch version; the install targets `/root/ros2_demo/install`, package name `robobaton_4p_ros2_demo`. Before use on the target board, complete the corresponding path's actual checks per [ROS2 Demo Usage](usage/ros2-demo.md), [non-ROS Demo Usage](usage/non-ros-demo.md), and [Saving Data](usage/save-data-guide.md); a Git release does not imply a target-board update. |
 
 Feature additions, fixes, and compatibility changes are in [Changelog](changelog.md).
 

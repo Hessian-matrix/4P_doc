@@ -49,7 +49,7 @@ cat VERSION
 
 `VERSION`、程序 `--version`、实际加载的 `libsc132`、`libprrtsp`、`libicm42688` 产品版本及 ABI 信息必须属于同一份包。不要混用系统目录、旧部署或其他工程中的同名动态库。
 
-`v1.3.0`发布使用同一组AArch64 ELF、`runtime-provenance.json`和`manifest.sha256`；使用时以部署包内实际`VERSION`为准，不以文档标题推断版本。
+当前 `v1.3.3` 运行包的 AArch64 ELF、`runtime-provenance.json` 和 `manifest.sha256` 成套生成；使用时以部署包内实际 `VERSION` 为准，不以文档标题推断版本。此版本标识不表示目标板已更新或通过硬件验收。
 
 ## 3. 板端运行前检查
 

@@ -96,7 +96,7 @@ int run_camera(void) {
 
 ## `libicm42688.so`
 
-Header: `include/icm42688_driver.h`. ABI: `ICM42688_ABI_VERSION_MAJOR=2`, `ICM42688_ABI_VERSION_MINOR=1`; the real SO is `libicm42688.so.2.1.0`, SONAME still `libicm42688.so.2`.
+Header: `include/icm42688_driver.h`. ABI: `ICM42688_ABI_VERSION_MAJOR=2`, `ICM42688_ABI_VERSION_MINOR=1`; the real SO is `libicm42688.so.2.1.1`, SONAME still `libicm42688.so.2`.
 
 Status codes:
 

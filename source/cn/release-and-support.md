@@ -15,9 +15,9 @@
 
 | 项目 | 当前版本 | 状态 |
 |---|---|---|
-| 文档修订 | `1.3.2` | 本站持续更新；修订内容见 [版本更新记录](changelog.md)，不表示软件版本升级。 |
-| non-ROS demo/运行包 | `v1.3.1` | 部署到`/root/demo`，按`manifest.sha256`整包校验。 |
-| ROS2 package/install | `v1.3.1` | 软件包部署到`/root/ros2_demo/install`，包名`robobaton_4p_ros2_demo`。目标板使用前应按 [ROS2 Demo 使用](usage/ros2-demo.md)、[non-ROS Demo 使用](usage/non-ros-demo.md) 和 [保存数据](usage/save-data-guide.md) 完成对应路径的实际检查；软件包发布不替代目标板运行检查。 |
+| 文档修订 | `1.3.3` | 本站持续更新；修订内容见 [版本更新记录](changelog.md)，不表示软件版本升级。 |
+| non-ROS demo/运行包 | `v1.3.3` | 软件补丁版本；运行包目标目录为`/root/demo`，按`manifest.sha256`整包校验。 |
+| ROS2 package/install | `v1.3.3` | 软件补丁版本；目标目录为`/root/ros2_demo/install`，包名`robobaton_4p_ros2_demo`。目标板使用前应按 [ROS2 Demo 使用](usage/ros2-demo.md)、[non-ROS Demo 使用](usage/non-ros-demo.md) 和 [保存数据](usage/save-data-guide.md) 完成对应路径的实际检查；Git 发布不表示目标板已经更新。 |
 
 功能新增、修复和兼容性变化见 [版本更新记录](changelog.md)。
 
