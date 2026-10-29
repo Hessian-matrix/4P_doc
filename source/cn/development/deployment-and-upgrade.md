@@ -6,7 +6,11 @@
 保持 `cam-service` 运行。更新前只退出旧的 `sensor_demo`、`cam_demo` 或其他相机应用，不停止 `cam-service`。
 ```
 
-当前源码包含未发布的 realtime、FSYNC 与曝光观测更新，软件版本字符串本身不能识别工件组成；按 [版本更新记录](../changelog.md) 与 manifest 选择整套头文件、库和 consumer。相机 ABI 2.2、IMU ABI 2.1 不改变当前 SONAME；部署后核对实际 `--version`、曝光 sidecar/topic 和 FSYNC 配置，不能仅凭旧包版本号推断具备这些功能。本页部署流程不升级 BSP、不修改 IRQ/debug 或实时配额，也不替代目标板功能验证。
+当前源码包含未发布的 realtime、FSYNC、FIFO/TMST 主导 IMU 与曝光观测更新，软件版本字符串本身不能识别工件组成；按 [版本更新记录](../changelog.md) 与 manifest 选择整套头文件、库和 consumer。相机与 IMU 均为 ABI 3.0，分别使用 `libsc132.so.3` 与 `libicm42670.so.3`；ICM 实体为 `libicm42670.so.3.0.0`，全部导出仅使用 `ICM42670_X5_3.0`。旧 consumer 必须全部重建，移除旧 `.2` 库，不能添加 `.so.2 -> .so.3` 链接或旧符号别名。ICM 字段布局不变但 host 时间改为原始 SPI FIFO burst 完成观测，INT1 仅唤醒，详见[数据合同](data-contracts.md#imu)。部署后核对实际 `--version`、sidecar/topic 和 FSYNC 配置，不能仅凭旧包版本号推断功能。本流程不升级 BSP、不修改 LPWM/kernel、IRQ/debug 或实时配额，不修复 GPIO 通知根因，也不替代目标板验证。
+
+完整复制必须保留动态库的相对链接：`libNAME.so -> libNAME.so.M -> libNAME.so.M.m.p`，最后一个是唯一实体。使用下文不带解引用选项的 `tar`（或 `cp -a`/`rsync -a`），不要把链接展开。主机运行当前 package/install verifier，检查精确链接目标与 ELF；板端 `sha256sum -c` 仍检查别名解析后的字节，不能单独证明链接元数据正确。non-ROS 旧 provenance 包须用当前脚本重新打包为 v3。
+
+当前 SC132 实体为 `libsc132.so.3.0.0`、符号节点 `LIBSC132_3.0`；PRRTSP 实体为 `libprrtsp.so.2.0.1`、SONAME `libprrtsp.so.2`、符号节点 `LIBPRRTSP_2.0`。清除 ICM42670 与 SC132 的旧 `.2` 工件，不能只换新实体而保留旧 consumer。ROS2 不携带 PRRTSP。完整工件校验不认证压力/长录或干净系统中 `python3`/`libstdc++` 的依赖归属；当前限制见{ref}`能力与验证边界 <capability-verification-boundary>`。
 
 ## 1. non-ROS 预检
 

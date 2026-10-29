@@ -7,7 +7,7 @@
 | 目标 | 使用路径 | 适合场景 |
 |---|---|---|
 | 四路 RTSP、IMU、UART 示例 | non-ROS `/root/demo` | 不接入 ROS2，最快确认视频流和传感器输出。 |
-| ROS2 图像和 IMU topics | ROS2 `/root/ros2_demo/install` | 订阅 raw/compressed 图像、CameraInfo、IMU 和温度。 |
+| ROS2 图像和 IMU topics | ROS2 `/root/ros2_demo/install` | 订阅 raw/compressed 图像、CameraInfo、曝光观测、IMU、温度与可选 FSYNC。 |
 
 两条路径不要同时占用相机资源；切换前先退出旧相机应用，并保持 `cam-service` 运行。
 
@@ -20,9 +20,9 @@ cd /root/demo
 ./sensor_demo
 ```
 
-`sensor_demo` 默认运行四路 SC132 相机、PRRTSP v2 H.264 RTSP 推流和 ICM-42670-P IMU（原生默认 `800Hz`）采集。默认图像为 `1280x1088@30fps`，支持 `25/30/40/50/60fps`；输出画布支持 `1280x1088`/`640x480`/`720x480`/`1280x720`。V2 实板验收仍待完成。
+`sensor_demo` 默认运行四路 SC132 相机、PRRTSP v2 H.264 RTSP 推流和 ICM-42670-P IMU（原生默认 `800Hz`）采集。默认图像为 `1280x1088@30fps`，支持 `25/30/40/50/60fps`；输出画布支持 `1280x1088`/`640x480`/`720x480`/`1280x720`。这是实现的参数集合，不保证所有保存/ROS2 路径持续达到目标帧率或零丢失；当前已验证范围与未闭环问题见{ref}`能力与验证边界 <capability-verification-boundary>`。
 
-默认不保存、不开启 FSYNC。保存 bag/MP4、显式 `--fsync --sample-rate-hz 1600` 及逐帧 ISP 曝光估计见 [non-ROS Demo 使用](usage/non-ros-demo.md) 和[数据保存](usage/save-data-guide.md)。相机需要只读 `/dev/mem` 和实时调度权限，设置失败拒绝启动；曝光估计不改变触发时间戳。
+默认不保存、不开启 FSYNC。保存 bag/MP4、显式 `--fsync --sample-rate-hz 1600` 及逐帧 ISP 曝光估计见 [non-ROS Demo 使用](usage/non-ros-demo.md) 和[数据保存](usage/save-data-guide.md)。相机需要只读 `/dev/mem` 和实时调度权限，设置失败拒绝启动；默认曝光估计不改变触发时间戳，显式曝光中点测试模式另见[数据合同](development/data-contracts.md)。
 
 四路 RTSP URL：
 
@@ -33,7 +33,7 @@ CAM3 / cam2 -> rtsp://192.168.1.12:556/PRR
 CAM4 / cam3 -> rtsp://192.168.1.12:557/PRR
 ```
 
-CAM1/CAM2/CAM3/CAM4 依次对应软件 cam0/cam1/cam2/cam3，物理映射与 V1 保持一致。出厂地址保持 `192.168.1.12/24`；如已修改地址，使用设备实际地址。
+CAM1/CAM2/CAM3/CAM4 依次对应软件 cam0/cam1/cam2/cam3。出厂地址为 `192.168.1.12/24`；如已修改地址，使用设备实际地址。
 
 Windows 上可使用 EasyPlayer 查看四路 RTSP 画面。
 

@@ -18,6 +18,8 @@ ROS1 bag and MP4 are two mutually exclusive save modes and currently cannot be e
 
 H.264 MP4 saving is recommended first: the four `cameraN.mp4` files play directly and reuse RTSP encoding. ROS1 bag stores JPEG messages for ROS1 tooling or later extraction. Supported frame rates are a parameter range, not a zero-loss guarantee; see section 9 for load boundaries. Startup and acceptance are in sections 5/7 respectively.
 
+Pressure bags may legally stop at strict drop-policy exhaustion; that is not a sustained-pressure pass. The current composition's `8h` MP4 + FSYNC recording has not started. Premature IMU admission closure at image-policy stop is fixed: normal finalization keeps IMU input open until producer shutdown and consumer drain, then closes the writer. The historical DDS publication/reception difference still cannot be exactly attributed. Continuous saved sequences do not prove every path retains all head/tail data; see {ref}`Capability and Verification Boundaries <capability-verification-boundary>`.
+
 | Mode | Entry | Main output | Complete-save criterion |
 |---|---|---|---|
 | H.264 MP4 | `--record-mp4-dir` | One session directory | `SENSOR_MP4_RESULT ... outcome=published_complete data_complete=yes cleanup_complete=yes ... success=yes` |
@@ -25,7 +27,7 @@ H.264 MP4 saving is recommended first: the four `cameraN.mp4` files play directl
 
 Only when the process exit code is 0 and the corresponding `SENSOR_*_RESULT` explicitly reports completeness can the data be used as formally complete data. `.partial`, a nonzero exit code, or `data_complete=no` can only be used as recovery or diagnostic data.
 
-Here, complete is first the individual recorder's publication result, not a universal proof that every hardware sample, exposure observation, or FSYNC association is complete. Default `--imu-sample-drop-policy allow-counted` continues after counted timing rejection when identity remains provable. Bag completeness checks the session and recorder queue/write errors; it does not independently require zero producer timing drops. MP4 completeness additionally requires valid final producer health, published=observed=admitted=written>0, continuous sequences, zero GPIO/FIFO/timing/invalid-packet drops, and maximum sample uncertainty at most `200µs`. For a zero-loss dataset, check final health and actual saved payloads in both modes. `strict` fails immediately on timing/invalid-packet rejection, but does not guarantee success under arbitrary load.
+Here, complete is first the individual recorder's publication result, not universal proof that every hardware sample, exposure observation, or FSYNC association is complete. Default `--imu-sample-drop-policy allow-counted` continues after counted timing rejection when identity remains provable. Bag completeness checks the session and recorder queue/write errors; it does not independently require zero producer timing drops. MP4 additionally requires valid final producer health, published=observed=admitted=written>0, continuous sequences, zero FIFO/timing/invalid-packet drops, and maximum sample uncertainty at most `200µs`. `gpio_event_gap_count` diagnoses missing wake-notification sequence values, not physical-edge/sample loss, and does not independently fail bag/MP4 completeness. For a zero-loss dataset, check final health and actual saved payloads in both modes. `strict` fails on timing/invalid-packet rejection but does not guarantee success under arbitrary load. Repeated host observations and wall-clock rollback are valid; sample sequence defines order.
 
 Images, frame metadata, and IMU CSV/bag payloads preserve producer `CLOCK_REALTIME` capture/sample times (Unix epoch ns). MP4 timestamp CSV stores group-trigger times on the same timeline, quantized by the encoder to microseconds and expressed in ns, not original per-camera nanosecond stamps; with FSYNC enabled, original values are in `fsync.jsonl`. Bag record time independently reads system time at writing, not sampling; backward steps are preserved and bag indexes are time-sorted. MP4 container playback remains relative/nominal. Synchronize the system clock before acquisition. A common domain does not prove camera/IMU sample or exposure alignment; see [Data Contracts](../development/data-contracts.md).
 
@@ -57,19 +59,19 @@ cat VERSION
 
 `VERSION`, program `--version`, and loaded `libsc132`, `libprrtsp`, `libicm42670` product versions and ABI information must belong to the same V2 package. Do not mix same-named dynamic libraries from system directories, old deployments, or other projects.
 
-The `v1.3.0` release uses the same set of AArch64 ELFs, `runtime-provenance.json`, and `manifest.sha256`; in use, follow the actual `VERSION` inside the deployment package, not the version inferred from the document title.
+The runtime package's AArch64 ELFs, `runtime-provenance.json`, and `manifest.sha256` must be consistent. Follow the actual `VERSION` inside the deployment package, not a version inferred from the document title.
 
 ## 3. Pre-Run On-Device Checks
 
 ### 3.1 Hardware and Processes
 
-The current stable path requires:
+The current four-camera saving path requires:
 
 - All four cameras connected;
-- ICM-42670-P INT1 acquisition link available;
+- ICM-42670-P SPI/FIFO acquisition available; INT1 only wakes acquisition, with bounded FIFO checks even without notifications;
 - `cam-service` running normally;
 - No other `cam_demo` or `sensor_demo` occupying the cameras at the same time;
-- The default stable trigger mode is `vin_lpwm`.
+- Trigger mode is only `vin_lpwm`.
 
 Check:
 
@@ -93,6 +95,8 @@ df -i /root/data/robobaton
 
 Before starting, reserve enough capacity for video, temporary staging, final publication, and failure recovery.
 
+For TF storage, follow [TF Card Usage](../getting-started/tf-card.md) to identify the SD device, partition, and exact mount backing first. Do not create the save directory or start recording when unmounted, to avoid writing into tmpfs or the system disk.
+
 ### 3.3 Environment and External Tools
 
 Prefer the runtime package's top-level launcher; it sets `LD_LIBRARY_PATH` and `PATH`:
@@ -114,6 +118,8 @@ ffmpeg -version | sed -n '1p'
 ```
 
 If any check fails, do not start formal MP4 recording.
+
+The device also needs usable `python3` and matching `libstdc++`. Clean-system-image versus runtime-package ownership of these dependencies is not fully resolved. Available tools or passing manifests do not establish runtime-dependency acceptance for every image.
 
 ## 4. Parameters and YAML Precedence
 
@@ -225,7 +231,7 @@ Also check:
 - `encoded_frames_dropped=0`;
 - `imu_samples_admitted == imu_samples_written > 0`;
 - The producer final-health snapshot is valid, and published samples equal consumer-observed samples;
-- IMU final GPIO/FIFO/mapper/uncertainty-drop are zero;
+- IMU final FIFO/mapper/uncertainty-drop/invalid-packet counters are zero and sample sequences are continuous; GPIO notification gaps remain diagnostic, not a completeness veto;
 - A matching `publication_receipt.json` exists in the session;
 - No `.publication_incomplete` marker exists in the session directory.
 
@@ -282,7 +288,7 @@ The output directory must not exist. Final publication uses atomic no-replace an
 
 ### 7.1 Foreground Start
 
-The following uses the default `30fps` as the complete-save example; to use `25/40/50/60fps`, replace `--fps` and check completeness per the corresponding target-board acceptance matrix:
+The following is a default `30fps` startup example, not an advance guarantee of complete saving. For `25/40/50/60fps`, replace `--fps` and check completeness in the actual target environment:
 
 ```bash
 DEMO_DIR=/root/demo  # change to the actual full runtime package directory
@@ -301,10 +307,10 @@ If the business explicitly allows saving once every other complete synchronized 
 ./sensor_demo \
   --fps 30 \
   --record-bag /root/data/robobaton/run_30fps_skip.bag \
-  --record-frame-skip 1
+  --record-frame-skip 1 --record-drop-min-interval 2
 ```
 
-`record-frame-skip=1` saves one group and skips one group in units of complete `group_id`, with all four cameras sharing the same decision; it does not change the RTSP output frame rate.
+`record-frame-skip=1` saves one group and skips one group using consecutive complete frame-set arrival ordinals at the recorder, with all four cameras sharing the decision; it does not change RTSP frame rate. Intentional alternate saving must explicitly use `--record-drop-min-interval 2`; the default interval of 10 conflicts with alternate saving and is rejected at startup.
 
 ### 7.2 YAML Start (More Recommended)
 
@@ -330,6 +336,7 @@ save_data:
   format: rosbag
   save_path: /root/data/robobaton/run_30fps.bag
   skip: false
+  drop_min_interval: 10
 ```
 
 Then run:
@@ -367,20 +374,39 @@ And check:
 
 - `image_frames_by_camera=cam0:N,cam1:N,cam2:N,cam3:N` all equal and `N > 0`;
 - Successful stop yields `IMU_RUNTIME_HEALTH final=yes health_valid=yes` with nonzero generation; compare published, consumer-observed, recorder-admitted/written counts, and actual bag IMU messages;
-- A zero-loss requirement additionally needs zero sequence gaps/duplicates/regressions, invalid packets, GPIO gaps, FIFO overflows, and timing drops. Windows without clock corrections should have no timestamp duplicates/regressions; system corrections may move realtime backward. Do not fabricate increasing stamps or ignore other health errors;
+- A zero-loss requirement additionally needs zero sequence gaps/duplicates/regressions, invalid packets, FIFO overflows, and timing drops, plus actual sample readback. GPIO notification gaps are not sample-loss counts. Windows without corrections should have no sample timestamp duplicates/regressions; host timestamps may repeat within a burst, and corrections may move both realtime stamps backward. Do not fabricate increasing stamps or ignore other health errors;
 - The final path comes from `SENSOR_BAG_RESULT path=`, not from guessing the configured path.
 
 A nonzero exit, `published_partial`, `.partial.bag`, or quarantine is not formally complete data, but should be kept for diagnostics — do not auto-overwrite or delete it.
 
+### 7.5 Queue and Storage Diagnostics
+
+`SENSOR_BAG_RESULT` fields `frame_queue_*`, `encoded_queue_*`, and `imu_queue_*` report capacity, peaks, time at capacity, and rejections. `encoded_queue_oldest_evicted_*` counts complete groups evicted to admit newer groups. The default strict policy is `--record-drop-min-interval 10` (YAML: `save_data.drop_min_interval`): scan fully encoded groups not yet claimed by the writer from oldest to newest and select only candidates at least 10 arrival ordinals from every previous drop. Without an eligible old candidate, dropping the incoming group requires the same spacing. If neither is legal, recording explicitly stops, drains accepted data, publishes `*.partial.bag`, records a reason, and exits nonzero rather than relaxing the interval. The guarantee covers recorder drops only, not acquisition-source, hardware, or IMU losses; it does not guarantee sustained target frame rate under pressure. Evictions or rejections preclude complete-data acceptance.
+
+`source_group_order` in each `/cameraN/frame_metadata` is the zero-based recorder frame-set arrival ordinal used to compare retained groups across cameras and calculate drop spacing. Producer `group_id` remains unchanged; its gaps must not inflate the interval. `/robobaton/session_config` records `drop_policy_min_group_interval`; `/robobaton/session_status` records `drop_policy_stopped`, `drop_policy_stop_group_order`, `drop_policy_dropped_groups`, `drop_policy_min_observed_interval` (0 for fewer than two drops), and `error`. On a policy stop, the terminal ordinal is the exclusive upper bound of recorded coverage, not a legal drop.
+
+At image-burst or IMU high-water service points, the writer drains the current IMU backlog snapshot in bounded batches; later arrivals cannot extend that service indefinitely. The reorder bound includes all committed orders, even frames not yet encoded. A group partially claimed by the writer cannot be evicted.
+
+Drops must apply the same decision to the complete four-camera group and report `data_complete=false`. Legal spacing proves policy compliance only; an early stop, partial bag, or readable playback is not sustained-pressure or all-sensor acceptance.
+
+`chunk_*` and `record_*` latencies include the writer/buffered-write path, not just storage-media latency. `dirty_kb`/`writeback_kb` come from system `/proc/meminfo`. `diskstats_*_delta` sums every `/proc/diskstats` row, potentially counting both disks and their partitions; it is not I/O attributable to this recording or one mount device. Do not derive disk busy percentage from aggregate `io_time`. Diagnose using the actual mounted device, final health, and payload readback.
+
+
 ## 8. View and Unpack a ROS1 Bag
 
-The runtime package includes `bin/rosbag_info.py` (a Python standard-library implementation; the device ships `/usr/bin/python3`). After saving, view the bag status directly on-device:
+The runtime package includes `bin/rosbag_info.py` (a Python standard-library implementation requiring usable `/usr/bin/python3` on-device; clean-image dependency ownership remains unresolved). After saving, view the bag status directly on-device:
 
 ```bash
 DEMO_DIR=/root/demo  # change to the actual full runtime package directory
 cd ${DEMO_DIR}
 python3 bin/rosbag_info.py /root/data/robobaton/run_30fps.bag
 python3 bin/rosbag_info.py --yaml --freq /root/data/robobaton/run_30fps.bag
+```
+
+With `--freq`, `frequency` is the inverse median interval of bag-index **record times**, explicitly identified by `frequency_basis`. Batched writes can make it much higher than the sensor sampling rate; this does not mean the IMU ran too fast or the payload is damaged. Current source adds `--header-freq` (implies `--freq`): scan payloads of `sensor_msgs/Imu`, `CompressedImage`, and `CameraInfo`, reporting `Header.stamp` frequency separately as `header_frequency`. All connections of a topic must share the same type and MD5. Other types, mixed schemas, fewer than two messages, or a nonpositive median period have no such value. Intervals are computed after sorting timestamps; this cannot check publication order or prove losslessness or hardware synchronization. Scanning reads the complete bag and retains the original record-time statistics.
+
+```bash
+python3 bin/rosbag_info.py --yaml --header-freq /root/data/robobaton/run_30fps.bag
 ```
 
 Using the host repository script on the Host:
@@ -410,6 +436,8 @@ Both modes accept `25/30/40/50/60fps`, but frame rate alone cannot guarantee com
 - H.264 MP4 reuses RTSP-encoded access units. Completeness depends on encoding, storage, and final IMU health; high load or timing drops can produce `published_partial` even when all four MP4s play.
 - ROS1 bag uses separate JPEG encoding and queues. CPU, encoder throughput, storage, and RTSP preview load affect losses; no frame-rate threshold guarantees complete saving or only a small loss at higher rates.
 - After changing fps, IMU ODR, FSYNC, dimensions, storage, or system scheduling, check sustained four-channel rates, final health, and actual payloads on the target. Exposure `status=1` coverage, unique FSYNC matching, and storage completeness are separate checks.
+
+Short non-ROS `60fps` + `1600Hz` FSYNC CPU/BPU console association does not establish saved-image decoding. Native bag JPEG removes only private JPU APP9, without changing the ROS2 JPEG plugin or closing high-rate H.264 RTSP missing-reference/slice warnings. One encoding/saving path's result does not certify another path.
 
 ## 10. Common Issues
 

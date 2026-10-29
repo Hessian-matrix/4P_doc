@@ -22,6 +22,7 @@ RoboBaton 4P 产品文档
    getting-started/hardware-and-safety
    getting-started/first-boot
    getting-started/wifi-configuration
+   getting-started/tf-card
    time-sync/system-time-sync
    quick-start
    development/code-and-interfaces

@@ -7,7 +7,7 @@ This page only covers "get it running as fast as possible". If `/root/demo` or `
 | Goal | Usage path | Suitable scenario |
 |---|---|---|
 | Four-channel RTSP, IMU, UART examples | non-ROS `/root/demo` | Not using ROS2; fastest way to confirm video streams and sensor output. |
-| ROS2 image and IMU topics | ROS2 `/root/ros2_demo/install` | Subscribe to raw/compressed images, CameraInfo, IMU, and temperature. |
+| ROS2 image and IMU topics | ROS2 `/root/ros2_demo/install` | Subscribe to raw/compressed images, CameraInfo, exposure observations, IMU, temperature, and optional FSYNC. |
 
 Do not let the two paths occupy camera resources at the same time; before switching, exit the old camera application and keep `cam-service` running.
 
@@ -20,9 +20,9 @@ cd /root/demo
 ./sensor_demo
 ```
 
-`sensor_demo` runs four SC132 cameras, PRRTSP v2 H.264 RTSP streaming, and ICM-42670-P IMU acquisition (native default `800Hz`). The default image is `1280x1088@30fps`, supporting `25/30/40/50/60fps`; the output canvas supports `1280x1088`/`640x480`/`720x480`/`1280x720`. V2 on-board acceptance is still pending.
+`sensor_demo` runs four SC132 cameras, PRRTSP v2 H.264 RTSP streaming, and ICM-42670-P IMU acquisition (native default `800Hz`). The default image is `1280x1088@30fps`, supporting `25/30/40/50/60fps`; the output canvas supports `1280x1088`/`640x480`/`720x480`/`1280x720`. This is the implemented parameter set, not a guarantee of sustained target rate or zero loss on every saving/ROS2 path. See {ref}`Capability and Verification Boundaries <capability-verification-boundary>` for demonstrated scope and unresolved issues.
 
-Saving and FSYNC default off. See [non-ROS Demo Usage](usage/non-ros-demo.md) and [Saving Data](usage/save-data-guide.md) for bag/MP4 recording, explicit `--fsync --sample-rate-hz 1600`, and per-frame ISP exposure estimates. Cameras need read-only `/dev/mem` and realtime scheduling permission; configuration failure rejects startup. Exposure estimates do not change trigger stamps.
+Saving and FSYNC default off. See [non-ROS Demo Usage](usage/non-ros-demo.md) and [Saving Data](usage/save-data-guide.md) for bag/MP4 recording, explicit `--fsync --sample-rate-hz 1600`, and per-frame ISP exposure estimates. Cameras need read-only `/dev/mem` and realtime scheduling permission; configuration failure rejects startup. Exposure estimates do not change default trigger stamps; explicit exposure-midpoint test mode is described in [Data Contracts](development/data-contracts.md).
 
 Four-channel RTSP URLs:
 
@@ -33,7 +33,7 @@ CAM3 / cam2 -> rtsp://192.168.1.12:556/PRR
 CAM4 / cam3 -> rtsp://192.168.1.12:557/PRR
 ```
 
-CAM1/CAM2/CAM3/CAM4 map to software cam0/cam1/cam2/cam3 respectively, unchanged from V1. The factory address remains `192.168.1.12/24`; use the actual device address if it has been changed.
+CAM1/CAM2/CAM3/CAM4 map to software cam0/cam1/cam2/cam3 respectively. The factory address is `192.168.1.12/24`; use the actual device address if it has been changed.
 
 On Windows you can use EasyPlayer to view the four RTSP streams.
 

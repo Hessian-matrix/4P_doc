@@ -1,6 +1,6 @@
 # 4P_doc
 
-`4P_doc` 是 RoboBaton 4P 的公开在线产品文档工程，使用 Sphinx + Read the Docs 构建。文档面向拿到 4P 硬件、non-ROS demo 或 ROS2 demo 的用户，目标是完成接线、开机、路径选择、运行验证和常见问题排查。
+`4P_doc` 是 RoboBaton 4P V2 的公开在线产品文档工程，使用 Sphinx + Read the Docs 构建。文档面向拿到 V2 硬件、匹配 non-ROS demo 或 ROS2 demo 的用户，目标是完成接线、开机、路径选择、运行验证和常见问题排查。
 
 ## 文档边界
 
@@ -28,6 +28,8 @@
 
 完整公开政策见 [中文发布说明](source/cn/release-and-support.md#文档版本政策) 和 [English release policy](source/en/release-and-support.md#documentation-version-policy)。主仓门禁命令为 `python3 -B tests/version_reporting_contract_test.py`；中英文仍须分别通过严格 HTML 构建和 linkcheck。
 
+当前文档修订为 `2.0.14`，软件仍为 `2.0.0`；硬件 V2.2 与 SO ABI 独立识别。本次仅同步文档，不改变软件行为。当前参数支持范围与实际完成的验证范围分别维护在[中文能力与验证边界](source/cn/release-and-support.md#capability-verification-boundary)和[English capability and verification boundaries](source/en/release-and-support.md#capability-verification-boundary)：不承诺所有路径持续 `60fps`、任意负载零丢失或当前新组成已完成 `8h` 长录。
+
 ## 当前在线文档目录
 
 顶层用户导航：
@@ -38,6 +40,7 @@
 硬件连接与安全
 首次上电与开机使用
 板载 Wi-Fi 配置
+TF 卡（microSD）使用
 时间同步（NTP / PPS / PTP）
 快速开始
 non-ROS Demo 使用
@@ -74,7 +77,7 @@ source/
 ├── cn/                # 中文文档（Sphinx srcdir）
 │   ├── index.rst
 │   ├── conf.py
-│   ├── getting-started/   # 产品介绍、版本兼容、硬件安全、首次上电、Wi-Fi
+│   ├── getting-started/   # 产品介绍、版本兼容、硬件安全、首次上电、Wi-Fi、TF 卡
 │   ├── quick-start.md
 │   ├── usage/             # non-ROS / 保存数据 / ROS2 使用
 │   ├── time-sync/         # 时间同步（NTP / PPS / PTP）

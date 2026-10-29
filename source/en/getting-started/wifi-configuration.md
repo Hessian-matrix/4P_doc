@@ -1,6 +1,6 @@
 # Wi-Fi Configuration
 
-This page explains how to upload `scripts/wifi_setup.sh` from the public non-ROS repository to the X5 device and configure the on-board Wi-Fi interactively from the terminal. The script supports:
+This page describes the image-provided `wifi_setup` command, sourced from `scripts/wifi_setup.sh` in the public non-ROS repository. Integrate both the command and its dedicated boot entry; uploading only a script to `/userdata` is no longer the installation method. Features:
 
 - **AP mode**: turn the X5 into a 2.4 GHz Wi-Fi hotspot and assign addresses to clients via DHCP;
 - **Client (STA) mode**: scan visible Wi-Fi, connect to a router, and obtain an address via DHCP;
@@ -16,38 +16,23 @@ When switching AP/STA or disabling Wi-Fi, the script stops existing `hostapd`, `
 
 - Log into the X5 as `root`;
 - The X5 recognizes the on-board Wi-Fi interface, default interface name `wlan0`;
-- The device already provides the script dependencies: `ip`, `iw`, `hostapd`, `dnsmasq`, `wpa_supplicant`, `wpa_cli`, `udhcpc`, `killall`, `awk`, and `sed`;
-- The host can SSH into the X5 over the wired network;
-- You have the public non-ROS repository, with the script at `scripts/wifi_setup.sh`.
+- The image provides Bash, `/usr/bin/env`, `ip`, `iw`, `hostapd`, `dnsmasq`, `wpa_supplicant`, `wpa_cli`, `udhcpc`, `killall`, `awk`, `sed`, `flock`, `mountpoint`, `seq`, and common BusyBox commands;
+- `/userdata` is a mounted persistent partition; `/run` is runtime storage cleared on every boot;
+- The image includes `/usr/bin/wifi_setup` and `/etc/init.d/S99wifi_setup`, ordered after userdata mounting and wireless driver readiness;
+- This tool exclusively owns wireless service processes. Its global stop operations are unsuitable for shared DHCP/DNS managers on other interfaces.
 
-First confirm the script exists:
+## 2. Check Image Integration
 
-```bash
-NON_ROS_ROOT="$HOME/RoboBaton_4p_demo"  # change to the actual repository directory
-cd ${NON_ROS_ROOT}
-test -f scripts/wifi_setup.sh
-```
-
-## 2. Upload to the Device
-
-On the host:
+Use the image maintainer's rootfs integration package and its instructions to rebuild and flash the matching BSP. The package does not include drivers, firmware, wireless utilities, or site credentials. After flashing, check on the device:
 
 ```bash
-X5_IP=192.168.1.12  # change to the actual board address
-NON_ROS_ROOT="$HOME/RoboBaton_4p_demo"  # change to the actual repository directory
-cd ${NON_ROS_ROOT}
-scp scripts/wifi_setup.sh root@${X5_IP}:/userdata/wifi_setup.sh
-ssh root@${X5_IP} "chmod 700 /userdata/wifi_setup.sh"
+command -v wifi_setup
+test -x /etc/init.d/S99wifi_setup
+mountpoint /userdata
+wifi_setup --help
 ```
 
-Check the file:
-
-```bash
-X5_IP=192.168.1.12  # change to the actual board address
-ssh root@${X5_IP} "ls -l /userdata/wifi_setup.sh"
-```
-
-The script always stores runtime configuration, state, and logs under `/userdata/wifi/`; do not enable boot autostart after placing the script only in a temporary directory.
+The image maintainer must remove old Wi-Fi boot calls, including old `S41wifi_manager` and Wi-Fi calls in shared `/userdata/startup.sh`, preserving other applications. The new command never rewrites this shared file or automatically migrates old autostart settings; configure once again. Copying the script alone does not install boot restore.
 
 ## 3. Start Interactive Configuration
 
@@ -55,7 +40,7 @@ An interactive terminal must be preserved, so `ssh -t` is recommended:
 
 ```bash
 X5_IP=192.168.1.12  # change to the actual board address
-ssh -t root@${X5_IP} "/userdata/wifi_setup.sh"
+ssh -t root@${X5_IP} "wifi_setup"
 ```
 
 Alternatively, log into the device first and then run:
@@ -63,7 +48,7 @@ Alternatively, log into the device first and then run:
 ```bash
 X5_IP=192.168.1.12  # change to the actual board address
 ssh root@${X5_IP}
-/userdata/wifi_setup.sh
+wifi_setup
 ```
 
 Main menu:
@@ -131,7 +116,7 @@ The interactive menu only allows selecting scanned, visible SSIDs; hidden SSIDs 
 After connecting, check:
 
 ```bash
-/userdata/wifi_setup.sh --status
+wifi_setup --status
 ip -4 addr show dev wlan0
 iw dev wlan0 link
 ip route
@@ -147,47 +132,43 @@ After AP or STA startup succeeds, the script asks:
 Save/update the current WiFi configuration as boot autostart? [y/N]
 ```
 
-After entering `y`:
+After successful configuration, mode and credentials are saved to `/userdata/wifi/current.conf` regardless of the autostart choice. Entering `y` creates `/userdata/wifi/autostart.enabled`; otherwise the marker is removed. A saved configuration does not imply permission to restore at boot.
 
-- The current mode and credentials are saved to `/userdata/wifi/current.conf`;
-- `/userdata/startup.sh` is generated;
-- At boot the following is executed:
+After userdata mounting and driver readiness, `/etc/init.d/S99wifi_setup` executes:
 
 ```bash
-/userdata/wifi_setup.sh --apply-saved >/userdata/wifi/boot.log 2>&1
+wifi_setup --boot
 ```
 
-```{important}
-If `/userdata/startup.sh` already exists and was not generated by this script, the script refuses to overwrite it. Keep the original startup logic, and manually merge the `--apply-saved` command above into the existing `/userdata/startup.sh`; do not delete other applications' startup commands.
-```
+Disabled restore never touches the interface; enabled restore with missing configuration fails explicitly without creating an open default hotspot. Repeated start after a successful restore in the same boot does not reset the connection. `/run/wifi_setup.boot-applied` records only that restore, not live connection health. `--stop` clears this runtime marker but preserves the persistent opt-in marker. No background reconnection supervisor or new DHCP renewal service is added.
 
 The script sets `current.conf`, `hostapd.conf`, and `wpa_supplicant.conf` to root-readable/writable only, but the Wi-Fi password is still stored in plaintext on the device. Do not upload, share, or commit these files.
 
 Manually verify the saved configuration:
 
 ```bash
-/userdata/wifi_setup.sh --apply-saved
-/userdata/wifi_setup.sh --status
+wifi_setup --apply-saved
+wifi_setup --status
 ```
 
 ## 7. Common Commands
 
 ```bash
 # Enter the interactive menu
-/userdata/wifi_setup.sh
+wifi_setup
 
 # Apply the saved configuration
-/userdata/wifi_setup.sh --apply-saved
+wifi_setup --apply-saved
 
 # View interface, connection, saved configuration, and boot-autostart status
-/userdata/wifi_setup.sh --status
+wifi_setup --status
 
 # Stop Wi-Fi processes, clear the address, and turn off wlan0; does not unload the kernel driver
-/userdata/wifi_setup.sh --stop
-/userdata/wifi_setup.sh --disable
+wifi_setup --stop
+wifi_setup --disable
 
 # Show help
-/userdata/wifi_setup.sh --help
+wifi_setup --help
 ```
 
 After choosing "Disable Wi-Fi" in the interactive menu, it also asks whether to disable the boot autostart managed by this script. Running `--stop` or `--disable` directly only stops the current runtime state; it does not delete the saved configuration nor automatically modify the boot-autostart setting.
@@ -196,7 +177,9 @@ After choosing "Disable Wi-Fi" in the interactive menu, it also asks whether to 
 
 | Path | Content |
 |---|---|
-| `/userdata/wifi_setup.sh` | Wi-Fi configuration script. |
+| `/usr/bin/wifi_setup` | Image-provided Wi-Fi configuration program. |
+| `/etc/init.d/S99wifi_setup` | Dedicated boot-restore entry. |
+| `/userdata/wifi/autostart.enabled` | Persistent boot opt-in marker. |
 | `/userdata/wifi/current.conf` | Saved mode and credentials, permissions `600`. |
 | `/userdata/wifi/hostapd.conf` | AP mode configuration. |
 | `/userdata/wifi/wpa_supplicant.conf` | STA mode configuration. |
@@ -205,7 +188,9 @@ After choosing "Disable Wi-Fi" in the interactive menu, it also asks whether to 
 | `/userdata/wifi/logs/dnsmasq.log` | DHCP service log. |
 | `/userdata/wifi/logs/wpa_supplicant.log` | STA connection log. |
 | `/userdata/wifi/boot.log` | Boot auto-restore log. |
-| `/userdata/startup.sh` | Optional late-boot startup entry. |
+| `/run/wifi_setup.boot-applied` | Successful restore marker for this boot, cleared on reboot. |
+| `/run/wifi_setup.lock` | Operation lock against concurrent configuration. |
+| `/etc/init.d/S41eth0-route-fallback` | Preserve static Ethernet configuration; ignore only eth0 IPv4 carrier-down routes. |
 
 `/userdata/wifi/` defaults to permissions `700`. You can read logs when troubleshooting, but before providing logs externally remove SSIDs, passwords, IPs, and other site network information.
 
@@ -252,7 +237,7 @@ Confirm router DHCP is enabled and the address pool is not exhausted. The script
 Check:
 
 ```bash
-/userdata/wifi_setup.sh --status
+wifi_setup --status
 cat /userdata/wifi/logs/hostapd.log
 cat /userdata/wifi/logs/dnsmasq.log
 ```
@@ -264,19 +249,19 @@ Confirm the channel is `1–13`, the AP IP and DHCP addresses are in the same `/
 Check:
 
 ```bash
-ls -l /userdata/startup.sh /userdata/wifi/current.conf
+ls -l /userdata/wifi/autostart.enabled /userdata/wifi/current.conf
 cat /userdata/wifi/boot.log
-/userdata/wifi_setup.sh --status
+wifi_setup --status
 ```
 
-If the device already has a custom `/userdata/startup.sh`, confirm the `--apply-saved` command has been merged manually and the original startup logic preserved.
+Confirm the dedicated entry runs after userdata mounting and driver readiness. No boot.log is normal before first configuration. Validate cold boot on the final image; manual start is not a substitute for a full reboot. With static Ethernet routes, the image's `S41eth0-route-fallback` sets `net.ipv4.conf.eth0.ignore_routes_with_linkdown=1` after `S40network`. Addresses, gateway, and metric remain unchanged. This handles carrier-down IPv4 routes only, not upstream failures or IPv6.
 
 ### Restore the Wired Configuration Entry
 
 Log in through wired Ethernet or the `1.8V` DEBUG_UART and run:
 
 ```bash
-/userdata/wifi_setup.sh --disable
+wifi_setup --disable
 ```
 
 This command turns off `wlan0` but does not unload the on-board Wi-Fi kernel driver, nor change the wired network configuration.

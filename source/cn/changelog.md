@@ -4,21 +4,126 @@
 
 ## 未发布
 
+以下记录当前源码中已实现但尚未作为新软件版本发布的更新；它们不因本文档修订自动成为软件发布或整机验收。当前适用范围与未闭环限制统一见{ref}`能力与验证边界 <capability-verification-boundary>`。
+
 ### 改进与修复
 
 - 新增独立 `can_demo`：默认经典 CAN，显式 `--fd` 支持最长 64 字节 FD 发送和经典/FD 混合接收，`--brs` 开启 TX 数据段速率切换，标准/扩展 ID 均可用。FD 发送采用可精确编码的长度且不隐式补零；接入构建、完整运行包和校验。接口配置仍由用户/BSP 完成；应用支持不代替 BSP 长载荷完整性验收，本机回环与排队成功不构成外部总线验收。
 - 相机、IMU、CLI、保存和 ROS2 对外传感器时间戳统一为 `CLOCK_REALTIME` 系统时间。相机通过有界 VSYNC 交叉采样及同计数器触发差值还原硬件触发沿，不使用 IRQ/到帧时间兜底；缺少有效映射即停止。
-- RAW 仅用于内部映射/配组；每次发布刷新 realtime 桥接，运行中校时允许回拨。bag record time 独立读取 realtime，不再强制递增，chunk index 按时间排序。统一时间域不代表相机/IMU 样本或曝光已硬件同步；旧 SIF/RAW 时间消费端必须成套迁移头文件、SO 和应用。
+- RAW 仅用于内部映射/配组；传感器 sample/trigger 发布刷新 realtime 桥接，运行中校时允许回拨；IMU host 则保留 burst 完成时原始观测，不在延迟发布时重新桥接。bag record time 独立读取 realtime，不再强制递增，chunk index 按时间排序。统一时间域不代表相机/IMU 样本或曝光已硬件同步；旧时间语义消费端必须成套迁移头文件、SO 和应用。
 - 新增显式开启的 LPWM→ICM-42670-P FSYNC 触发—样本关联：硬件 FIFO 标记、相邻绝对 TMST 有界重建、RAW 唯一候选匹配及缺失/歧义状态。non-ROS `--fsync`、YAML/ROS2 `imu.fsync_enabled` 默认关闭，仅支持 `800/1600Hz`；保留 `200µs` admission 策略，不保证所有触发均匹配或曝光同步。结果传至 stdout、bag `/robobaton/fsync`、MP4 `fsync.jsonl` 和 ROS2 同名 topic。
-- ICM ABI minor 为 `2.1`：新增独立 FSYNC callback 使用 `ICM42670_X5_2.1`，原函数节点、结构尺寸、real SO 文件名及 SONAME 不变。相机 frame-set reserved 字段提供 RAW 触发、组不确定度与 generation，外部时间仍为 realtime。
+- ICM 当前公开 ABI 为 `3.0`：全部导出（包括 FSYNC callback）仅使用 `ICM42670_X5_3.0`，实体 `libicm42670.so.3.0.0`、SONAME `libicm42670.so.3`。字段布局不变但 host 时间语义不兼容；必须重建全部 consumer、移除旧 `.2` 工件，无旧符号别名或跨 major shim。相机 frame-set reserved 字段提供 RAW 触发、组不确定度与 generation，外部时间仍为 realtime。
 - 关联结果保留逐路原始 realtime stamp，支持与 ROS2 Image/CameraInfo 精确核对；整数 JSON 需无损解析。MP4 timestamp CSV 是微秒量化的组触发时间（以 ns 表示），逐路原始值见开启 FSYNC 后的 `fsync.jsonl`，不再宣称 CSV 为逐路原始纳秒时间。
 - 修复跨优先级队列锁导致的采集阻塞；IMU consumer/ROS2 发布使用显式实时调度，SPI 为 `10MHz`，INT1 使用 `100µs` 异步复位脉冲。启动失败释放资源，最终健康快照保留尾部无效 FIFO 包计数。保持相位、唯一匹配和 `200µs` 检查；高负载仍受系统 IRQ/debug 与订阅端调度约束，不保证每个触发或任意负载零丢失。
 - 最终 IMU 健康行增加 timing drop 和 FSYNC captured/dropped 总数；non-ROS 终止摘要使用 stop 后的最终计数，无效 FIFO 包与 timing 拒绝重叠时不再漏计。
-- INT1→RAW 转换保留沿时观测历史，并按读取窗口与调速距离的完整不确定度选择证书；独立实时 observer 在 SPI/callback 阻塞期间继续观测，启动握手及优先级继承锁保证初始化和历史顺序，原相位与发布门限不变。
-- 相机 ABI 2.2 增加逐帧冻结的 ISP 曝光观测，保留旧 frame-info 前缀读取，SONAME 不变；bag/tee 元数据、MP4 `exposure.jsonl` 与 ROS2 `/robobaton/camN/exposure` 同步交付。估计值与不可用状态分开，不保证实际生效帧或误差上界，不改变触发时间戳、不宣称真实曝光中点。捕获 observer 继承允许 CPU 集合，不再强制 CPU0。
-- 修复 sensor 探测阶段重复申请 MCLK 引用未释放的问题；探测引用在 VIN 接管前释放，不清除历史遗留引用。相机捕获使用 FIFO/60 并正确处理扫描内 VSYNC 更新，INT1 observer 改为继承 CPU 集合的 FIFO/30，避免压过默认 GPIO IRQ。IMU 使用读取区间约束拟合、拒绝过宽观测污染解绕并保留更长沿时历史；`500µs`/`200µs` 门限不变，高负载仍可能显式拒绝或停止。
+- IMU 改由 FIFO 顺序、实测 TMST 与 FSYNC 标记/delta 主导：INT1 仅唤醒，不再转换 GPIO 沿时间、逐包配沿或运行独立 INT1 时钟 observer。无通知时仍有界检查 FIFO；可检测通知序号缺口仅诊断、不证明物理沿/样本丢失，也不单独失败。FIFO overflow、坏包、时钟歧义和无效 epoch 仍失败，`200µs` admission 不变。
+- FIFO 启动增加实测 Arm 到使能完成的最短 ODR 期限；超过即拒绝启动，避免首包 epoch 整圈 TMST 回绕别名，不以 GPIO 或名义 ODR 补造时间。
+- 相机 ABI 3.0 包含逐帧冻结的 ISP 曝光观测及 frame-info 前缀尺寸读取；SONAME 切到 `libsc132.so.3`。bag/tee 元数据、MP4 `exposure.jsonl` 与 ROS2 `/robobaton/camN/exposure` 同步交付。估计值与不可用状态分开，不保证实际生效帧或误差上界，默认触发时间戳不变、不宣称真实曝光中点。捕获 observer 继承允许 CPU 集合，不再强制 CPU0。
+- 修复 sensor 探测阶段重复申请 MCLK 引用未释放的问题；探测引用在 VIN 接管前释放，不清除历史遗留引用。相机捕获使用 FIFO/60 并正确处理扫描内 VSYNC 更新。IMU 使用读取区间约束拟合，拒绝过宽观测污染解绕；相机 `500µs` 与 IMU `200µs` 门限不变，高负载仍可能显式拒绝或停止。
 - IMU 区间观测与旧时钟证书矛盾时立即使旧证书失效，禁止继续发布；过宽观测仍只拒绝该次观测。修复 bag 收尾时最终编码帧在预取后入队被误判为顺序缺口的竞态，真实缺口继续报错。实时线程仍受系统调度与 IRQ 延迟约束，不修改系统实时配额，不承诺任意负载零丢失。
 - 相机增加默认关闭的 `SC132_TEST_EXPOSURE_MIDPOINT`：测试时逐路时间戳为触发时间加半曝光时长，忽略触发到积分起点延迟；曝光不可用时停止采集。配组、触发 skew 和 FSYNC RAW 审计不变，关闭恢复原逻辑；仅当前源码重建库支持，不代表软件发布或硬件验收。
+- UART 接收等待中收到 `SIGINT`／`SIGTERM` 正常退出并恢复原串口配置；其他信号不延长 RX deadline，真实 I/O 错误仍失败。
+- ROS2 关闭 rate metrics 时，最终 IMU sink 发布计数明确为 `unavailable`／`imu_publish_count_valid=no`；开启后保留实际 `publish()` 成功计数。producer、sink 和 DDS 接收计数独立，不用 producer 数值代替未测量的 sink 计数。
+- ROS2 FastDDS SHM profile 调整为每 participant `256 MiB`，为三进程场景保留容量余量；每个附加 daemon／CLI／订阅进程仍单独计入预算，不代表全部历史 SHM 初始化错误已解决。
+- 原生 bag 的 X5 硬件 JPEG 省略 SOI 后长度为 4、只含私有 frameIdx 的 APP9，保留其他 APP 与编码载荷，避免通用解码器的 APP 结构告警；不改变 ROS2 JPEG 插件的输出合同。
+- `rosbag_info.py --freq` 显式标注 bag record-time 基准；新增 `--header-freq` 单列已保存的 IMU／CompressedImage／CameraInfo `Header.stamp` 频率，不把批量写入频率当作传感器采样率或无丢样证明。
+- ROS1 bag 过载采用默认最小丢组间隔 10 的严格候选选择；以连续 frame-set 到达序号而非 producer 跳号计距，四路整组保存／淘汰。不能合法丢旧组或当前组时，显式停止并排空为 partial、非零退出；bag 元数据与最终状态提供序号、间隔及原因，采集源和 IMU 丢样不在此保证内。主动隔组保存需显式将间隔设为 2。
+- 修复严格 bag 图像停止时提前关闭 IMU 接纳，以及 ROS2 在 producer 停止完成前拒收回调的问题；正常收尾保持 IMU 输入直到采集静止，再排空队列。ROS2 收到 SIGINT/SIGTERM 时先在有效 context 内清理节点，最后关闭 context；不把 `publish()` 正常返回视为 DDS 接收确认，不宣称任意负载零丢失。
+
+## 2.0.15 - 2026-10-29
+
+- 同步 bag 与 ROS2 的停止、接纳及排空合同，区分已修复的停止边界缺陷与仍无法精确归因的历史 DDS 差额。
+- 软件保持 `2.0.0`，SO ABI 不变；短窗 smoke 不替代持续压力、高帧率、长录或正式发布验收。
+
+## 2.0.14 - 2026-10-29
+
+本次仅同步中英文公开文档；软件保持 `2.0.0`，不改变软件行为，不发布新软件，也不新增硬件、负载或长时验收结论。
+
+### 文档同步
+
+- 以发布与支持页统一当前参数能力、软件/硬件/文档/SO ABI 的独立版本定义及验证边界；同步 ICM42670/SC132 ABI `3.0` 与 PRRTSP ABI `2.0` 的整套重建和迁移要求。
+- 对齐 FIFO/TMST、INT1 唤醒、原始 burst host 观测、realtime 回拨、默认触发时间与显式曝光中点测试模式，以及 FSYNC、曝光和实时调度合同。
+- 同步严格 bag 丢组间隔、partial 停止、producer/sink/DDS 计数差异及 JPEG/record-time 说明；明确高帧率、高压保存和当前新组成 `8h` 长录不构成完整验收，历史结果不能替代当前组成。
+- 补充 LPWM、RTSP、SHM、USB、CAN、RTC/UTC 与运行依赖的用户可见限制；TF 硬件修复和单颗相机诊断保留为用户确认，不扩展到所有环境。
+
+
+## 2.0.13 - 2026-10-23
+
+本节记录 bag 过载修复及追加的 FIFO/TMST 主导 IMU ABI 3.0 迁移说明；文档修订号和软件 VERSION 不变，IMU SONAME/ABI 按下述不兼容语义独立切换。
+
+### 改进与修复
+
+- bag writer 到达图像 burst 或 IMU 高水位服务点时，分批排空当时的 IMU backlog 快照；后续到达样本留待下一轮，避免高 ODR 下积压持续增长或图像无限等待。不扩大队列，也不保证无限写盘停顿下零丢失。
+- 连续替换最旧完整帧组时回收队首淘汰标记，并在提交淘汰前检查完整 record-order 窗口；保护已被 writer 领取的帧组余部，不越过未就绪帧组、不覆盖环形槽。淘汰或拒收仍计数并发布为 partial；bag 修复本身不改变 LPWM 或不确定度检查，IMU 架构切换见下条。
+- 补充 bag 队列、writer 延迟及系统磁盘统计的判读边界；系统聚合值不能当作保存设备利用率或实际载荷完整性的证据。
+- IMU ABI 切至 `3.0`，实体 `libicm42670.so.3.0.0`、SONAME `.3`，全部当前导出仅使用 `ICM42670_X5_3.0`；字段名/布局不变，无旧别名、重导出或兼容 shim。必须同步头文件、库和全部重建的 consumer，清除旧 `.2` 工件，不能仅替换 SO 或建立跨 major 链接。
+- FIFO 顺序与实测芯片 TMST 定义样本；FSYNC 继续使用芯片标记/delta 和实测端点，INT1 只唤醒。`host_timestamp_ns` 改为包所在 SPI FIFO burst 成功完成时的 RAW 观测，经当次桥接转换为 realtime，同 burst 可重复、FSYNC 延迟发布保留转换后的原值、可早于发布且随墙钟回拨；不是 IRQ 沿、样本或曝光时间。`sample_timestamp_ns` 仍为实测 TMST→RAW→realtime，`200µs` admission 不变。
+- GPIO 通知序号缺口只诊断，不证明物理沿或样本丢失，也不单独失败；实际 FIFO overflow、坏包、时钟歧义和无效 epoch 仍失败。此架构不修改 LPWM/kernel，也不修复底层 GPIO/IRQ 原因，不承诺任意负载零丢失；需重新构建、同步并做目标板验收，软件版本号不是通过证据。
+
+## 2.0.12 - 2026-10-23
+
+本次补充采集延迟排查条件；软件版本及 SO 的 SONAME/ABI 不变。
+
+### 改进与修复
+
+- 说明 BSP 的 spidev 逐传输 dynamic-debug 与应用日志的区别、对照实验授权和原 flags 恢复要求。调试关闭条件下的采集通过不等于原环境通过，不改变 FIFO/INT1 身份、`500µs`/`200µs` 门限或失败即停止行为。
+- 普通 FIFO 首包同样拒绝 Arm 到首包之间不存在的分数相位，且失败前保留 GPIO 身份；GPIO 事件序号回绕至零后仍检测后续缺口。适用于 FSYNC 开关两种模式，不改变时间戳或不确定度门限。
+- 修复 frame-set producer 与帧组完成线程并发访问可变 metadata 的竞态；内部 dump 使用原始帧号与 RAW 捕获时间，公开 consumer 的归一化帧号及 realtime 时间合同不变。
+- Arm 仅使用已通过映射校验的实测时钟沿；不兼容的有界观测会使旧时钟证书失效，不再将新计数器与旧映射混用。不扩大 `200µs` 门限，也不以名义 ODR 或到达时间替代实测时间。
+
+## 2.0.11 - 2026-10-22
+
+本次说明采集启动处理修复；软件版本及 SO 的 SONAME/ABI 不变。
+
+### 改进与修复
+
+- frame-set 的既有 warmup 丢帧前移至时间映射、曝光查询和图像变换之前，避免非交付首帧因缺少捕获映射中止启动。正式交付仍要求精确捕获匹配，`500µs` 窗口上限不变。
+- FSYNC 首包保留至后续绝对 TMST 到达，结合启动实测时钟沿进行区间重建，不再仅因首包无左侧 FIFO 端点直接失败。不按名义 ODR 猜时间；GPIO 身份、回绕唯一性、`200µs` 上限及丢样策略保持不变。
+- LPWM 终止诊断区分精确记录被拒绝与未保留触发，并冻结该次查找的计数器、RAW 采样窗口和历史端点；不改变时间戳、门限、ABI 或失败即停止行为，不代表持续采集问题已修复。
+- 修复 frame-set 在 realtime 桥接或曝光中点校验失败时释放未初始化描述符的风险；失败输出在校验前清零，保留待处理帧的原有所有权，不交付部分帧组。
+- 首包重建分别检查与 Arm 同次转换或晚一个完整 ODR 区间，仅接受唯一可行假设，拒绝两者之间不存在的分数相位；补充持续采集时 FIFO/INT1 身份失败的诊断与停止边界，不将重复启动通过当作持续稳定性保证。
+
+## 2.0.10 - 2026-10-22
+
+本次新增中英文 TF 卡数据盘使用说明；软件版本和 SO ABI 不变，不代表新的硬件或卡兼容性验收。
+
+### 改进与修复
+
+- 补充 TF（microSD）与系统 eMMC 的识别区别、文件系统选择、手动挂载、采集保存路径、正常卸载和未枚举排查。保存前核对 SD 类型和挂载设备号，避免挂载失败后误写内存或系统盘；不自动格式化、挂载或承诺热插拔。
+
+## 2.0.9 - 2026-10-22
+
+本次将中英文公开文档统一为 V2 当前产品说明；软件版本仍为 `2.0.0`，SO 版本与 ABI 不变，不代表新的硬件验收。
+
+### 改进与修复
+
+- 清理过期产品版本历史、下载说明、主板与串口照片及烧录截图；保留适用的相机尺寸图和 RTSP 播放示例。
+- 将迁移比较改为当前 V2 接口、数据与运行库合同；保留 UART 电平、待确认的完整线序和供电额定值、断电接线及热插拔安全边界。
+
+## 2.0.8 - 2026-10-22
+
+同步独立 SO 版本和相机不兼容迁移说明；软件版本仍为 `2.0.0`，不代表新的硬件验收。
+
+### 改进与修复
+
+- ICM42670 实体库为 `2.1.0`（SONAME `2`），SC132 为 `3.0.0`（SONAME `3`、`LIBSC132_3.0`、公开 ABI `3.0`），PRRTSP 为 `2.0.1`（SONAME `2`）。同步 producer、consumer、打包及校验规则；相机旧 consumer 必须重建，不能将 `.so.2` 链接到 `.so.3`。每套库继续使用一份实体和两个相对链接。
+- ROS2 增量 install 清除同名 producer 的旧修订与旧 major；verifier 拒绝多余库、悬空旧链接和跨 major 兼容别名。ICM staged C 链接探针同时消费 `ICM42670_X5_2.0` 与 `ICM42670_X5_2.1`，避免把 producer 定义节点误当作 consumer 需求节点。
+
+## 2.0.7 - 2026-10-22
+
+本次统一动态库链接链与完整复制规则的中英文说明；软件版本和 SO ABI 不变，不代表新的板端功能验收。
+
+### 改进与修复
+
+- producer 同步、non-ROS 运行包和 ROS2 install 保留单份真实库与精确相对链接，不再把 `.so`/`.so.2` 展开为重复文件。补充保留链接的归档/复制方法、链接与字节校验区别，以及 non-ROS v3 provenance 的重新打包要求。
+
+## 2.0.6 - 2026-10-22
+
+本次同步 Wi-Fi 镜像内命令和独立开机恢复的中英文说明；软件版本与 SO ABI 不变，不宣称新镜像已经完成实板冷启动验收。
+
+### 改进与修复
+
+- 使用 `wifi_setup` 系统命令、专用启动入口和持久化启用标记，不再占用共享应用启动文件；补充静态有线断线路由策略、镜像依赖、凭据权限及验收边界。
 
 ## 2.0.5 - 2026-10-21
 
@@ -60,7 +165,7 @@
 
 - 对齐 realtime 时间域、可选 FSYNC、相机 ABI 2.2 曝光观测与 IMU ABI 2.1；补齐默认配置、topic 和保存 sidecar 的使用入口。
 - 区分 ISP 曝光估计、触发—样本关联、保存完整性及 DDS 实际送达；说明实时调度权限、最终健康计数和高负载拒绝边界。
-- 更正 MP4/bag 帧率完整性保证、`max_skew_ns` 的曝光精度误读和系统回拨下的时间戳检查；历史版本记录不改写。
+- 更正 MP4/bag 帧率完整性保证、`max_skew_ns` 的曝光精度误读和系统回拨下的时间戳检查。
 
 ## 2.0.0 - 2026-10-15
 
@@ -70,106 +175,6 @@ V2.0.0 发布：软件与文档版本统一至 2.0.0，默认触发模式切换�
 
 - 所有相机采集入口仅支持 `vin_lpwm`（VIN LPWM 硬件触发），移除软件 GPIO 与 free-run 路径。
 - 相机时间戳保留随帧传播的 `trig_tv` 触发捕获（SIF 原生计数器域），不伪装为 RAW/UTC；相机与 IMU 共线不等于样本/曝光已关联。
-- V2 镜像标记待发布；删除 V1 TF/风扇设备树修复、ISP 参数替换和 UART7→PPS 复用步骤，改为默认独立 PPS IO。旧产品/接口图标注发布前替换；相机映射、FOV、出厂网络和串口电平不变。
+- V2 镜像标记待发布；独立 PPS IO 默认启用，无需 UART7 RX/TX 复用。相机映射、FOV、出厂网络和串口电平按对应使用指南说明。
 - PTP master 的 PHC 使用 PTP/TAI 时间尺度，`phc2sys -w` 跟随 `ptp4l` 的 UTC offset，不再使用 `-O 0`；启用硬件 `hwts_filter full`，使 master 正确接收 Delay_Req 并返回 Delay_Resp。master/报文通过不代表 slave 锁定或绝对 UTC 精度。
 - bag 使用独立、非递减的统一记录时钟；图像和 CameraInfo 保留相机捕获时间，IMU 保留样本时间，session 配置分别声明三个时间域，避免跨域数值比较破坏记录顺序。缺失 LPWM 捕获时由 dispatcher 串行投递至多一次终止回调，支持回调内请求停止。
-
-## 1.3.3 - 2026-10-11
-
-本次为 V2 硬件迁移的中英文文档修订；软件 VERSION 不变，不代表 V2 全功能或整机验收通过。
-
-### 改进与修复
-
-- 当前 IMU 指南/API/示例切换至 ICM-42670-P、`icm42670_*`、`icm42670_driver.h`；real SO `libicm42670.so.2.0.0`、SONAME `libicm42670.so.2`、节点 `ICM42670_X5_2.0`。
-- 原生 ODR 为 `25/50/100/200/400/800/1600Hz`，默认 `800Hz`；旧 `500/1000/2000Hz` 明确拒绝，需用户显式迁移配置。
-- 相机 producer 解析触发控制器 `34130000.gpio` offset `0`，INT1 为 `34120000.gpio` offset `8`；IMU FSYNC 与相机触发共网不代表相机/IMU 硬件对齐。
-- 时间字段按新公开头文件说明；V2 pinout、电气、物理映射、IMU 方向及照片仍标记待确认。历史 V1 下载 URL、工件身份和以下 changelog 原样保留，不构成 V2 兼容或验收承诺。
-
-## 1.3.2 - 2026-10-10
-
-本次为 1.3 系列内的构建与文档修订，各软件版本号保持不变。
-
-### 改进与修复
-
-- 修正 ROS2 显式工具链参数优先级及运行库来源，支持从独立 non-ROS 仓库生成并验证运行包。
-- 补充 Ubuntu 22.04 x86_64 主机准备、五个 non-ROS 示例和 ROS2 节点/插件的完整构建步骤，见 [公开 Demo 源码编译](development/open-source-build.md)。构建与包验证不替代板端硬件验收。
-- 统一文档版本定义与维护约束；文档修订号独立于软件版本，中英文构建从 `4P_doc/VERSION` 读取同一修订号。
-
-## 20261009 工具链 - 2026-10-10
-
-- 发布 [x5_4cam_cross_toolchain_20261009.tar.gz](https://www.hessian-matrix.com/wp-content/uploads/2026/automaticupdates/x5_4cam_cross_toolchain_20261009.tar.gz)，补齐目标 ROS Humble、image_transport/pluginlib 及环境入口，固定包内编译器和 sysroot 查找路径。大小、SHA-256 和用法见 [公开 Demo 源码编译](development/open-source-build.md)。
-
-## 1.3.1 - 2026-09-20
-
-### 新增
-
-- 运行包新增 `sensor_demo` 开机自启动脚本 `start_sensor_demo.sh`：无参数前台启动，`enable`/`disable`/`status` 管理开机自启动。自启动通过板端 `/userdata/startup.sh` 实现（系统 `S99auto_startup` 在 `/userdata` 挂载后执行），脚本只追加/删除自己带标记的块，可与 `wifi_setup.sh` 等内容共存；用法见{ref}`non-ROS Demo 使用：开机自启动 <non-ros-autostart>`。
-- 发布板端软件 `v1.3.0` 配套的出厂系统镜像与烧录工具，支持出厂系统恢复和系统版本升级；镜像获取、烧录步骤与验收见{ref}`修复和升级：系统烧录 <system-flashing>`。
-
-## 1.3.0 - 2026-09-16
-
-### 新增
-
-- 发布 non-ROS `mosaic_rtsp_demo`：把四路 SC132 `1280x1088` NV12 帧在 CPU 内合成为 `2560x2176` 单帧，经 `libprrtsp` 输出固定 H.264 RTSP；公开帧率集合 `25/30/40/50/60fps`，默认 `30fps`，固定地址 `rtsp://<X5_IP>:558/PRR`。应用细节、退出统计与资源占用见{ref}`non-ROS Demo 使用：四路拼接 RTSP（mosaic_rtsp_demo） <non-ros-mosaic>`。
-
-### 改进与修复
-
-- 发布更新版 SC132GS ISP 调优参数 `patch/sc132gs_tuning.json`，改善部分光照场景下的图像质量表现。
-
-## 1.2.0 - 2026-09-14
-
-### 新增
-
-- non-ROS `cam_demo`/`sensor_demo` 支持 VSE 硬件整幅缩放输出画布：`640x480`、`720x480`、`1280x720`，两种轴向写法均合法；缩放不改变 FOV，软件旋转（180/270）在缩放之后由 Nano2D 完成，外部旋转 `90/270` 的交付画布宽高交换。
-- ROS2 图像节点帧率扩展到 `25/30/40/50/60fps`（默认 `30fps`），与 non-ROS/RTSP 公开集合对齐。
-- `libsc132` real SO 从 `libsc132.so.2.0.0` 升级为 `libsc132.so.2.0.1`；SONAME 仍为 `libsc132.so.2`，ABI 节点 `LIBSC132_2.0` 不变。
-- 文档增加 NTP、PPS 输入/UART7 IO 复用及 X5 master + Mid-360 slave 的 PTP 参考配置；PPS 固定使用当前产品组合中的 `/dev/pps2`。
-- 更新部署校验、公开 API、版本兼容入口和时间同步边界。保存模式逐帧率的完整性与压力（stress）边界统一以{ref}`数据保存：帧率与压力边界 <persistence-fps-boundary>`为准。
-
-## 1.1.1 - 2026-09-08
-
-
-### 新增
-
-- 相对v1.0.0，non-ROS `sensor_demo` 新增ROS1 bag v2.0保存，包含四路同步JPEG图像、相机信息、帧元数据、独立IMU和session状态。
-- non-ROS `sensor_demo` 新增互斥的H.264 MP4 session保存模式，输出四路MP4、四路精确timestamp CSV、独立IMU CSV、相机参数、session status和publication receipt。
-- 新增MP4 session到时间戳命名JPEG的Host离线转换工具，支持complete与recovery源且不会把partial升级为complete。
-- ICM real SO从`libicm42688.so.2.0.0`提升为`libicm42688.so.2.1.0`，ABI minor为2.1；SONAME继续为`libicm42688.so.2`。既有函数保留`ICM42688_X5_2.0`节点，新增`icm42688_get_runtime_health()`使用`ICM42688_X5_2.1`节点，sample/config布局不变。
-- 新增[保存数据](usage/save-data-guide.md)，覆盖整包校验、ROS1 bag/MP4配置、优雅退出、验收、离线转换和恢复。
-- non-ROS 公开仓新增交互式 `scripts/wifi_setup.sh`，支持板载 Wi-Fi AP/STA 配置、状态查看、停用和可选开机恢复；新增[Wi-Fi 配置](getting-started/wifi-configuration.md)使用说明。
-
-### 改进与修复
-
-- 强化ROS1 bag和MP4的临时写入、partial/quarantine、原子no-replace发布、receipt、目录耐久化和崩溃恢复。
-- 强化SC132、RTSP、IMU、writer和外部工具的停止顺序、callback ownership、超时进程组清理及错误传播。
-- MP4 complete严格绑定完整四路inventory、四路等量非零帧、IMU final health和status/receipt identity。
-
-### 已知限制与发布门
-
-- ROS1 bag与MP4当前只能选择一种保存模式，不能在同一进程同时开启。
-- MP4只支持H.264完整四路，不支持frame skip；板端需要`ffmpeg`，离线提取需要Host完整`ffmpeg`/`ffprobe`。
-- v1.1.1 non-ROS相机与RTSP的公开帧率集合为`25/30/40/50/60fps`，默认`30fps`；ROS2图像节点为`25/30fps`。IMU支持`25/50/100/200/500/1000/2000Hz`。保存后端的参数接受、完整性和压力边界见{ref}`数据保存：帧率与压力边界 <persistence-fps-boundary>`。
-- `trigger_mode=none` 仅用于显式 free-run 诊断，不属于 V1 稳定发布合同；V1 验证模式为 `software_gpio`。
-- non-ROS ROS1 bag 与 H.264 MP4 的完整保存判据和逐帧率边界见[保存数据](usage/save-data-guide.md)；历史证据仍按原始帧率保留，不替代当前发布门。
-
-## v1.0.0 - 2026-08-06
-
-
-### 新增
-
-- non-ROS四目相机H.264/H.265 RTSP示例，默认四路`1280x1088@30fps`。
-- 初始版本暴露`25/30/40/50/60fps`离散相机与RTSP配置。
-- camera ID 0/1/2/3单路诊断、0/90/180/270度旋转及配置前置校验。
-- ICM-42688 FIFO/TMST时间戳、`25/50/100/200/500/1000/2000Hz`离散ODR和non-ROS联合`sensor_demo`。
-- ROS2 四路 NV12 raw、X5 硬件 JPEG compressed image 和 IMU topic 发布。
-- ROS2 运行环境脚本、FastDDS SHM 配置、发布率指标和 IMU 频率检查工具。
-- ROS2 install 根目录环境脚本 `robobaton_ros2_env.bash`，统一加载 underlay、overlay、FastDDS SHM profile 和日志缓冲设置。
-- 所有自研SO提供`*_get_version()` C ABI；交付可执行文件提供无需硬件的`--version`。
-- UART1/UART7 3.3V 硬件通信已通过 V1 验收；两个 UART 3.3V 供电脚对外设供电合计额定边界为 `500 mA`。
-
-### 已知限制
-
-- 40/50/60fps可用，但是当系统CPU压力过高的时候，可能会出现掉帧的情况，尤其是60fps。
-- V1 稳定性和正式交付默认使用四路 `30fps`。
-- 四路 `trigger` 当前稳定验证模式为 `software_gpio`。
-- `180`度旋转只在`30fps`配置下受支持。

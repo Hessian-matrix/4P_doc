@@ -1,6 +1,8 @@
 # ROS2 Demo Usage
 
-This page describes ROS2 usage for current V2 source; historical V1 build/install verification is not V2 acceptance. Topics, compressed images, native IMU rates, and required camera rates still need target-board checks.
+This page describes ROS2 usage for current V2 source. Before use, topics, compressed images, native IMU rates, and required camera rates still need target-board checks; build or install verification does not replace actual runtime checks.
+
+Supported parameters do not establish a complete mode/load/duration acceptance matrix. Sustained high ROS2 rates and complete DDS delivery remain unresolved; non-ROS console FSYNC association or historical runs cannot certify them. See {ref}`Capability and Verification Boundaries <capability-verification-boundary>`.
 
 ```{important}
 ROS2 and non-ROS RTSP are two independent usage paths. The ROS2 demo does not provide RTSP; do not mix directories, headers, or `.so` between the non-ROS `/root/demo` runtime package and the ROS2 `/root/ros2_demo` install package.
@@ -23,10 +25,11 @@ Exposed capabilities:
 - Four `sensor_msgs/msg/CameraInfo`.
 - IMU: `sensor_msgs/msg/Imu`.
 - Temperature: `sensor_msgs/msg/Temperature`.
+- Per-frame ISP exposure observations and opt-in FSYNC association JSON; fields and statuses are listed below.
 
 RTSP, exposure-sync guarantees, TF extrinsics, camera intrinsics, and distortion calibration are unavailable. FSYNC trigger-to-sample association is opt-in and does not change IMU sample phase. `CameraInfo` only publishes current width/height, with empty calibration fields; IMU orientation is unavailable.
 
-CAM1..CAM4 map respectively to software cam0..cam3 and `/robobaton/cam0..3`, unchanged from V1. See [Hardware Connection and Safety](../getting-started/hardware-and-safety.md#camera-interface).
+CAM1..CAM4 map respectively to software cam0..cam3 and `/robobaton/cam0..3`. See [Hardware Connection and Safety](../getting-started/hardware-and-safety.md#camera-interface).
 
 ## Topics
 
@@ -147,6 +150,10 @@ FastDDS SHM and environment variable checks:
 /root/ros2_demo/install/robobaton_ros2_env.bash --check
 ```
 
+The current-source profile reserves `256 MiB` per participant; the node, monitor, and each separate subscriber process own a segment each. Three participants require at least `768 MiB` plus DDS metadata and port resources. Check `/dev/shm` and available RAM before starting, leaving headroom for other processes. This budget does not guarantee arbitrary participant counts or loads; other processes must load the same SHM profile. Budget hardening does not establish that every historical initialization error is resolved.
+
+The historical SHM initialization root cause remains unresolved and specialized investigation is paused. Larger segments, stale-file cleanup, or one successful start do not establish a root-cause repair.
+
 Only when the launch has been stopped, `ros2 daemon stop` has run, and you have confirmed there are no `robobaton_sensors_node`, `ros2 launch`, or `ros2 run` processes, may you clean up leftover FastDDS SHM files:
 
 ```bash
@@ -174,7 +181,7 @@ Only when the launch has been stopped, `ros2 daemon stop` has run, and you have 
 | `camera.compressed_jpeg_quality` | `80` | JPEG quality, range `1..100`. |
 | `camera.frame_id_prefix` | `robobaton_cam` | Generates frame_ids such as `robobaton_cam0_optical_frame`. |
 | `camera.trigger_mode` | `vin_lpwm` | Only VIN LPWM hardware triggering is supported; other values are rejected. |
-| `imu.sample_rate_hz` | `800` | Only native `25/50/100/200/400/800/1600`; old `500/1000/2000` explicitly rejected. |
+| `imu.sample_rate_hz` | `800` | Only native `25/50/100/200/400/800/1600`; other values are explicitly rejected. |
 | `imu.read_mode` | `sensor_timestamp_fifo` | Currently only this mode is supported. |
 | `imu.fifo_watermark_samples` | `1` | Currently fixed to `1`. |
 | `imu.fsync_enabled` | `false` | Opt-in `/robobaton/fsync` association JSON; requires both camera and IMU enabled, at `800/1600Hz` IMU rate. |
@@ -183,7 +190,11 @@ Only when the launch has been stopped, `ros2 daemon stop` has run, and you have 
 
 Default stable IMU monitor windows should approach configured `800Hz`, not old `1000Hz`; camera `30fps` and IMU rate are independent. INT1 uses `34120000.gpio` offset `8`. V2 FSYNC shares the camera trigger net. Enable association with `--ros-args -p imu.fsync_enabled:=true -p imu.sample_rate_hz:=1600`, subscribe to `/robobaton/fsync`, and accept only `status=1`; see [Data Contracts](../development/data-contracts.md).
 
-The node requires realtime scheduling permission: camera capture uses `SCHED_FIFO/60`, IMU owner `SCHED_FIFO/20`, independent INT1 observer `SCHED_FIFO/30`, and IMU publication `SCHED_RR/3`. Observers inherit the allowed CPU mask; scheduling failure rejects startup. Applications do not automatically change IRQ/debug or system realtime quotas. Under load, inspect final post-stop `IMU_RUNTIME_HEALTH`, sustained four-channel rates, and actual DDS image/IMU payloads; topic existence, send counts, or association JSON alone do not prove delivery.
+The node requires realtime scheduling permission: camera capture uses `SCHED_FIFO/60`, IMU owner `SCHED_FIFO/20`, and IMU publication `SCHED_RR/3`. The camera observer inherits the allowed CPU mask; IMU no longer uses an independent INT1 observer. INT1 is wake-only; FIFO order and measured TMST define samples, and notification sequence gaps are diagnostic, not independently fatal. Scheduling failure rejects startup. Applications do not automatically change IRQ/debug or system realtime quotas, and the redesign does not fix the GPIO/kernel root cause. Under load, inspect final post-stop `IMU_RUNTIME_HEALTH`, sustained four-channel rates, and actual DDS payloads; topic existence, send counts, or association JSON alone do not prove delivery.
+
+`diagnostics.rate_metrics_enabled` defaults to false: final `IMU_RUNTIME_HEALTH` reports `imu_published_samples=unavailable imu_publish_count_valid=no`, rather than treating an unmeasured count as zero. When enabled, the field counts successful IMU `publish()` calls and `imu_publish_count_valid=yes`; it is not a DDS delivery acknowledgment. `published_samples` is the separate producer health count, not a substitute for sink or subscriber counts. Disabled diagnostics add no clock reads or metrics updates.
+
+Normal SIGINT/SIGTERM only requests owner-thread exit: stop the producer while keeping admission open until acquisition is quiescent, drain IMU publication, destroy the node, then shut down the ROS context. This order avoids counting a normal `publish()` return on an already-shut-down context as a valid send during normal finalization; it does not guarantee best-effort DDS delivery. Fatal errors may still close the context early and must be judged by failure status and actual received payloads, not the normal-drain contract.
 
 ## Data Semantics
 
@@ -192,6 +203,6 @@ raw `Image` uses NV12. `Image.step` keeps the underlying DMA buffer's stride; `d
 The compressed topic is a standard `CompressedImage` JPEG payload. The plugin only performs compression when there is an `/image_raw/compressed` subscriber: it validates the NV12 layout per `Image.step` and `data.size()`, copies valid Y/UV rows into the X5 media-codec input buffer, and generates JPEG via `MEDIA_CODEC_ID_JPEG`, preserving the original message `header`.
 
 
-`header.stamp` is not publication time. Cameras map LPWM hardware trigger edges to `CLOCK_REALTIME`; IMU/Temperature use `sample_timestamp_ns` in the same domain, not `host_timestamp_ns`. ROS2 splits the producer nanoseconds unchanged, without another offset. Subsequent stamps follow system-clock corrections, including backward steps. They can be compared on the same calibrated system timeline, not simulation `/clock` even with `use_sim_time`. Neither shared LPWM IO nor a common domain establishes FSYNC sample/exposure associations or synchronization accuracy; cross-device accuracy still depends on system-clock calibration.
+`header.stamp` is not publication time. By default, cameras map LPWM hardware trigger edges to `CLOCK_REALTIME`; explicit exposure-midpoint test mode uses the estimates described above. IMU/Temperature use `sample_timestamp_ns` in the same domain, not `host_timestamp_ns`. ROS2 splits the producer nanoseconds unchanged, without another offset. Subsequent stamps follow system-clock corrections, including repeated values and backward steps. They can be compared on the same calibrated system timeline, not simulation `/clock` even with `use_sim_time`. Neither shared LPWM IO nor a common domain establishes FSYNC sample/exposure associations or synchronization accuracy. Cross-device accuracy still depends on system-clock calibration; these field semantics do not certify persistent RTC/UTC.
 
 `CameraInfo` only carries the current frame width/height, with the distortion model and calibration matrices empty. IMU orientation is unavailable, and messages set `orientation_covariance[0] = -1.0`; gyro/accel covariance is currently not fabricated. `robobaton_imu_link` only identifies the source of the IMU message; it does not establish a transform to the camera, base, optical frame, or other coordinate systems, nor declare TF or extrinsics.

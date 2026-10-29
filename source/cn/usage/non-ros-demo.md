@@ -1,6 +1,8 @@
 # non-ROS Demo 使用
 
-[`RoboBaton_4p_demo`](https://github.com/Hessian-matrix/RoboBaton_4p_demo) 是面向用户的 V2 non-ROS 公开源码仓库，提供四目 SC132 RTSP、四路拼接 RTSP、ICM-42670-P IMU、UART 和 SocketCAN CAN 示例。旧 V1 下载包的硬件/API 不适用于 V2。
+[`RoboBaton_4p_demo`](https://github.com/Hessian-matrix/RoboBaton_4p_demo) 是面向用户的 V2 non-ROS 公开源码仓库，提供四目 SC132 RTSP、四路拼接 RTSP、ICM-42670-P IMU、UART 和 SocketCAN CAN 示例。
+
+当前参数支持范围与实际验证范围分别定义，见{ref}`能力与验证边界 <capability-verification-boundary>`。控制台关联成功不证明保存图像可解码或全部样本已保存，不承诺所有路径持续高帧率或当前组成已完成长录。
 
 ## 1. 目录和运行包
 
@@ -35,7 +37,7 @@
 
 - 四路 SC132 相机；
 - PRRTSP v2 H.264/H.265 RTSP 推流；
-- ICM-42670-P INT1（`34120000.gpio` offset `8`）+ sensor timestamp FIFO IMU 采集线程。
+- ICM-42670-P sensor timestamp FIFO IMU 采集线程；INT1（`34120000.gpio` offset `8`）只唤醒，无通知时仍有界检查 FIFO。
 
 ```bash
 cd /root/demo
@@ -97,7 +99,7 @@ save_data:
 - non-ROS公开帧率集合为25/30/40/50/60fps；默认`30`，其他值在启动相机前拒绝。
 - `camera.test_exposure_midpoint` 默认 `false`；改为 `true` 并重启 `sensor_demo`，图像时间戳使用“触发时间＋半曝光时长”的估算曝光中点。显式 YAML 值优先于 `SC132_TEST_EXPOSURE_MIDPOINT`；旧配置省略此字段时沿用环境变量（未设置则关闭）。需要同时重建应用和支持该开关的 `libsc132.so`；不影响 IMU 时间戳或 bag record time。ROS1 bag 对齐读取图像 `header.stamp`，不要再加半曝光。曝光不可用时停止采集，不宣称已校准的真实曝光中点，详见 {ref}`数据合同 <test-exposure-midpoint>`。
 - `rtsp.codec` 支持 `h264` 和 `h265`。
-- IMU 原生采样率支持 `25/50/100/200/400/800/1600Hz`，默认 `800Hz`；旧 `500/1000/2000Hz` 明确拒绝，不会重采样。
+- IMU 原生采样率支持 `25/50/100/200/400/800/1600Hz`，默认 `800Hz`；其他值明确拒绝，不会重采样。
 - `save_data.format` 默认是 `mp4`，同时支持 `rosbag`；保存路径必须是绝对路径。
 
 (non-ros-save)=
@@ -244,23 +246,23 @@ cd /root/demo
 
 关键字段：
 
-- `ts_ns`：`CLOCK_REALTIME` 域的 IMU sample 时间戳，单位 `ns`，由 producer 的 FIFO TMST→RAW→realtime 映射提供；`host_ts_ns` 为同域 INT1 边沿。`TIME_BASE domain=realtime realtime_start_ns=...` 仅声明启动时系统参考，不会冻结 offset；运行中校时可使后续时间戳回拨。
+- `ts_ns`：`CLOCK_REALTIME` 域的 IMU sample 时间戳，单位 `ns`，由 FIFO TMST→RAW→realtime 实测映射提供；`host_ts_ns` 为该包 SPI FIFO burst 成功完成时的 RAW 观测，经当次系统时钟桥接转换为 realtime，同 burst 可重复、FSYNC 延迟发布保留转换后的原值，不是 IRQ 沿、样本或曝光时间。两类时间均随系统校时回拨；按 `sample_seq` 判断顺序。`TIME_BASE domain=realtime realtime_start_ns=...` 仅声明启动参考，不冻结 offset。
 - `accel_mps2`：加速度，单位 `m/s^2`。
 - `gyro_rps`：角速度，单位 `rad/s`。
 - `uncertainty_us`、`gpio_gap_count`、`fifo_overflow_count`、`mapper_failure_count`：时间戳映射和采集链路诊断。
 
-V2 `accel_mps2` 按 `[X, Y, Z]` 输出；PCB 安装方向和符号尚待实板六面/旋转验证，不以 V1 顶视图推断正负轴或相机坐标变换。
+V2 `accel_mps2` 按 `[X, Y, Z]` 输出；PCB 安装方向和符号尚待实板六面/旋转验证，当前不声明相对于主板或相机的正负轴及坐标变换。
 
 IMU INT1 使用 `34120000.gpio` offset `8`，FIFO TMST 为逐样本时间；相机使用 LPWM，输出时间来自 VIN 随帧传播的触发捕获，不是到帧时间。相机和 IMU FSYNC 共用同一物理 IO；这不自动提供 FIFO 样本与曝光的一一对应。
 
 显式关联使用 `sensor_demo --fsync --sample-rate-hz 1600` 或 YAML `imu.fsync_enabled: true`（默认关闭，仅支持 `800/1600Hz`）。不保存时 stdout 输出 `robobaton_fsync_v1` JSON；保存时进入 bag `/robobaton/fsync` 或 MP4 `fsync.jsonl`。仅 `status=1` 表示唯一匹配；检查 timing drop、序号缺口和 `SENSOR_FSYNC_RESULT`，不把样本对应误称为曝光同步，详见[数据合同](../development/data-contracts.md)。
 
-运行需要实时调度权限：相机捕获 `SCHED_FIFO/60`、IMU owner `SCHED_FIFO/20`、INT1 observer `SCHED_FIFO/30`，联合应用 IMU consumer `SCHED_RR/3`；两个 observer 继承允许 CPU 集合，每轮休眠 `50µs`。调度设置失败拒绝启动。应用不自动修改 IRQ/debug 或实时配额，高负载可能显式丢样或失败；保存及关联验收还须读取成功 stop 后的 `IMU_RUNTIME_HEALTH final=yes health_valid=yes`，不只观察仍有终端输出。
+运行需要实时调度权限：相机捕获 `SCHED_FIFO/60`、IMU owner `SCHED_FIFO/20`、联合应用 IMU consumer `SCHED_RR/3`；相机 observer 继承允许 CPU 集合，每轮休眠 `50µs`。IMU 不再使用独立 INT1 时钟 observer，INT1 仅唤醒；GPIO 通知序号缺口仅诊断、不单独失败。调度设置失败拒绝启动。应用不自动修改 IRQ/debug 或实时配额，重构不修复 GPIO/kernel 根因，高负载仍可能显式丢样或失败；验收须读取成功 stop 后的 `IMU_RUNTIME_HEALTH final=yes health_valid=yes` 并核对实际载荷，不只观察终端输出。
 
 ## 8. 串口 Demo
 
 
-UART1/UART7 逻辑电平保持 `3.3V`，设备节点为 `/dev/ttyS1`、`/dev/ttyS7`；DEBUG_UART 为 `1.8V`，不适用于 `serial_port_demo`。V2 CN2/CN3 为 5pin；CN3 的独立 IO 默认作为 PPS 输入，无需切换 UART7 RX/TX。完整线序和供电脚额定值以正式 V2 资料为准，断电接线，不继承 V1 `500 mA` 或热插拔承诺；见[硬件连接与安全](../getting-started/hardware-and-safety.md#uart)。
+UART1/UART7 逻辑电平为 `3.3V`，设备节点为 `/dev/ttyS1`、`/dev/ttyS7`；DEBUG_UART 为 `1.8V`，不适用于 `serial_port_demo`。V2 CN2/CN3 为 5pin；CN3 的独立 IO 默认作为 PPS 输入，无需切换 UART7 RX/TX。完整线序、供电脚额定值和热插拔条件仍待正式 V2 硬件资料确认，默认断电接线，不接适配器 VCC，不反灌；见[硬件连接与安全](../getting-started/hardware-and-safety.md#uart)。
 
 ```bash
 cd /root/demo
@@ -275,6 +277,8 @@ cd /root/demo
 ./serial_port_demo --port /dev/ttyS1 --mode txrx --baud 115200 --count 10 --text "ping"
 ./serial_port_demo --port /dev/ttyS7 --mode echo --baud 115200
 ```
+
+UART 信号退出修复仅覆盖 RX 等待：收到 `SIGINT`/`SIGTERM` 正常退出并恢复串口设置，其他信号不延长 RX deadline，真实 I/O 错误仍失败；不扩展为所有串口模式或硬件可靠性验收。
 
 ## 9. 验证建议
 
@@ -298,7 +302,7 @@ cd /root/demo
 ./start_sensor_demo.sh status     # 查看自启动与运行状态
 ```
 
-开机自启动通过板端 `/userdata/startup.sh` 实现：系统 `S99auto_startup` 在 `/userdata` 挂载后执行该文件。脚本只追加/删除自己带 `SENSOR_DEMO_AUTOSTART_MANAGED` 标记的块，不会覆盖其它脚本（如 `wifi_setup.sh`）写入的内容；取消自启动时若文件只剩余注释/空行残留会整体删除。开机自启动使用运行包内默认配置，直接修改 `config/sensor_config.yaml` 即可调整，无需重新执行 `enable`。`enable`/`disable` 需要 root 权限。
+开机自启动通过板端 `/userdata/startup.sh` 实现：系统 `S99auto_startup` 在 `/userdata` 挂载后执行该文件。脚本只追加/删除自己带 `SENSOR_DEMO_AUTOSTART_MANAGED` 标记的块，不会覆盖其它应用写入的内容；取消自启动时若文件只剩余注释/空行残留会整体删除。镜像内 `wifi_setup` 使用独立启动入口，不占用该文件。开机自启动使用运行包内默认配置，直接修改 `config/sensor_config.yaml` 即可调整，无需重新执行 `enable`。`enable`/`disable` 需要 root 权限。
 
 (non-ros-can)=
 
@@ -386,6 +390,6 @@ CAN FD 示例（先完成 FD 接口配置，外部节点先准备好接收）：
 
 `tx_queued=N` 只表示 N 帧被内核接受，不表示对端收到或每帧已在总线上完成。默认 SocketCAN 本地回环可能让同机另一个接收进程看到发帧；这不能证明外部接线、收发器或 ACK 正常。外部验收须在第二个物理节点核对 ID、格式、载荷和计数，再反向发帧确认本板接收，同时检查 `ip -details -statistics link show can0` 的错误、丢帧和 BUS-OFF 状态。host 数据报逻辑测试、vcan 或 `--help` 不代替这一步。
 
-应用支持 FD 不等于当前 BSP 已通过实板完整性验收。受影响 BSP 的长 FD 载荷可能损坏，不能仅凭收齐帧数、没有总线错误或短帧通过认定可靠；须先修复底层问题，并在第二个物理节点逐字节核对长载荷、FD/BRS 标志及双向计数。
+应用支持 FD 不等于当前 BSP 已通过实板完整性或持续吞吐验收。受影响 BSP 的长 FD 载荷可能损坏，不能仅凭收齐帧数、没有总线错误或短帧通过认定可靠；须先使用匹配的已修复 BSP，并在第二个物理节点逐字节核对长载荷、FD/BRS 标志及双向计数。组合负载、延迟和错误恢复仍未完整闭环，不对当前整机组合承诺吞吐；见{ref}`能力与验证边界 <capability-verification-boundary>`。
 
 单独编译使用 `scripts/build_can_demo.sh`，完整打包使用 `scripts/package_runtime.sh`，详见[公开 Demo 源码编译](../development/open-source-build.md)。

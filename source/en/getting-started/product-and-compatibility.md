@@ -1,12 +1,14 @@
 # Product Version and Compatibility
 
-This page describes compatibility between current RoboBaton 4P V2 source, non-ROS/ROS2 demos, and runtime environments; historical V1 downloads are not automatically V2-compatible. Technical facts follow public headers, configuration, VERSION, and runtime manifests.
+This page describes compatibility between current RoboBaton 4P V2 source, non-ROS/ROS2 demos, and runtime environments. Technical facts follow public headers, configuration, VERSION, and runtime manifests.
 
 ## Documentation and Software Versions
 
 See [Release, License, and Support](../release-and-support.md#documentation-version-policy) for the current documentation revision, software releases, and shared version definitions. A documentation revision does not require software versions to increase with it.
 
-V2 uses ICM-42670-P, API `icm42670_*`, real SO `libicm42670.so.2.0.0`, and SONAME `libicm42670.so.2`. Current ABI 2.1 retains base functions in `ICM42670_X5_2.0` and adds the FSYNC callback in `ICM42670_X5_2.1`. This is incompatible with V1 ICM libraries; update headers, libraries, consumers, and configuration together. Native ODRs are `25/50/100/200/400/800/1600Hz`, default `800Hz`; old `500/1000/2000Hz` rates are explicitly rejected, not silently resampled.
+Current hardware revision V2.2, software `2.0.0`, documentation, and SO ABI are identified independently. Supported parameters do not mean all mode/load/duration combinations passed. See {ref}`Capability and Verification Boundaries <capability-verification-boundary>` for high-rate, pressure, long-recording, and peripheral limits.
+
+V2 uses ICM-42670-P, API `icm42670_*`, ABI 3.0, real SO `libicm42670.so.3.0.0`, and SONAME `libicm42670.so.3`. Every export uses only `ICM42670_X5_3.0`, without old aliases. Field layouts remain unchanged, but host time becomes the SPI FIFO burst-completion observation and INT1 is wake-only; FIFO order and measured TMST define samples. Synchronize headers, libraries, consumers, and configuration, rebuild every consumer, and remove old `.2` libraries without cross-major links. Software VERSION is unchanged. Native ODRs are `25/50/100/200/400/800/1600Hz`, default `800Hz`; unsupported rates are explicitly rejected, not silently resampled.
 
 | Deliverable | User entry |
 |---|---|
@@ -35,13 +37,15 @@ Do not mix directories, headers, or `.so` files between the two paths. Run only 
 | Trigger | All camera entries support only `vin_lpwm` (VIN LPWM hardware triggering); no free-run or software GPIO triggering. |
 | Permissions and scheduling | Cameras require read-only `/dev/mem`; capture and IMU realtime threads require scheduling permission, with failure rejecting startup. See [Data Contracts](../development/data-contracts.md). |
 
+Cameras support only full four-camera operation or single-sensor diagnostics, not 2/3 cameras; rotation `180` requires `30fps`. Single-camera diagnostics are user-confirmed, not acceptance of every mode or pressure load.
+
 The ROS2 path does not provide RTSP; use the non-ROS path when RTSP is needed. TF, extrinsics, camera intrinsics, and distortion calibration are not currently provided; CameraInfo only has width/height, and IMU orientation is unavailable.
 
-Current camera ABI 2.2 adds frozen per-frame ISP `exposure` observations while preserving old frame-info prefix reads and SONAME; estimates do not certify applied exposure for that frame. FSYNC defaults off, supports only `800/1600Hz`, and provides unique trigger-to-sample association, not exposure synchronization. An identical software version does not prove identical package capabilities: distinguish unreleased changes in [Changelog](../changelog.md) and check manifests, headers, and actual libraries.
+Current camera ABI 3.0 adds frozen per-frame ISP `exposure` observations with frame-info prefix-size reads but a new `libsc132.so.3` SONAME; old binaries must be rebuilt; estimates do not certify applied exposure for that frame. FSYNC defaults off, supports only `800/1600Hz`, and provides unique trigger-to-sample association, not exposure synchronization. An identical software version does not prove identical package capabilities: distinguish unreleased changes in [Changelog](../changelog.md) and check manifests, headers, and actual libraries.
 
 ## Factory system image and target-board compatibility
 
-The historical factory image and flashing tool for on-device software `v1.3.0` apply only to its original V1 board and must not be written to V2; URLs and artifacts cannot be overwritten in place. Public information for the matching V2 BSP/system image and recovery channel is pending confirmation; see [System Flashing](../ops/system-flashing.md).
+Public information for the matching V2 BSP/system image and recovery channel is pending confirmation. No public image download or confirmed flashing procedure is currently available; see [System Flashing](../ops/system-flashing.md). Do not write an image unless its compatibility with the current hardware is confirmed.
 
 ## Version query and whole-package matching
 

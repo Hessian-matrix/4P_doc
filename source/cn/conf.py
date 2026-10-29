@@ -51,7 +51,7 @@ html_theme_options = {
 # 2026-07-31：为 Markdown 标题生成锚点，原因是在线文档内部跳转和外链引用更稳定。
 myst_heading_anchors = 3
 
-# GitHub 仓库可能返回 403；大型系统镜像和烧录工具下载另行核验。
+# GitHub 仓库可能返回 403；跨语言部署地址由 Read the Docs 管理。
 linkcheck_ignore = [
     r"https://github\.com/Hessian-matrix/RoboBaton_4p_demo/?$",
     r"https://github\.com/Hessian-matrix/RoboBaton_4P_ROS2_demo/?$",

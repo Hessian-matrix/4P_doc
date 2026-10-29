@@ -2,6 +2,8 @@
 
 This page records the data formats, fields, and time semantics that users can rely on. Undisclosed physical orientation, coordinate systems, extrinsics, and hardware-sync capabilities are explicitly listed as limitations and are not fabricated in the documentation.
 
+Parameters and fields describe the current implemented contract, not acceptance of a complete mode/load/duration matrix. See {ref}`Capability and Verification Boundaries <capability-verification-boundary>` for current results and limits.
+
 ## Camera Images and RTSP
 
 | Item | Contract |
@@ -11,11 +13,13 @@ This page records the data formats, fields, and time semantics that users can re
 | FOV | Camera A/B retain horizontal `148.4°`/`115.6°`, vertical `126.6°`/`96.8°`, diagonal `193.8°`/`157.2°`. |
 | camera FPS | Default `30fps`, supports `25fps`, `30fps`, `40fps`, `50fps`, and `60fps`; other values rejected before startup side effects |
 | RTSP path | `/PRR` |
-| Port mapping | CAM1..CAM4 map respectively to software cam0..cam3 and `554/555/556/557`, unchanged from V1. |
+| Port mapping | CAM1..CAM4 map respectively to software cam0..cam3 and `554/555/556/557`. |
 
 The `libsc132.so` callback exposes NV12 raw frames, while RTSP carries H.264/H.265 encoded video. Frame information includes `width`, `height`, `stride`, `vstride`, Y/UV virtual/physical addresses, and sizes. Rotation `90/270` swaps dimensions; consumers must use each frame's metadata and stride/size rather than assume compact `1280x1088`.
 
 For complete C declarations, field-by-field meanings, NV12 row layout, and reference lifetime, see the {ref}`API Image Output Structure Reference <camera-output-structures>`.
+
+Only full four-camera operation or single-sensor diagnostics is supported, not 2/3-camera combinations; rotation `180` requires `30fps`. VSE sizes are the discrete set above, not arbitrary scaling.
 
 ## Frame Set Fields
 
@@ -25,7 +29,7 @@ For complete C declarations, field-by-field meanings, NV12 row layout, and refer
 | `group_id` | Frame-group sequence number. |
 | `group_timestamp_ns` | Frame-group timestamp in `ns`. |
 | `max_skew_ns` | Observed trigger-capture span of the group in `ns`; test exposure-midpoint offsets do not change it. |
-| `items[i].camera_id` | Software ID `0..3`, mapping respectively to physical CAM1..CAM4, unchanged from V1. |
+| `items[i].camera_id` | Software ID `0..3`, mapping respectively to physical CAM1..CAM4. |
 | `items[i].frame_id` | Normalized frame ID. |
 | `items[i].timestamp_ns` | Single-channel frame timestamp in `ns`. |
 
@@ -38,6 +42,8 @@ For complete C declarations, field-by-field meanings, NV12 row layout, and refer
 | `vin_lpwm` | The only supported trigger for all camera applications and the library | Camera and IMU FSYNC share the LPWM IO; the camera time base is the frame-propagated `trig_tv` hardware capture. Missing capture stops acquisition rather than falling back to frame arrival time. |
 
 All public sensor timestamps use `CLOCK_REALTIME` system time (Unix epoch, in ns). By default camera stamps represent the LPWM hardware trigger edge, not frame arrival, IRQ, or exposure midpoint; see the opt-in {ref}`Exposure-Midpoint Test Switch <test-exposure-midpoint>`. The library brackets a SIF VSYNC capture-register transition with RAW reads, subtracts `VSYNC − trigger` in the shared 24 MHz counter, and exactly matches the frame's `trig_tv` against capture history. The background thread inherits the process's allowed CPU mask, uses `SCHED_FIFO/60`, and sleeps `50µs` between scans. An in-scan transition uses that scan's bracket, rereads TRIG, and verifies stable VSYNC. Failure to enable realtime scheduling rejects startup. A register window exceeding `500µs`, missing capture, or failed match stops acquisition without an arrival-time fallback. This implementation requires the fixed X5 register map, read-only `/dev/mem` access, and realtime scheduling permission; the rejection window is not demonstrated synchronization accuracy.
+
+Frame-set mode first discards 30 warmup frames per camera by default. Until all enabled cameras finish warmup, buffers are returned immediately, without exposure queries, image transforms, or capture-map admission for these unpublished frames. Every delivered frame after warmup still requires a valid exact capture match with the unchanged `500µs` window limit; disabling warmup does not exempt the first frame.
 
 Grouping remains in internal trigger RAW time, followed by one freshly sampled RAW-to-realtime bridge for the entire group. Group time is the minimum delivered channel timestamp; `max_skew_ns` always measures trigger-capture differences, not exposure or camera/IMU alignment accuracy. Non-ROS diagnostics, RTSP input times, saved images, and ROS2 image stamps use the delivered timestamp: realtime trigger time by default, estimated exposure midpoint in test mode. Bridges follow runtime clock corrections, including backward steps, without a frozen offset or monotonic clamp. Internal timeouts remain monotonic; the FSYNC trigger-to-sample association below is explicitly opt-in.
 
@@ -84,31 +90,33 @@ Group admission and `max_skew_ns` still use original trigger RAW; reserved RAW/g
 | INT1 DRDY | `34120000.gpio` offset `8`; not old GPIO395 |
 | Read mode | sensor timestamp FIFO |
 | FIFO watermark | `1` |
-| Native ODR | `25/50/100/200/400/800/1600Hz`, default `800Hz`; old `500/1000/2000Hz` configurations are rejected, not resampled |
+| Native ODR | `25/50/100/200/400/800/1600Hz`, default `800Hz`; other values are rejected, not resampled |
 | FSYNC | V2 input shares the camera trigger net; opt-in rising-edge capture links a trigger to its first subsequent tagged IMU sample without changing continuous sampling phase. |
 
 Field semantics:
 
 | Field | Unit / semantics |
 |---|---|
-| `sample_sequence` / demo `sample_seq` | IMU sample sequence number. |
+| `sample_sequence` / demo `sample_seq` | IMU sequence defined by FIFO order, not INT1 notifications or increasing realtime. |
 | `temperature_c` / demo `temp_c` | Degrees Celsius. |
 | `accel_mps2` | `m/s^2`. |
 | `gyro_rps` | `rad/s`. |
-| `host_timestamp_ns` | Paired INT1 edge mapped to `CLOCK_REALTIME` nanoseconds; not the sample timestamp. |
+| `host_timestamp_ns` / CLI `fifo_observation_ns` | RAW observation at the packet's successful SPI FIFO burst completion, converted to `CLOCK_REALTIME` ns using the bridge measured for that observation. Packets in one burst may share it; FSYNC deferral retains the converted value, possibly earlier than publication, without rebridging old RAW. Follows wall steps; not IRQ-edge, sample, or exposure time. |
 | `sample_timestamp_ns` | Per-sample FIFO TMST-to-RAW-to-`CLOCK_REALTIME` timestamp; each publication refreshes the bridge and follows backward system-clock steps. |
 | demo `ts_ns` | Producer realtime sample time retained unchanged, in ns; `host_ts_ns` is also realtime, with no further consumer offset. |
-| `reserved0` | Count of observed FIFO timestamp low-16-bit rollovers in this session; not V1 20-bit SPI snapshot rollovers. |
+| `reserved0` | Count of observed FIFO timestamp low-16-bit rollovers in this session. |
 | `timestamp_uncertainty_us` | Per-sample time-mapping uncertainty, in microseconds. |
-| `gpio_event_gap_count` / `fifo_overflow_count` / `mapper_failure_count` | Cumulative counts of edge gaps, FIFO overflows, and mapping failures in the current session. |
+| `gpio_event_gap_count` / `fifo_overflow_count` / `mapper_failure_count` | Session counts of detectable missing GPIO notification sequence values, FIFO overflows, and mapping failures. GPIO gaps are diagnostic, not proof of physical-edge/sample loss or independently fatal. |
 
-The IMU samples independently and continuously. FSYNC identifies the first hardware-tagged sample after a trigger; it does not make that sample simultaneous with camera exposure. Exposure midpoint, TF extrinsics, and calibration remain unavailable. Neither the host INT1 timestamp nor an FSYNC delta is the sample time.
+The IMU samples continuously and independently. FIFO order and measured chip TMST define sequence and time; INT1 only wakes FIFO draining, without per-packet pairing. FSYNC uses chip tags/deltas and measured endpoints to identify the first tagged sample after a trigger, not exposure simultaneity. Exposure midpoint, TF extrinsics, and calibration remain unavailable. Neither host observations nor FSYNC deltas are sample time. Both realtime stamps follow clock corrections; unique host values and increasing wall time are not acquisition-order requirements.
 
 ### FSYNC Trigger-to-Sample Association
 
 Disabled by default. Non-ROS uses `sensor_demo --fsync --sample-rate-hz 1600` or YAML `imu.fsync_enabled: true`; ROS2 sets `imu.fsync_enabled:=true` and `imu.sample_rate_hz:=1600`. Only `800/1600Hz` are supported; the rate is not changed automatically. The tighter `800Hz` budget can cause more timing drops; `1600Hz` also does not guarantee an admissible sample for every trigger.
 
 The hardware FSYNC FIFO tag replaces the packet's absolute TMST with trigger-to-sample delay. The implementation waits for adjacent absolute TMSTs, bounds missing time with legal tick-step intervals, and includes interval half-width in midpoint uncertainty; it never synthesizes timestamps from nominal ODR. Measured clock slope converts delay to ns before subtraction from sample RAW time. Missing endpoints, ambiguous wrap, or uncertainty exceeding the `200µs` policy do not produce fabricated associations.
+
+Retain a leading FSYNC-tagged packet and its original burst-completion observation until a later absolute TMST permits reconstruction, without waiting for or consuming a corresponding GPIO identity. The measured pre-enable Arm transition is not a preceding FIFO sample: check shared-transition and one-full-legal-ODR-later hypotheses separately, narrowed by later measured endpoints. Accept only a unique feasible hypothesis, never fractional phases. Both FIFO-enable writes must complete before the shortest legal ODR interval measured from the start of the Arm observation bracket, converted using the measured clock-slope lower bound. Exceeding this deadline rejects startup to prevent whole-TMST-wrap aliasing. Unique wrap, measured clocks, and `200µs` admission remain required. Unprovable clocks/epochs fail; over-budget samples retain strict/allow-counted policies and health counters.
 
 Camera groups and FSYNC edges match only with a unique candidate in both directions within combined RAW uncertainty intervals, never by nearest neighbor or equal realtime timestamps. History is bounded (128 groups, 256 events); restarted generations cannot mix. JSON schema is `robobaton_fsync_v1`:
 
@@ -127,15 +135,15 @@ Without saving, JSON goes to stdout; ROS1 bags store `/robobaton/fsync` (`std_ms
 
 Read integer timestamps and sequences with a lossless integer JSON parser (for example, Python `json.loads` uses `int`). Epoch nanoseconds exceed the IEEE-754 safe-integer range; ordinary JavaScript `JSON.parse` rounds them, so use a BigInt-aware lossless parser. Association describes source-frame/source-sample identity, not successful storage selection, queue admission, or DDS delivery; cross-check per-camera stamps, frame metadata, and IMU sequences against actual data. With `SENSOR_FSYNC_RESULT health_valid=no`, captured/dropped are `unknown`, not zero; `stdout_dropped` reports stdout write losses.
 
-Load boundary: the acquisition owner uses `SCHED_FIFO/20`; the non-ROS IMU consumer and ROS2 IMU publication thread use `SCHED_RR/3`. Cross-priority queue locks use priority inheritance so ordinary load cannot starve a lock holder. SPI is fixed at `10MHz`; INT1 retains a `100µs` asynchronous-reset pulse. Realtime scheduling permission is required; configuration failures do not silently downgrade scheduling. Applications do not automatically change system IRQ routing, INT1 IRQ thread priority, or SPI dynamic-debug settings; under saturation, these settings and subscriber scheduling still affect results. Absolute-TMST/INT1 phase checks, unique bidirectional matching, and the `200µs` gate remain unchanged: violations are rejected or stop acquisition. At `800Hz`, many FSYNC-tagged samples can still be rejected; this is not a zero-loss guarantee under arbitrary load.
+Load boundary: the acquisition owner uses `SCHED_FIFO/20`; non-ROS IMU consumers and ROS2 IMU publication use `SCHED_RR/3`. Cross-priority queue locks use priority inheritance. SPI is `10MHz`; INT1 retains its `100µs` asynchronous-reset wake pulse. Realtime scheduling failure never silently downgrades. Applications do not automatically change IRQs, SPI dynamic-debug, realtime quotas, LPWM, or the kernel. SPI/scheduling and subscriber load still matter. Measured TMST, unique bidirectional FSYNC matching, and `200µs` admission remain unchanged, without a zero-loss guarantee under arbitrary load.
 
-INT1 kernel edge timestamps use MONOTONIC. Conversion to internal RAW uses bounded clock observations near the edge, not a dequeue-time offset applied to a queued edge. An independent observer inherits the allowed CPU mask, uses `SCHED_FIFO/30` (below the board's default FIFO/50 GPIO IRQ thread), and sleeps `50µs` between iterations; startup confirms successful scheduler setup. Its 4096-entry history inserts at intervals of at least `100µs` so a queue-drain burst cannot evict old edge certificates; at lower ODRs this does not guarantee coverage of the entire 256-edge queue. Acquisition also adds observations while waiting for INT1 and polling the sensor clock; a priority-inheritance lock serializes sampling and insertion. Certificate selection accounts for both bracket half-width and clock-steering distance; scheduling delay cannot change the GPIO sequence or reassign an edge to another sample. This steering bound applies to the current X5 Linux 6.1 kernel without `CONFIG_NTP_PPS` or a boot `ntp_tick_adj=` override. Revalidate the clock bound after kernel/boot-parameter changes; never reduce reported uncertainty on that basis.
+INT1 is notification, not a sample clock or per-packet identity source; GPIO software IRQ timestamps are not physical-edge hardware latches and acquisition does not consume them. Detectable notification sequence gaps only increment `gpio_event_gap_count`; continuous sequences cannot rule out loss/merging before event generation. FIFO/TMST-led acquisition removes per-edge pairing but **does not fix or establish the underlying GPIO/kernel cause**. Diagnosing that cause still requires matching-BSP IRQ capture or synchronized physical waveforms. Bounded timeouts still check FIFO liveness without IRQs. Do not infer sample loss from notification gaps; inspect FIFO/sample sequences, final health, and actual payloads.
 
-The sensor TMST-to-RAW fit requires one affine line to satisfy all valid read intervals rather than treating their midpoints as exact observations. An incompatible narrow observation cannot leave a contradicted old certificate. An overwide SPI observation does not advance counter unwrapping. Slope, extrapolation, INT1 phase, and FSYNC reconstruction errors still count toward publication admission. IRQ delays and long SPI stalls can still cause explicitly reported timing rejections, identity failures, or FIFO overflows; neither wider gates nor cached old samples conceal them.
+The sensor TMST-to-RAW fit requires one affine line satisfying valid read intervals, not exact midpoint observations. Contradictory narrow observations invalidate old certificates; overwide SPI observations do not advance unwrapping. Slope, extrapolation, and FSYNC reconstruction count toward admission uncertainty. FIFO overflow, bad packets, wrap/clock ambiguity, and invalid epochs still fail. Long SPI stalls can still reject samples or stop acquisition; wider gates, nominal-ODR timestamps, and cached old samples do not conceal failures.
 
 Acceptance must use the final `IMU_RUNTIME_HEALTH final=yes health_valid=yes` after a successful stop: require a nonzero generation and check `published_samples`, `invalid_packet_drop_count`, GPIO gaps, and FIFO overflows. The final record also reports `mapper_failure_count`, `uncertainty_over_200_drop_count`, `max_consecutive_timing_drop_count`, `fsync_captured`, and `fsync_dropped`, including losses after the final successful sample. Invalid packets are counted even when timing admission also rejects them. The last published sample is insufficient because a trailing error may have no later sample to carry its counters. Timing drops and FSYNC dropped tags remain explicitly counted, not complete associations. Storage or DDS acceptance must also read actual IMU/four-camera payloads and verify association coverage using the timestamp rules above, rather than rely only on health summaries, topic existence, or container completeness.
 
-`accel_mps2` outputs `[X, Y, Z]`. The V2 PCB mounting direction and acceleration signs still require on-board six-face/rotation verification; do not inherit the V1 top-view `[0, 0, -9.8]` or left/front axis claims.
+`accel_mps2` outputs `[X, Y, Z]`. The V2 PCB mounting direction and acceleration signs still require on-board six-face/rotation verification. Axis signs and transforms relative to the main board or cameras are not currently declared.
 
 ## non-ROS Save Output
 
@@ -152,7 +160,11 @@ Bag payload stamps are separate from record time: image and first-frame CameraIn
 
 MP4 CSV indexes use the realtime system timeline, subject to the precision and per-camera distinction above; container playback remains relative/nominal, not Unix epoch. A backward step unsupported by the encoder/container produces an error and incomplete artifacts rather than fabricated increasing times. Complete system-clock synchronization before continuous recording.
 
-Storage completeness is recorder-specific. Bag complete checks session success and recorder queue/write errors, not independently zero producer timing drops. MP4 complete additionally requires valid final health after successful stop, published=observed=admitted=written>0, continuous sample sequences, no GPIO/FIFO/timing/invalid-packet drops, and maximum sample uncertainty ≤`200µs`. Default `allow-counted` can continue after timing rejection with provable identity, so bag complete does not prove zero sample loss. Unavailable exposure estimates and missing/ambiguous FSYNC associations also require separate checks rather than inference from container completeness; see [Saving Data](../usage/save-data-guide.md).
+Storage completeness is recorder-specific. Bag complete checks the session and recorder queue/write errors, not independently zero producer timing drops. MP4 complete additionally requires valid successful-stop final health, published=observed=admitted=written>0, continuous sequences, zero FIFO/timing/invalid-packet drops, and maximum uncertainty ≤`200µs`. GPIO notification gaps are diagnostic and do not independently make storage incomplete. Default `allow-counted` may continue after timing rejection with provable clock identity, so bag complete does not prove zero sample loss. Exposure/FSYNC completeness needs separate checks; see [Saving Data](../usage/save-data-guide.md).
+
+Bag overload retains/drops complete four-camera groups together. The default minimum interval `10` uses contiguous `source_group_order`, not producer `group_id`. Candidates must be fully encoded, complete, and unclaimed; writer-claimed groups stay protected. Without a legal old or incoming group to drop, stop and drain to a readable partial bag with nonzero exit. Every group drop means `data_complete=false`; policy compliance is not sustained-pressure or all-sensor acceptance. Intentional alternate saving explicitly requires minimum interval `2`; see [Saving Queue Diagnostics](../usage/save-data-guide.md).
+
+Native bag JPEG removes only the length-`4` JPU APP9 immediately after SOI containing private frameIdx, preserving other APP markers and coded payload without changing ROS2 JPEG plugin output. `rosbag_info.py --freq` measures record time; `--header-freq` separately reports saved-message `Header.stamp`. Neither alone proves lossless acquisition. Compare producer, consumer, recorder, and readback counts separately; continuous saved sequences can still omit source head/tail data.
 
 ## ROS2 Topics
 
@@ -193,8 +205,7 @@ ROS2 does not publish RTSP, TF extrinsics, or calibration. FSYNC provides trigge
 | Baud rate | `serial_port_demo` defaults to `115200`; DEBUG_UART uses `921600`. |
 | serial_port_demo data format | 8N1, raw, no flow control |
 | demo modes | `tx`, `rx`, `txrx`, `echo` |
-| UART1/UART7 TX/RX signal logic level | Unchanged `3.3V`; DEBUG_UART uses `1.8V`. |
-| UART1/UART7 power pins | V2 CN2/CN3 power function, voltage, rated load, and hot-plug limits pending confirmation; do not reuse the V1 `500 mA` total limit. |
-| Historical V1 boundary | UART1/UART7 were validated on V1; this is not proof of V2 electrical or harness compatibility. |
+| UART1/UART7 TX/RX signal logic level | `3.3V`; DEBUG_UART uses `1.8V`. |
+| UART1/UART7 power pins | V2 CN2/CN3 power function, voltage, rated load, and hot-plug limits await confirmation. Wire with power off by default, leave adapter VCC disconnected, and prevent reverse feed. |
 
 V2 UART1/UART7 use CN2/CN3 5-pin connectors and `/dev/ttyS1`, `/dev/ttyS7`. CN3 has an independent IO enabled as PPS input by default, without RX/TX mux switching; discover the enumerated PPS device. Use official V2 labeling for complete pin order and power-pin function. DEBUG_UART is not a user serial port. Wire with power off after checking TX/RX/GND, peer voltage, and common ground; leave adapter VCC disconnected and prevent reverse feed. See [Hardware Connection and Safety](../getting-started/hardware-and-safety.md#uart).

@@ -18,6 +18,8 @@ ROS1 bag 与 MP4 是两种互斥的保存模式，当前不能在同一个进程
 
 推荐优先使用 H.264 MP4 保存：四路 `cameraN.mp4` 可直接播放，并复用 RTSP 编码结果；ROS1 bag 保存 JPEG 消息，适合 ROS1 消息工具或后续解包分析。支持的帧率是参数范围，不是零丢失保证，负载边界见第 9 节。两种模式的启动与验收分别见第 5/7 节。
 
+高压 bag 在严格丢组策略耗尽时合法停止，不是持续压力通过；当前新组成 `8h` MP4 + FSYNC 长录尚未启动。已修复图像策略停止时提前关闭 IMU 接纳的缺陷；正常收尾保持 IMU 输入直到 producer 停止、consumer 排空后再关闭 writer。历史 DDS 发布/接收差额仍未精确归因，不能仅凭保存序列连续证明所有路径头尾无损；统一结论见{ref}`能力与验证边界 <capability-verification-boundary>`。
+
 | 模式 | 入口 | 主要输出 | 完整保存判据 |
 |---|---|---|---|
 | H.264 MP4 | `--record-mp4-dir` | 一个 session 目录 | `SENSOR_MP4_RESULT ... outcome=published_complete data_complete=yes cleanup_complete=yes ... success=yes` |
@@ -25,7 +27,7 @@ ROS1 bag 与 MP4 是两种互斥的保存模式，当前不能在同一个进程
 
 只有进程退出码为 0 且对应 `SENSOR_*_RESULT` 明确报告完整，才可把数据作为正式完整数据使用。`.partial`、非零退出码或 `data_complete=no` 只能作为恢复或诊断数据。
 
-这里的 complete 首先是各 recorder 的发布结果，不是所有硬件样本、曝光或 FSYNC 关联都完整的统一证明。默认 `--imu-sample-drop-policy allow-counted` 允许可证明身份的 timing 拒绝计数后继续；bag 的 complete 判定检查会话和 recorder 队列/写入错误，不单独强制 producer timing drop 为零。MP4 的 complete 判定更严格：最终 producer 健康有效、published=observed=admitted=written>0、序号连续且 GPIO/FIFO/timing/invalid-packet drop 为零，最大样本不确定度不超过 `200µs`。若要求零丢失数据集，两种模式都要核对最终健康与实际保存载荷；`strict` 可使 timing/无效包拒绝立即失败，但不保证任意负载成功。
+这里的 complete 首先是各 recorder 的发布结果，不是所有硬件样本、曝光或 FSYNC 关联都完整的统一证明。默认 `--imu-sample-drop-policy allow-counted` 允许可证明身份的 timing 拒绝计数后继续；bag 的 complete 判定检查会话和 recorder 队列/写入错误，不单独强制 producer timing drop 为零。MP4 还要求最终 producer 健康有效、published=observed=admitted=written>0、序号连续、FIFO/timing/invalid-packet drop 为零，最大样本不确定度不超过 `200µs`。`gpio_event_gap_count` 是缺失唤醒通知序号诊断，不证明物理沿或样本丢失，也不单独使 bag/MP4 失败。若要求零丢失数据集，两种模式都要核对最终健康与实际保存载荷；`strict` 可使 timing/无效包拒绝立即失败，但不保证任意负载成功。重复 host 与系统校时回拨合法，不能代替样本序号判断顺序。
 
 图像、frame metadata 及 IMU CSV/bag payload 保留 producer 的 `CLOCK_REALTIME` 捕获/采样时间（Unix epoch ns）。MP4 timestamp CSV 保存同域组触发时间，经编码器微秒量化后以 ns 表示，不是逐路原始纳秒 stamp；开启 FSYNC 时逐路原始值在 `fsync.jsonl`。bag record time 独立读取写入时系统时间，不等于采样时间；系统回拨如实保留，bag index 按时间排序。MP4 容器仍使用相对/名义播放时间。采集前应先校时；同域不证明相机/IMU 的样本或曝光已对齐，详见[数据合同](../development/data-contracts.md)。
 
@@ -57,19 +59,19 @@ cat VERSION
 
 `VERSION`、程序 `--version`、实际加载的 `libsc132`、`libprrtsp`、`libicm42670` 产品版本及 ABI 信息必须属于同一份 V2 包。不要混用系统目录、旧部署或其他工程中的同名动态库。
 
-`v1.3.0`发布使用同一组AArch64 ELF、`runtime-provenance.json`和`manifest.sha256`；使用时以部署包内实际`VERSION`为准，不以文档标题推断版本。
+运行包内的 AArch64 ELF、`runtime-provenance.json` 和 `manifest.sha256` 必须一致；使用时以部署包内实际 `VERSION` 为准，不以文档标题推断版本。
 
 ## 3. 板端运行前检查
 
 ### 3.1 硬件与进程
 
-当前稳定路径要求：
+当前四路保存路径要求：
 
 - 四颗相机全部连接；
-- ICM-42670-P INT1 采集链路可用；
+- ICM-42670-P SPI/FIFO 采集链路可用；INT1 仅唤醒，无通知时仍有界检查 FIFO；
 - `cam-service` 正常运行；
 - 同一时刻没有另一个 `cam_demo` 或 `sensor_demo` 占用相机；
-- 默认稳定 trigger 模式为 `vin_lpwm`。
+- trigger 模式仅为 `vin_lpwm`。
 
 检查：
 
@@ -93,6 +95,8 @@ df -i /root/data/robobaton
 
 开始前应为视频、临时 staging、最终 publication 和故障保留空间预留足够容量。
 
+保存到 TF 卡时，先按[TF 卡使用](../getting-started/tf-card.md)确认 SD 设备、分区与精确挂载身份；未挂载时不要创建保存目录或启动录制，避免误写 tmpfs 或系统盘。
+
 ### 3.3 环境与外部工具
 
 优先运行包顶层 launcher；它会设置 `LD_LIBRARY_PATH` 和 `PATH`：
@@ -114,6 +118,8 @@ ffmpeg -version | sed -n '1p'
 ```
 
 任一检查失败时，不要启动 MP4 正式录制。
+
+板端还需可用的 `python3` 与匹配的 `libstdc++`。干净系统镜像与运行包对这些依赖的归属尚未完整确认，不能把工具可用或 manifest 通过推广为所有镜像运行依赖已验收。
 
 ## 4. 参数与 YAML 优先级
 
@@ -227,7 +233,7 @@ success=yes
 - `encoded_frames_dropped=0`；
 - `imu_samples_admitted == imu_samples_written > 0`；
 - producer final-health snapshot 有效，published samples 与 consumer observed samples 相同；
-- IMU final GPIO/FIFO/mapper/uncertainty-drop 为零；
+- IMU final FIFO/mapper/uncertainty-drop/invalid-packet 为零，样本序号连续；GPIO 通知缺口单独诊断，不作为 complete 否决条件；
 - session 中存在匹配的 `publication_receipt.json`；
 - session 目录中不存在 `.publication_incomplete` marker。
 
@@ -284,7 +290,7 @@ python3 scripts/mp4_extract.py \
 
 ### 7.1 前台启动
 
-以下以默认 `30fps` 作为完整保存示例；需要使用 `25/40/50/60fps` 时替换 `--fps`，并按对应目标板验收矩阵检查完整性：
+以下为默认 `30fps` 的启动示例，不预先保证 complete；使用 `25/40/50/60fps` 时替换 `--fps`，并在实际目标环境检查完整性：
 
 ```bash
 DEMO_DIR=/root/demo  # 改成实际完整运行包目录
@@ -303,10 +309,10 @@ cd ${DEMO_DIR}
 ./sensor_demo \
   --fps 30 \
   --record-bag /root/data/robobaton/run_30fps_skip.bag \
-  --record-frame-skip 1
+  --record-frame-skip 1 --record-drop-min-interval 2
 ```
 
-`record-frame-skip=1` 以完整 `group_id` 为单位保存一组、跳过一组，四颗相机共享同一个决策；它不会改变 RTSP 输出帧率。
+`record-frame-skip=1` 按 recorder 收到完整 frame-set 的连续序号保存一组、跳过一组，四颗相机共享同一个决策；它不会改变 RTSP 输出帧率。主动隔组保存必须显式配合 `--record-drop-min-interval 2`；默认间隔 10 与隔组保存不兼容，启动时会拒绝冲突配置。
 
 ### 7.2 YAML 启动（更推荐）
 
@@ -332,6 +338,7 @@ save_data:
   format: rosbag
   save_path: /root/data/robobaton/run_30fps.bag
   skip: false
+  drop_min_interval: 10
 ```
 
 然后运行：
@@ -369,20 +376,39 @@ success=yes
 
 - `image_frames_by_camera=cam0:N,cam1:N,cam2:N,cam3:N` 四路相等且 `N > 0`；
 - 成功 stop 后的 `IMU_RUNTIME_HEALTH final=yes health_valid=yes` 有非零 generation，核对 published 与 consumer observed、recorder admitted/written 及 bag 实际 IMU 消息数；
-- 零丢失要求额外检查 sequence gap/duplicate/regression、无效包、GPIO gap、FIFO overflow 和 timing drop 为零。未校时窗口应无 timestamp duplicate/regression；系统校时可使 realtime 回拨，不能据此伪造递增时间或忽略其他健康错误；
+- 零丢失要求额外检查 sequence gap/duplicate/regression、无效包、FIFO overflow 和 timing drop 为零，并回读实际样本；GPIO 通知缺口不等于样本丢失。未校时窗口应无 sample timestamp duplicate/regression；同 burst 的 host timestamp 可重复，系统校时可使两类 realtime 回拨，不能据此伪造递增时间或忽略其他健康错误；
 - 最终路径来自 `SENSOR_BAG_RESULT path=`，不要只依赖配置路径猜测。
 
 非零退出、`published_partial`、`.partial.bag` 或 quarantine 都不是正式完整数据，但应保留用于诊断，不要自动覆盖或删除。
 
+### 7.5 队列与写盘诊断
+
+`SENSOR_BAG_RESULT` 的 `frame_queue_*`、`encoded_queue_*`、`imu_queue_*` 给出各级容量、峰值、满队列停留时间及拒收；`encoded_queue_oldest_evicted_*` 统计为接收新帧组而淘汰的完整组。默认严格策略为 `--record-drop-min-interval 10`（YAML：`save_data.drop_min_interval`）：只在已编码、未被 writer 领取的完整组中，从旧到新选择与所有已丢组至少相距 10 组的合法候选；没有合法候选时，当前组也必须满足同一间隔才能丢弃。仍无法满足则显式停止并排空已接收数据，发布 `*.partial.bag`、记录原因并以非零退出，不放宽间隔继续丢。该保证只约束 recorder 丢组，不覆盖采集源、硬件或 IMU 丢样，也不保证高压下持续达到目标帧率。任何淘汰或拒收都不能按 complete 验收。
+
+每路 `/cameraN/frame_metadata` 的 `source_group_order` 是从 0 开始的 recorder frame-set 到达序号，用于比较四路保留组和计算丢组间隔；producer `group_id` 保留原值，不能用其跳号扩大间隔。`/robobaton/session_config` 记录 `drop_policy_min_group_interval`；`/robobaton/session_status` 记录 `drop_policy_stopped`、`drop_policy_stop_group_order`、`drop_policy_dropped_groups`、`drop_policy_min_observed_interval`（少于两次丢组为 0）和 `error`。策略停止时，终止序号是已录制范围的排他上界，不计为合法丢组。
+
+writer 在图像 burst 或 IMU 高水位服务点分批排空当时的 IMU backlog 快照，期间新到样本不会无限延长该轮服务。重排窗口按全部已提交顺序计界，包含尚未编码的帧；writer 已领取部分帧的组不得淘汰。
+
+丢组必须是四路整组同一决策，并记录为 `data_complete=false`。候选间隔符合策略只证明策略正确，不能将提前停止、partial 或可读回放认定为持续高压或全传感器通过。
+
+`chunk_*`、`record_*` 延迟包含 writer／缓冲写路径，不能直接等同于设备介质延迟。`dirty_kb`／`writeback_kb` 来自系统 `/proc/meminfo`；`diskstats_*_delta` 聚合 `/proc/diskstats` 全部行，可能同时包含整盘与分区重复统计，不是本次保存文件或单一挂载设备的 I/O。不要由聚合 `io_time` 推导磁盘 busy 百分比；结合实际挂载设备、最终 health 和回读载荷定位。
+
+
 ## 8. 查看和解包 ROS1 bag
 
-运行包包含 `bin/rosbag_info.py`（Python 标准库实现，板端系统自带 `/usr/bin/python3`）。保存完成后可直接在板端查看 bag 状态：
+运行包包含 `bin/rosbag_info.py`（Python 标准库实现，需要板端可用的 `/usr/bin/python3`；干净镜像依赖归属仍待确认）。保存完成后可直接在板端查看 bag 状态：
 
 ```bash
 DEMO_DIR=/root/demo  # 改成实际完整运行包目录
 cd ${DEMO_DIR}
 python3 bin/rosbag_info.py /root/data/robobaton/run_30fps.bag
 python3 bin/rosbag_info.py --yaml --freq /root/data/robobaton/run_30fps.bag
+```
+
+`--freq` 的 `frequency` 是 bag index **record time** 相邻间隔中位数的倒数，输出 `frequency_basis` 明示该基准。writer 批量写入时可远高于传感器采样率，不表示 IMU 超速或载荷损坏。当前源码新增 `--header-freq`（隐含 `--freq`）：扫描 `sensor_msgs/Imu`、`CompressedImage`、`CameraInfo` 的载荷，将 `Header.stamp` 频率另列为 `header_frequency`；同一 topic 的所有 connection 必须类型与 MD5 一致。其他类型、混合 schema 或不足两条／中位周期非正时无该数值。时间戳排序后计算相邻间隔，不能据此检查发布顺序、证明无丢样或硬件同步；扫描需要读取完整 bag，保留原 record-time 统计语义。
+
+```bash
+python3 bin/rosbag_info.py --yaml --header-freq /root/data/robobaton/run_30fps.bag
 ```
 
 在 Host 使用开发机仓库脚本时：
@@ -412,6 +438,8 @@ python3 scripts/rosbag_extract.py \
 - H.264 MP4 复用 RTSP 编码 access unit，完整性同时受编码、存储和 IMU 最终健康约束；高负载或 timing drop 可以得到 `published_partial`，即使四路 MP4 均可播放。
 - ROS1 bag 使用独立 JPEG 编码和队列，CPU、编码吞吐、存储及 RTSP 预览负载均影响丢帧；不能承诺某个帧率以下必定 complete，或高帧率只有少量丢失。
 - 更换 fps、IMU ODR、FSYNC、尺寸、保存介质或系统调度后，应在目标环境核对四路速率、最终健康及实际载荷。曝光 `status=1` 覆盖率、FSYNC 唯一匹配率和完整保存分别检查，不相互代替。
+
+non-ROS `60fps` + `1600Hz` FSYNC 的短时 CPU/BPU 控制台关联不等于已保存图像解码通过；原生 bag JPEG 只去除私有 JPU APP9，不改变 ROS2 JPEG 插件，也不关闭 H.264 RTSP 高帧率 missing-reference/slice 告警问题。不要用一种编码/保存路径的结果代替另一条路径。
 
 ## 10. 常见问题
 

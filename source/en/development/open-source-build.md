@@ -5,7 +5,7 @@ This page explains how to cross-compile the example code in the public demo repo
 Scope:
 
 - [`RoboBaton_4p_demo`](https://github.com/Hessian-matrix/RoboBaton_4p_demo): non-ROS four-camera RTSP, IMU, UART, and SocketCAN CAN examples.
-- [`RoboBaton_4P_ROS2_demo`](https://github.com/Hessian-matrix/RoboBaton_4P_ROS2_demo): ROS2 four-camera NV12/raw+compressed images, CameraInfo, IMU, and temperature topic examples.
+- [`RoboBaton_4P_ROS2_demo`](https://github.com/Hessian-matrix/RoboBaton_4P_ROS2_demo): ROS2 four-camera NV12/raw+compressed images, CameraInfo, exposure observations, IMU, temperature, and optional FSYNC topic examples.
 
 ## 1. Build Boundary
 
@@ -32,6 +32,14 @@ The public demo repositories already carry the public headers and matching preco
 - ROS2: `include/robobaton_4p_ros2_demo/`, `lib/libicm42670.so*`, `lib/libsc132.so*`; building also requires the target-side ROS2, `hb_media_codec.h`, `libmultimedia.so.1`, `libhbmem.so.1`, and `libalog.so.1` provided by the X5 cross-compilation package.
 
 These repositories do not compile the underlying ICM42670, SC132, or PRRTSP producer source. Without the X5 cross-compilation toolchain, you cannot recompile the source and can only use the `demo/` in the repository or a pre-generated install package for deployment.
+
+Each library family has one regular `libNAME.so.M.m.p` file and two exact same-directory relative links: `libNAME.so.M -> libNAME.so.M.m.p`, `libNAME.so -> libNAME.so.M`. Non-ROS uses ICM42670, SC132, and PRRTSP; ROS2 uses only the first two. Synchronization, packaging, and install preserve links; verifiers reject flattened aliases and wrong, absolute, or broken links. Copy complete trees with `tar`, `cp -a`, or `rsync -a`, without dereferencing links.
+
+Non-ROS `runtime-provenance.json` uses v3: regular-file bytes and raw link text are bound separately; source-input links are hashed by link text. Regenerate packages with older provenance using the current script. This does not change software versions or SONAME/ABI. Both SHA-256 manifests still include resolved-byte hashes for aliases; these do not replace link-metadata verification.
+
+The current matched set is ICM42670 `libicm42670.so.3.0.0`, SONAME `libicm42670.so.3`, all exports `ICM42670_X5_3.0`; SC132 `libsc132.so.3.0.0`, SONAME `libsc132.so.3`, `LIBSC132_3.0`; PRRTSP `libprrtsp.so.2.0.1`, SONAME `libprrtsp.so.2`, `LIBPRRTSP_2.0`. Synchronize public headers and libraries before upgrading, remove old ICM42670/SC132 `.2` libraries, and rebuild every consumer, without cross-major links. Software `2.0.0`, hardware V2.2, documentation revision, and SO ABI are independent. Successful compilation does not certify current-composition throughput, pressure, or long recording; see {ref}`Capability and Verification Boundaries <capability-verification-boundary>`.
+
+Clean-target-image versus runtime-package ownership of `python3`/`libstdc++` remains unresolved. Builds, links, and package/install verifiers do not establish runtime-dependency validation on every clean image. Confirm dependencies on the actual system before deployment, rather than infer them from documentation versions.
 
 ## 2. Prepare the Cross-Compilation Environment
 

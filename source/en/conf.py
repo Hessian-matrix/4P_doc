@@ -52,7 +52,7 @@ html_theme_options = {
 # Generate stable anchors for Markdown headings so in-page and cross-page links stay valid.
 myst_heading_anchors = 3
 
-# GitHub repositories may return 403; large system images and flashing tools are verified separately.
+# GitHub repositories may return 403; Read the Docs manages cross-language deployment URLs.
 linkcheck_ignore = [
     r"https://github\.com/Hessian-matrix/RoboBaton_4p_demo/?$",
     r"https://github\.com/Hessian-matrix/RoboBaton_4P_ROS2_demo/?$",

@@ -25,6 +25,8 @@
 5. V2 独立 PPS IO 无需切换 UART7 引脚；接线前确认正式 5pin 线序、电平和共地，断电操作。
 6. 系统时间同步不等于采样同步。相机、IMU、PPS、PTP 和 ROS `header.stamp` 属于不同层次，字段语义见[数据合同](../development/data-contracts.md)。
 7. 相机、IMU 和 bag record time 均输出 `CLOCK_REALTIME` 系统时间；硬件触发/采样时间经内部 RAW 映射并持续刷新 realtime 桥接，不冻结启动 offset。系统校时会改变后续时间戳，允许回拨；内部超时仍使用单调时钟。先校时再采集，避免编码/容器遇到不支持的时间回退。统一时间域不代表 FSYNC 样本或曝光已同步；系统时间未校准时也不代表准确 UTC。
+8. IMU `host_timestamp_ns`（producer CLI `fifo_observation_ns`）保留成功 SPI FIFO burst 完成时 RAW 观测按当次桥接转换的 realtime；同 burst 可共享，FSYNC 延迟发布不重新桥接旧 RAW。它不是 IRQ、样本或曝光时间；包序和身份不由 realtime 递增定义。
+9. 上述字段语义不证明持久 RTC、断电/重启后自动校时或绝对 UTC 精度，也不关闭当前 LPWM/FSYNC 的负载与长尾限制；见{ref}`能力与验证边界 <capability-verification-boundary>`。
 
 ## 三种同步方式
 

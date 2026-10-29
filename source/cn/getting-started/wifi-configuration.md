@@ -1,6 +1,6 @@
 # Wi-Fi 配置
 
-本页说明如何把 non-ROS 公开仓库中的 `scripts/wifi_setup.sh` 上传到 X5 板端，并通过终端交互配置板载 Wi-Fi。脚本支持：
+本页说明镜像内 `wifi_setup` 命令的使用方法；源码来自 non-ROS 公开仓库 `scripts/wifi_setup.sh`。镜像需同时集成命令与专用启动入口，不再单独上传脚本到 `/userdata`。支持：
 
 - **AP 模式**：把 X5 变成 2.4 GHz Wi-Fi 热点，并通过 DHCP 给客户端分配地址；
 - **客户端（STA）模式**：扫描可见 Wi-Fi，连接路由器并通过 DHCP 获取地址；
@@ -16,38 +16,23 @@
 
 - 使用 `root` 登录 X5；
 - X5 已识别板载 Wi-Fi 接口，默认接口名为 `wlan0`；
-- 板端已提供脚本依赖：`ip`、`iw`、`hostapd`、`dnsmasq`、`wpa_supplicant`、`wpa_cli`、`udhcpc`、`killall`、`awk` 和 `sed`；
-- 开发机可以通过有线网络 SSH 登录 X5；
-- 已取得 non-ROS 公开仓库，其中脚本路径为 `scripts/wifi_setup.sh`。
+- 镜像提供 Bash、`/usr/bin/env`、`ip`、`iw`、`hostapd`、`dnsmasq`、`wpa_supplicant`、`wpa_cli`、`udhcpc`、`killall`、`awk`、`sed`、`flock`、`mountpoint`、`seq` 和常用 BusyBox 命令；
+- `/userdata` 是已挂载的持久化分区，`/run` 是每次开机清空的运行态目录；
+- 镜像包含 `/usr/bin/wifi_setup`、`/etc/init.d/S99wifi_setup`，启动入口晚于 userdata 挂载和无线驱动就绪；
+- 本工具独占无线服务进程。现有全局停止操作不适合与其他接口的 DHCP/DNS 管理器共用。
 
-先确认脚本存在：
+## 2. 检查镜像集成
 
-```bash
-NON_ROS_ROOT="$HOME/RoboBaton_4p_demo"  # 改成实际仓库目录
-cd ${NON_ROS_ROOT}
-test -f scripts/wifi_setup.sh
-```
-
-## 2. 上传到板端
-
-在开发机执行：
+使用镜像维护者提供的 rootfs 集成包，按随包说明合入匹配的 BSP 后重新构建烧录。此包不包含驱动、固件或无线工具，也不预置现场凭据。烧录后在板端检查：
 
 ```bash
-X5_IP=192.168.1.12  # 改成实际板卡地址
-NON_ROS_ROOT="$HOME/RoboBaton_4p_demo"  # 改成实际仓库目录
-cd ${NON_ROS_ROOT}
-scp scripts/wifi_setup.sh root@${X5_IP}:/userdata/wifi_setup.sh
-ssh root@${X5_IP} "chmod 700 /userdata/wifi_setup.sh"
+command -v wifi_setup
+test -x /etc/init.d/S99wifi_setup
+mountpoint /userdata
+wifi_setup --help
 ```
 
-检查文件：
-
-```bash
-X5_IP=192.168.1.12  # 改成实际板卡地址
-ssh root@${X5_IP} "ls -l /userdata/wifi_setup.sh"
-```
-
-脚本固定把运行配置、状态和日志放在 `/userdata/wifi/`；不要只把脚本放到临时目录后启用开机启动。
+镜像维护者需移除旧 Wi-Fi 自动启动调用，包括旧 `S41wifi_manager` 和共享 `/userdata/startup.sh` 中的 Wi-Fi 调用，但保留其他应用内容。新命令不再改写该共享文件，也不自动迁移旧自启动设置；重新配置一次即可。不能只复制脚本后期望开机恢复生效。
 
 ## 3. 启动交互配置
 
@@ -55,7 +40,7 @@ ssh root@${X5_IP} "ls -l /userdata/wifi_setup.sh"
 
 ```bash
 X5_IP=192.168.1.12  # 改成实际板卡地址
-ssh -t root@${X5_IP} "/userdata/wifi_setup.sh"
+ssh -t root@${X5_IP} "wifi_setup"
 ```
 
 也可以先登录板端再运行：
@@ -63,7 +48,7 @@ ssh -t root@${X5_IP} "/userdata/wifi_setup.sh"
 ```bash
 X5_IP=192.168.1.12  # 改成实际板卡地址
 ssh root@${X5_IP}
-/userdata/wifi_setup.sh
+wifi_setup
 ```
 
 主菜单：
@@ -131,7 +116,7 @@ SSID 选择提示中：
 连接成功后检查：
 
 ```bash
-/userdata/wifi_setup.sh --status
+wifi_setup --status
 ip -4 addr show dev wlan0
 iw dev wlan0 link
 ip route
@@ -147,47 +132,43 @@ AP 或 STA 启动成功后，脚本会询问：
 是否保存/更新为开机自动启动当前 WiFi 配置？ [y/N]
 ```
 
-输入 `y` 后：
+无论是否启用自启动，配置成功后模式和凭据都会保存到 `/userdata/wifi/current.conf`。输入 `y` 创建 `/userdata/wifi/autostart.enabled`；否则移除标记。配置文件存在不代表允许开机恢复。
 
-- 当前模式和凭据保存到 `/userdata/wifi/current.conf`；
-- 生成 `/userdata/startup.sh`；
-- 开机时执行：
+`/etc/init.d/S99wifi_setup` 在 userdata 挂载与驱动就绪后执行：
 
 ```bash
-/userdata/wifi_setup.sh --apply-saved >/userdata/wifi/boot.log 2>&1
+wifi_setup --boot
 ```
 
-```{important}
-如果 `/userdata/startup.sh` 已存在且不是本脚本生成，脚本会拒绝覆盖。请保留原启动逻辑，并由用户手工把上面的 `--apply-saved` 命令合并到现有 `/userdata/startup.sh`，不要删除其他应用的启动命令。
-```
+未启用时不触碰接口；启用但配置缺失时明确失败，不建立默认开放热点。一次开机成功恢复后重复 start 不重置连接；`/run/wifi_setup.boot-applied` 只记录本次恢复，不代表实时连接健康。`--stop` 清除该运行态标记，但不删除持久化启用标记。没有后台重连监督或新增 DHCP 续租服务。
 
 脚本会把 `current.conf`、`hostapd.conf` 和 `wpa_supplicant.conf` 设置为仅 root 可读写，但 Wi-Fi 密码仍以明文形式保存在板端。不要上传、分享或提交这些文件。
 
 手动验证已保存配置：
 
 ```bash
-/userdata/wifi_setup.sh --apply-saved
-/userdata/wifi_setup.sh --status
+wifi_setup --apply-saved
+wifi_setup --status
 ```
 
 ## 7. 常用命令
 
 ```bash
 # 进入交互菜单
-/userdata/wifi_setup.sh
+wifi_setup
 
 # 应用已保存配置
-/userdata/wifi_setup.sh --apply-saved
+wifi_setup --apply-saved
 
 # 查看接口、连接、保存配置和开机启动状态
-/userdata/wifi_setup.sh --status
+wifi_setup --status
 
 # 停止 Wi-Fi 进程、清空地址并关闭 wlan0；不卸载内核驱动
-/userdata/wifi_setup.sh --stop
-/userdata/wifi_setup.sh --disable
+wifi_setup --stop
+wifi_setup --disable
 
 # 显示帮助
-/userdata/wifi_setup.sh --help
+wifi_setup --help
 ```
 
 交互菜单选择“停用 Wi-Fi”后，还会询问是否同时关闭本脚本管理的开机自动启动。直接运行 `--stop` 或 `--disable` 只停用当前运行状态，不删除已保存配置，也不自动修改开机启动设置。
@@ -196,7 +177,9 @@ AP 或 STA 启动成功后，脚本会询问：
 
 | 路径 | 内容 |
 |---|---|
-| `/userdata/wifi_setup.sh` | Wi-Fi 配置脚本。 |
+| `/usr/bin/wifi_setup` | 镜像内 Wi-Fi 配置程序。 |
+| `/etc/init.d/S99wifi_setup` | 专用开机恢复入口。 |
+| `/userdata/wifi/autostart.enabled` | 持久化开机启用标记。 |
 | `/userdata/wifi/current.conf` | 已保存模式和凭据，权限为 `600`。 |
 | `/userdata/wifi/hostapd.conf` | AP 模式配置。 |
 | `/userdata/wifi/wpa_supplicant.conf` | STA 模式配置。 |
@@ -205,7 +188,9 @@ AP 或 STA 启动成功后，脚本会询问：
 | `/userdata/wifi/logs/dnsmasq.log` | DHCP 服务日志。 |
 | `/userdata/wifi/logs/wpa_supplicant.log` | STA 连接日志。 |
 | `/userdata/wifi/boot.log` | 开机自动恢复日志。 |
-| `/userdata/startup.sh` | 可选的 late-boot 启动入口。 |
+| `/run/wifi_setup.boot-applied` | 本次开机恢复成功标记，重启后清空。 |
+| `/run/wifi_setup.lock` | 防止并行配置的操作锁。 |
+| `/etc/init.d/S41eth0-route-fallback` | 保留静态有线配置，仅忽略 eth0 IPv4 断线路由。 |
 
 `/userdata/wifi/` 默认权限为 `700`。排查问题时可以读取日志，但对外提供日志前应删除 SSID、密码、IP 和其他现场网络信息。
 
@@ -252,7 +237,7 @@ ip route
 检查：
 
 ```bash
-/userdata/wifi_setup.sh --status
+wifi_setup --status
 cat /userdata/wifi/logs/hostapd.log
 cat /userdata/wifi/logs/dnsmasq.log
 ```
@@ -264,19 +249,19 @@ cat /userdata/wifi/logs/dnsmasq.log
 检查：
 
 ```bash
-ls -l /userdata/startup.sh /userdata/wifi/current.conf
+ls -l /userdata/wifi/autostart.enabled /userdata/wifi/current.conf
 cat /userdata/wifi/boot.log
-/userdata/wifi_setup.sh --status
+wifi_setup --status
 ```
 
-如果板端已有自定义 `/userdata/startup.sh`，确认已经手工合并 `--apply-saved` 命令并保留原启动逻辑。
+确认专用启动入口在 userdata 挂载和驱动就绪之后执行；首次未配置时没有 boot.log 属正常。完整冷启动需用最终镜像实板验收，手动 start 不代替整机重启。若沿用静态有线路由，镜像中的 `S41eth0-route-fallback` 在 `S40network` 后设置 `net.ipv4.conf.eth0.ignore_routes_with_linkdown=1`；不改变地址、网关或 metric，只处理无载波的 IPv4 路由，不检测上游故障或 IPv6。
 
 ### 需要恢复有线配置入口
 
 通过有线以太网或 `1.8V` DEBUG_UART 登录后执行：
 
 ```bash
-/userdata/wifi_setup.sh --disable
+wifi_setup --disable
 ```
 
 该命令关闭 `wlan0`，但不会卸载板载 Wi-Fi 内核驱动，也不会改动有线网络配置。

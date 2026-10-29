@@ -4,21 +4,126 @@ This file records user-visible updates in the RoboBaton 4P public delivery, foll
 
 ## Unreleased
 
+The following updates are implemented in current source but have not been released as a new software version. This documentation revision does not turn them into a software release or system acceptance. Current scope and unresolved limits are centralized in {ref}`Capability and Verification Boundaries <capability-verification-boundary>`.
+
 ### Improvements and Fixes
 
 - Added standalone `can_demo`: classical CAN by default, explicit `--fd` for up-to-64-byte FD transmission and mixed classical/FD reception, and `--brs` for TX data-phase bit-rate switching, with standard/extended IDs. FD transmission accepts exactly encodable lengths without implicit padding. Integrated into builds, full runtime packaging, and verification. Users/BSP still configure the interface; application support does not replace BSP long-payload integrity acceptance, and local loopback or queued sends do not constitute external-bus acceptance.
 - Camera, IMU, CLI, saving, and ROS2 public sensor timestamps now use `CLOCK_REALTIME` system time. Bounded VSYNC cross-sampling and the same-counter trigger delta reconstruct camera hardware trigger edges, without IRQ/arrival-time fallbacks; missing valid mappings stop acquisition.
-- RAW remains internal to mapping/grouping. Realtime bridges refresh at publication and follow backward system-clock steps. Bag record time independently reads realtime without a monotonic clamp; chunk indexes are time-sorted. A common domain does not establish camera/IMU hardware sample/exposure synchronization. Consumers of old SIF/RAW times must migrate headers, SOs, and applications together.
+- RAW remains internal to mapping/grouping. Sensor sample/trigger publication refreshes realtime bridges and follows backward clock steps; IMU host time instead retains the original burst-completion observation without rebridging at deferred publication. Bag record time independently reads realtime without a monotonic clamp; chunk indexes are time-sorted. A common domain does not establish hardware sample/exposure synchronization. Consumers of old time semantics must migrate headers, SOs, and applications together.
 - Added opt-in LPWM-to-ICM-42670-P FSYNC trigger-to-sample association: hardware FIFO tags, bounded reconstruction from adjacent absolute TMSTs, unique RAW candidate matching, and missing/ambiguous statuses. Non-ROS `--fsync` and YAML/ROS2 `imu.fsync_enabled` default off and support only `800/1600Hz`; the `200µs` admission policy remains, without guaranteeing every trigger or exposure synchronization. Results reach stdout, bag `/robobaton/fsync`, MP4 `fsync.jsonl`, and the same ROS2 topic.
-- ICM ABI minor is `2.1`: the separate FSYNC callback uses `ICM42670_X5_2.1`; existing function nodes, structure sizes, real SO filename, and SONAME are unchanged. Camera frame-set reserved fields carry RAW trigger, group uncertainty, and generation; public time remains realtime.
+- Current ICM ABI is `3.0`: every export, including the FSYNC callback, uses only `ICM42670_X5_3.0`, with real file `libicm42670.so.3.0.0` and SONAME `libicm42670.so.3`. Field layouts remain unchanged, but host-time semantics are incompatible. Rebuild all consumers and remove old `.2` artifacts, without old symbol aliases or cross-major shims. Camera frame-set reserved fields carry RAW trigger, group uncertainty, and generation; public time remains realtime.
 - Association records retain original per-camera realtime stamps for exact joins with ROS2 Image/CameraInfo; integer JSON requires lossless parsing. MP4 timestamp CSV contains microsecond-quantized group-trigger times expressed in ns; original per-camera values are in opt-in `fsync.jsonl`, not the CSV.
 - Fixed acquisition blocking through cross-priority queue locks. IMU consumers/ROS2 publication use explicit realtime scheduling, SPI uses `10MHz`, and INT1 uses a `100µs` asynchronous-reset pulse. Failed starts release resources; final health snapshots retain trailing invalid-FIFO-packet counts. Phase, unique-match, and `200µs` checks remain; high-load results still depend on system IRQ/debug and subscriber scheduling, without guaranteeing every trigger or zero loss under arbitrary load.
 - Final IMU health records include timing-drop and FSYNC captured/dropped totals. Non-ROS terminal summaries use post-stop counters, and invalid FIFO packets remain counted when timing rejection overlaps.
-- INT1-to-RAW conversion retains event-time observations and selects certificates by complete bracket-plus-steering uncertainty. An independent realtime observer continues through SPI/callback stalls; startup handshaking and a priority-inheritance lock preserve initialization and history order, without changing phase or publication gates.
-- Camera ABI 2.2 adds frozen per-frame ISP exposure observations while preserving old frame-info prefix reads and SONAME. Bag/tee metadata, MP4 `exposure.jsonl`, and ROS2 `/robobaton/camN/exposure` carry estimates separately from unavailable values, without certifying applied-frame identity, an error bound, or actual exposure midpoint; trigger stamps remain unchanged. The capture observer inherits the allowed CPU mask rather than forcing CPU0.
-- Fixed an unreleased MCLK reference acquired during sensor probing: release it before VIN takes ownership without clearing historical references. Camera capture uses FIFO/60 and handles in-scan VSYNC transitions; the INT1 observer inherits the CPU mask at FIFO/30 to stay below the default GPIO IRQ. IMU fitting constrains read intervals, overwide observations cannot poison unwrapping, and longer edge-time history is retained. The `500µs`/`200µs` gates remain unchanged; high load can still cause explicit rejection or acquisition failure.
+- FIFO order, measured TMST, and FSYNC tags/deltas now lead IMU acquisition. INT1 is wake-only: GPIO edge-time conversion, per-packet edge pairing, and the independent INT1 clock observer are removed. Bounded waits still check FIFO without notifications. Detectable missing notification sequence values are diagnostic, not proof of physical-edge/sample loss or independently fatal. FIFO overflow, bad packets, ambiguous clocks, and invalid epochs still fail; the `200µs` admission gate is unchanged.
+- FIFO startup bounds measured Arm-to-enable completion by the shortest legal ODR interval. Late enable rejects startup rather than aliasing a whole TMST wrap; neither GPIO nor nominal ODR fabricates time.
+- Camera ABI 3.0 includes frozen per-frame ISP exposure observations and frame-info prefix-size reads, with SONAME `libsc132.so.3`. Bag/tee metadata, MP4 `exposure.jsonl`, and ROS2 `/robobaton/camN/exposure` carry estimates separately from unavailable values, without certifying applied-frame identity, an error bound, or actual exposure midpoint; default trigger stamps remain unchanged. The capture observer inherits the allowed CPU mask rather than forcing CPU0.
+- Fixed an unreleased MCLK reference acquired during sensor probing: release it before VIN takes ownership without clearing historical references. Camera capture uses FIFO/60 and handles in-scan VSYNC transitions. IMU fitting constrains read intervals, and overwide observations cannot poison unwrapping. The camera `500µs` and IMU `200µs` gates remain unchanged; high load can still cause explicit rejection or acquisition failure.
 - IMU interval observations that contradict the retained clock certificate now invalidate it before further publication; overwide observations remain individually rejected. Fixed a bag shutdown race that mistook a final encoded frame arriving after prefetch for an order gap; real gaps still fail. Realtime threads remain subject to system scheduling and IRQ latency; system realtime quotas are unchanged, without a zero-loss guarantee under arbitrary load.
 - Camera adds default-off `SC132_TEST_EXPOSURE_MIDPOINT`: test timestamps use trigger time plus half exposure duration, ignoring trigger-to-integration-start delay; unavailable exposure stops acquisition. Group admission, trigger skew, and FSYNC RAW audit remain unchanged; disabling restores original logic. Requires a current-source library rebuild, not a software release or hardware acceptance claim.
+- UART RX waits now exit normally on `SIGINT`/`SIGTERM` and restore the original serial settings. Other signals do not extend the RX deadline; genuine I/O errors remain failures.
+- With ROS2 rate metrics disabled, final IMU sink publication count is explicitly `unavailable` / `imu_publish_count_valid=no`; enabled metrics retain the actual successful `publish()` count. Producer, sink, and DDS reception counts remain distinct; producer counts do not substitute for an unmeasured sink count.
+- ROS2 FastDDS SHM profile now reserves `256 MiB` per participant, leaving capacity headroom for three processes. Each extra daemon/CLI/subscriber process still counts separately; this does not establish that all historical SHM initialization errors are resolved.
+- Native bag X5 hardware JPEG omits only the length-4 APP9 immediately after SOI containing a private frameIdx, preserving other APP markers and coded payload to avoid generic-decoder APP structure warnings. The ROS2 JPEG plugin output contract is unchanged.
+- `rosbag_info.py --freq` explicitly identifies its bag record-time basis; new `--header-freq` separately reports saved IMU/CompressedImage/CameraInfo `Header.stamp` rates. Batched-write frequency is not sensor sampling rate or proof of losslessness.
+- ROS1 bag overload now selects candidates with a strict default minimum drop interval of 10 consecutive frame-set arrival ordinals, not sparse producer IDs; all cameras share each retain/evict decision. If neither an old nor incoming group can legally be dropped, recording explicitly stops, drains to a partial bag, and exits nonzero. Bag metadata and final status expose ordinals, intervals, and the reason; source/IMU losses are outside this guarantee. Intentional alternate saving explicitly requires interval 2.
+- Fixed premature IMU admission closure on strict bag image stops and ROS2 callback rejection before producer shutdown completes. Normal finalization keeps IMU input open until acquisition is quiescent, then drains queues. On SIGINT/SIGTERM, ROS2 cleans up the node while its context remains valid and shuts down the context last. A normal `publish()` return is not DDS receipt, nor a zero-loss guarantee under arbitrary load.
+
+## 2.0.15 - 2026-10-29
+
+- Align bag and ROS2 stop, admission, and drain contracts; distinguish fixed shutdown defects from the historical DDS difference that still cannot be exactly attributed.
+- Software remains `2.0.0`, with unchanged SO ABIs. Short smoke runs do not replace sustained-pressure, high-frame-rate, long-recording, or release acceptance.
+
+## 2.0.14 - 2026-10-29
+
+This revision synchronizes public documentation in both languages only. Software remains `2.0.0`; it changes no software behavior, releases no new software, and establishes no additional hardware, load, or long-duration acceptance.
+
+### Documentation Synchronization
+
+- Centralize accepted parameters, independent software/hardware/documentation/SO ABI versions, and verification boundaries on the support page. Align complete rebuild and migration requirements for ICM42670/SC132 ABI `3.0` and PRRTSP ABI `2.0`.
+- Align FIFO/TMST, wake-only INT1, original burst host observations, backward realtime steps, default trigger stamps and explicit exposure-midpoint test mode, plus FSYNC, exposure, and realtime-scheduling contracts.
+- Synchronize strict bag drop spacing, partial stops, producer/sink/DDS count distinctions, and JPEG/record-time semantics. High frame rate, pressure recording, and the current composition's `8h` recording do not establish complete acceptance; historical results cannot certify this composition.
+- Add user-facing LPWM, RTSP, SHM, USB, CAN, RTC/UTC, and runtime-dependency limits. Retain TF hardware repair and single-camera diagnostics as user-confirmed without generalizing to every environment.
+
+
+## 2.0.13 - 2026-10-23
+
+Record bag overload fixes and the added FIFO/TMST-led IMU ABI 3.0 migration. Documentation revision and software VERSION remain unchanged; IMU SONAME/ABI independently move for the incompatible semantics described below.
+
+### Improvements and Fixes
+
+- At image-burst or IMU high-water service points, the bag writer drains a snapshot of the current IMU backlog in bounded batches. Later arrivals wait for the next round, preventing a growing high-ODR deficit or indefinite image starvation. Queue capacities are unchanged; unbounded storage stalls can still lose data.
+- Repeated oldest-complete-group replacement retires head eviction markers and checks the full committed record-order window before eviction. A claimed group's remaining frames stay protected; unready groups are not bypassed and ring slots are not overwritten. Evictions/rejections remain counted partial data. The bag fixes themselves change neither LPWM nor uncertainty checks; see below for the IMU architecture cutover.
+- Clarify bag queue/writer-latency diagnostics and system-wide disk counters. Aggregate counters are not saving-device utilization or proof of payload completeness.
+- IMU moves to ABI `3.0`, real file `libicm42670.so.3.0.0`, SONAME `.3`, and only `ICM42670_X5_3.0` for every current export. Field names/layouts remain unchanged; no old aliases, reexports, or compatibility shims exist. Synchronize headers, libraries, and every rebuilt consumer, remove old `.2` artifacts, and never substitute a lone SO or cross-major link.
+- FIFO order and measured chip TMST define samples; FSYNC retains chip tags/deltas and measured endpoints, while INT1 only wakes acquisition. `host_timestamp_ns` becomes the RAW observation at the successful SPI FIFO burst completion, converted to realtime using that observation's bridge. Packets may share it; FSYNC deferral retains the converted value, it may precede publication, and it follows wall-clock steps. It is not IRQ-edge, sample, or exposure time. `sample_timestamp_ns` remains measured TMST-to-RAW-to-realtime, with unchanged `200µs` admission.
+- GPIO notification sequence gaps are diagnostic, not proof of physical-edge/sample loss or independently fatal. Actual FIFO overflow, bad packets, ambiguous clocks, and invalid epochs still fail. This architecture changes neither LPWM nor kernel and does not fix the underlying GPIO/IRQ cause or guarantee zero loss under arbitrary load. Rebuild, synchronize, and repeat target-board acceptance; software version strings are not passing evidence.
+
+## 2.0.12 - 2026-10-23
+
+Clarify acquisition-latency troubleshooting conditions. Software versions and SO SONAME/ABI are unchanged.
+
+### Improvements and Fixes
+
+- Explain BSP per-transfer spidev dynamic-debug versus application logging, authorization for comparison experiments, and restoration of original flags. Passing with debug disabled is not a pass in the original environment; FIFO/INT1 identity, the `500µs`/`200µs` gates, and fail-closed behavior remain unchanged.
+- Normal first FIFO packets also reject nonexistent fractional phases after Arm without consuming GPIO identity. GPIO event-gap detection remains active after the sequence wraps to zero. Both FSYNC modes retain the same timestamp and uncertainty gates.
+- Fixed concurrent mutable-metadata access between a frame-set producer and group finalization. Internal dumps use the raw frame counter and RAW capture time; public consumers retain normalized frame IDs and the realtime timestamp contract.
+- Arm uses only measured clock transitions accepted by the mapper. An incompatible bounded observation invalidates the old clock certificate instead of combining a new counter with a stale mapping. The `200µs` gate remains unchanged; neither nominal ODR nor arrival time replaces measured timestamps.
+
+## 2.0.11 - 2026-10-22
+
+Document acquisition-startup fixes. Software versions and SO SONAME/ABI are unchanged.
+
+### Improvements and Fixes
+
+- Frame-set warmup now discards unpublished frames before clock-map admission, exposure queries, and image transforms, avoiding startup failure on an unavailable first-frame capture map. Delivered frames still require exact capture matches with the unchanged `500µs` window limit.
+- Retain leading FSYNC packets until a later absolute TMST arrives, then reconstruct bounded intervals using the measured startup clock transition instead of failing solely because no preceding FIFO endpoint exists. No nominal-ODR timestamps are synthesized; GPIO identity, unique rollover, the `200µs` limit, and drop policies remain unchanged.
+- LPWM fatal diagnostics distinguish a rejected exact record from an absent trigger and snapshot that lookup's counter values, RAW bracket, and history endpoints. Timestamps, bounds, ABI, and fail-closed behavior are unchanged; this does not claim a sustained-acquisition fix.
+- Fixed an uninitialized frame-set release risk when realtime bridging or exposure-midpoint validation fails. Clear the output descriptor before validation, preserving pending-frame ownership without delivering a partial group.
+- Startup reconstruction checks the shared-Arm and one-full-ODR-later hypotheses separately, accepting only a unique feasible hypothesis and rejecting nonexistent fractional phases between them. Document sustained FIFO/INT1 identity failures and fail-closed boundaries; repeated-start success is not a sustained-stability guarantee.
+
+## 2.0.10 - 2026-10-22
+
+Add bilingual instructions for TF cards as data disks. Software versions and SO ABI are unchanged; this is not new hardware or card-compatibility acceptance.
+
+### Improvements and Fixes
+
+- Document TF (microSD) versus system eMMC identification, filesystem selection, manual mounting, acquisition output paths, normal unmounting, and enumeration troubleshooting. Check SD type and mount device number before saving to avoid writing into RAM or the system disk after a failed mount. No automatic formatting, mounting, or hot-plug safety claim.
+
+## 2.0.9 - 2026-10-22
+
+This revision aligns both public language trees with the current V2 product. Software remains `2.0.0`; SO versions and ABI are unchanged, without a new hardware-acceptance claim.
+
+### Improvements and Fixes
+
+- Remove obsolete product-version history, download instructions, main-board and UART photographs, and flashing screenshots; retain applicable camera dimensions and the RTSP playback example.
+- Replace migration comparisons with current V2 interface, data, and runtime-library contracts. Preserve UART logic levels, pending complete pin order and power ratings, power-off wiring, and hot-plug safety boundaries.
+
+## 2.0.8 - 2026-10-22
+
+Document independent SO revisions and the incompatible camera migration. Software remains `2.0.0`, without a new hardware-acceptance claim.
+
+### Improvements and Fixes
+
+- ICM42670 real SO is `2.1.0` (SONAME `2`), SC132 is `3.0.0` (SONAME `3`, `LIBSC132_3.0`, public ABI `3.0`), and PRRTSP is `2.0.1` (SONAME `2`). Align producers, consumers, packaging, and verification. Old camera consumers must be rebuilt; never link `.so.2` to `.so.3`. Each family retains one real file and two relative links.
+- Incremental ROS2 installs remove obsolete revisions and majors of the same producer family; the verifier rejects extra libraries, dangling old links, and cross-major compatibility aliases. The staged ICM C link probe consumes both `ICM42670_X5_2.0` and `ICM42670_X5_2.1`, rather than treating producer version definitions as consumer version needs.
+
+## 2.0.7 - 2026-10-22
+
+This revision documents canonical shared-library chains and link-preserving delivery in both languages. Software versions and SO ABI are unchanged; this is not new board-level functional acceptance.
+
+### Improvements and Fixes
+
+- Producer synchronization, non-ROS packages, and ROS2 installs retain one real library with exact relative links instead of flattening `.so`/`.so.2` aliases into duplicate files. Document link-preserving archives/copies, metadata versus byte verification, and the requirement to regenerate non-ROS v3 provenance packages.
+
+## 2.0.6 - 2026-10-22
+
+Synchronize bilingual instructions for the image-provided Wi-Fi command and dedicated boot restore. Software versions and SO ABI are unchanged; no cold-boot acceptance claim for a newly flashed image.
+
+### Improvements and Fixes
+
+- Use the `wifi_setup` system command, dedicated boot entry, and persistent opt-in marker instead of the shared application startup file; document static Ethernet carrier-down routing, image dependencies, credential permissions, and acceptance boundaries.
 
 ## 2.0.5 - 2026-10-21
 
@@ -60,7 +165,7 @@ Documentation-only synchronization with current source; software remains `2.0.0`
 
 - Align realtime timestamps, opt-in FSYNC, camera ABI 2.2 exposure observations, and IMU ABI 2.1; complete configuration, topic, and saved-sidecar entry points.
 - Distinguish ISP exposure estimates, trigger-to-sample association, storage completeness, and actual DDS delivery; document realtime permissions, final health counters, and high-load rejection boundaries.
-- Correct MP4/bag frame-rate completeness guarantees, the exposure-accuracy interpretation of `max_skew_ns`, and timestamp checks during backward clock steps; preserve historical version records.
+- Correct MP4/bag frame-rate completeness guarantees, the exposure-accuracy interpretation of `max_skew_ns`, and timestamp checks during backward clock steps.
 
 ## 2.0.0 - 2026-10-15
 
@@ -70,106 +175,6 @@ V2.0.0 release: software and documentation versions unified to 2.0.0, with defau
 
 - All camera acquisition entries support only `vin_lpwm` (VIN LPWM hardware triggering); software GPIO and free-run paths are removed.
 - Camera timestamps preserve frame-propagated `trig_tv` trigger captures in the native SIF counter domain, not RAW/UTC. Sharing the camera/IMU wire does not establish sample/exposure association.
-- V2 images are explicitly unreleased. Remove V1 TF/fan device-tree repairs, ISP parameter replacement, and UART7-to-PPS mux steps; use the default independent PPS IO. Mark old product/interface images for replacement before release. Camera mapping, FOV, factory networking, and UART levels remain unchanged.
+- V2 images are explicitly unreleased. Independent PPS IO defaults on without UART7 RX/TX multiplexing. Camera mapping, FOV, factory networking, and UART levels follow their corresponding usage guides.
 - The PTP master PHC uses the PTP/TAI time scale; `phc2sys -w` follows the UTC offset from `ptp4l` instead of using `-O 0`. Hardware `hwts_filter full` lets the master receive Delay_Req timestamps and return Delay_Resp. Passing master/packet checks does not establish slave lock or absolute UTC accuracy.
 - Bags use a separate, nondecreasing common recording clock. Images and CameraInfo retain camera capture times; IMU messages retain sample times. Session configuration declares the three domains separately, preventing cross-domain numeric comparisons from corrupting record order. Missing LPWM captures produce at most one terminal callback, serialized by the dispatcher, with callback-side stop requests supported.
-
-## 1.3.3 - 2026-10-11
-
-This bilingual documentation revision covers the V2 hardware migration; software VERSION files are unchanged, and this does not declare full V2 feature or system acceptance.
-
-### Improvements and Fixes
-
-- Current IMU guides, APIs, and examples move to ICM-42670-P, `icm42670_*`, and `icm42670_driver.h`; real SO `libicm42670.so.2.0.0`, SONAME `libicm42670.so.2`, node `ICM42670_X5_2.0`.
-- Native ODRs are `25/50/100/200/400/800/1600Hz`, default `800Hz`; old `500/1000/2000Hz` rates are explicitly rejected and require deliberate configuration migration.
-- Camera producer resolves trigger controller `34130000.gpio` offset `0`; INT1 uses `34120000.gpio` offset `8`. Sharing the camera trigger net at IMU FSYNC does not establish camera/IMU hardware alignment.
-- Time fields follow the new public header; V2 pinout, electrical limits, physical mapping, IMU direction, and photographs remain pending confirmation. Historical V1 download URLs, artifact identities, and changelog entries below are retained unchanged, not as V2 compatibility or acceptance claims.
-
-## 1.3.2 - 2026-10-10
-
-This update revises build scripts and documentation within the 1.3 series. All software version numbers remain unchanged.
-
-### Improvements and Fixes
-
-- Corrects ROS2 explicit toolchain argument precedence and runtime-library selection, and supports generating and verifying runtime packages from standalone non-ROS clones.
-- Adds Ubuntu 22.04 x86_64 host preparation and complete build steps for five non-ROS examples and ROS2 nodes/plugins; see [Building the Public Demo Source](development/open-source-build.md). Build and package verification do not replace on-device hardware acceptance.
-- Defines a shared documentation version policy and maintenance constraints; documentation revisions are independent of software versions, and both language builds read the same revision from `4P_doc/VERSION`.
-
-## 20261009 Toolchain - 2026-10-10
-
-- Publishes [x5_4cam_cross_toolchain_20261009.tar.gz](https://www.hessian-matrix.com/wp-content/uploads/2026/automaticupdates/x5_4cam_cross_toolchain_20261009.tar.gz), adding target ROS Humble, image_transport/pluginlib, and environment entries, with a fixed bundled compiler and sysroot search paths. See [Building the Public Demo Source](development/open-source-build.md) for the size, SHA-256, and usage.
-
-## 1.3.1 - 2026-09-20
-
-### Added
-
-- The runtime package adds the `sensor_demo` boot-autostart script `start_sensor_demo.sh`: foreground start with no arguments, and `enable`/`disable`/`status` to manage boot autostart. Autostart is implemented through the on-device `/userdata/startup.sh` (the system `S99auto_startup` runs after `/userdata` is mounted); the script only appends/removes its own marked block and can coexist with `wifi_setup.sh` and others; usage is in {ref}`non-ROS Demo Usage: Boot Autostart <non-ros-autostart>`.
-- Ships the factory system image and flashing tool matching on-device software `v1.3.0`, supporting factory-system restore and system-version upgrade; image acquisition, flashing steps, and acceptance are in {ref}`Fixes and Upgrades: System Flashing <system-flashing>`.
-
-## 1.3.0 - 2026-09-16
-
-### Added
-
-- Releases the non-ROS `mosaic_rtsp_demo`: composites four SC132 `1280x1088` NV12 frames into one `2560x2176` frame in CPU, outputting fixed H.264 RTSP via `libprrtsp`; the public frame-rate set is `25/30/40/50/60fps`, default `30fps`, fixed address `rtsp://<X5_IP>:558/PRR`. For application details, exit statistics, and resource usage see {ref}`non-ROS Demo Usage: Four-Channel Mosaic RTSP (mosaic_rtsp_demo) <non-ros-mosaic>`.
-
-### Improvements and Fixes
-
-- Releases the updated SC132GS ISP tuning parameter `patch/sc132gs_tuning.json`, improving image quality in some lighting scenarios.
-
-## 1.2.0 - 2026-09-14
-
-### Added
-
-- non-ROS `cam_demo`/`sensor_demo` support VSE hardware full-frame scaled output canvas: `640x480`, `720x480`, `1280x720`, either axial orientation is legal; scaling does not change the FOV, software rotation (180/270) is done by Nano2D after scaling, and external rotation `90/270` swaps the delivered canvas width/height.
-- ROS2 image-node frame rate extends to `25/30/40/50/60fps` (default `30fps`), aligned with the non-ROS/RTSP public set.
-- `libsc132` real SO upgrades from `libsc132.so.2.0.0` to `libsc132.so.2.0.1`; SONAME is still `libsc132.so.2`, and the ABI node `LIBSC132_2.0` is unchanged.
-- Documentation adds NTP, PPS input/UART7 IO reuse, and the X5 master + Mid-360 slave PTP reference configuration; PPS fixedly uses `/dev/pps2` in the current product combination.
-- Updates deployment verification, the public API, the version-compatibility entry, and the time-sync boundary. The per-frame-rate completeness and stress boundary of save modes uniformly follows {ref}`Saving Data: Frame Rate and Stress Boundaries <persistence-fps-boundary>`.
-
-## 1.1.1 - 2026-09-08
-
-
-### Added
-
-- Relative to v1.0.0, non-ROS `sensor_demo` adds ROS1 bag v2.0 saving, including four-channel synchronized JPEG images, camera info, frame metadata, independent IMU, and session status.
-- non-ROS `sensor_demo` adds the mutually exclusive H.264 MP4 session save mode, outputting four MP4s, four precise timestamp CSVs, independent IMU CSV, camera parameters, session status, and publication receipt.
-- Adds the host offline conversion tool from MP4 session to timestamp-named JPEG, supporting complete and recovery sources and never upgrading partial to complete.
-- ICM real SO upgrades from `libicm42688.so.2.0.0` to `libicm42688.so.2.1.0`, ABI minor 2.1; SONAME continues as `libicm42688.so.2`. Existing functions keep the `ICM42688_X5_2.0` node; the new `icm42688_get_runtime_health()` uses the `ICM42688_X5_2.1` node, with sample/config layout unchanged.
-- Adds [Saving Data](usage/save-data-guide.md), covering whole-package verification, ROS1 bag/MP4 configuration, graceful exit, acceptance, offline conversion, and recovery.
-- The non-ROS public repository adds the interactive `scripts/wifi_setup.sh`, supporting on-board Wi-Fi AP/STA configuration, status viewing, disabling, and optional boot restore; adds the [Wi-Fi Configuration](getting-started/wifi-configuration.md) usage guide.
-
-### Improvements and Fixes
-
-- Strengthens temporary writing, partial/quarantine, atomic no-replace publication, receipt, directory durability, and crash recovery for ROS1 bag and MP4.
-- Strengthens stop ordering, callback ownership, timeout process-group cleanup, and error propagation for SC132, RTSP, IMU, writer, and external tools.
-- MP4 complete strictly binds the full four-channel inventory, four-channel equal nonzero frames, IMU final health, and status/receipt identity.
-
-### Known Limitations and Release Gates
-
-- ROS1 bag and MP4 currently support only one save mode and cannot be enabled simultaneously in the same process.
-- MP4 supports only H.264 full four-channel and no frame skip; the device requires `ffmpeg`, and offline extraction requires a full `ffmpeg`/`ffprobe` on the Host.
-- v1.1.1 non-ROS camera and RTSP public frame-rate set is `25/30/40/50/60fps`, default `30fps`; the ROS2 image node is `25/30fps`. IMU supports `25/50/100/200/500/1000/2000Hz`. Save-backend parameter acceptance, completeness, and stress boundaries are in {ref}`Saving Data: Frame Rate and Stress Boundaries <persistence-fps-boundary>`.
-- `trigger_mode=none` is only for explicit free-run diagnostics and is not part of the V1 stable release contract; the V1-verified mode is `software_gpio`.
-- The non-ROS ROS1 bag and H.264 MP4 complete-save criteria and per-frame-rate boundaries are in [Saving Data](usage/save-data-guide.md); historical evidence is still kept at its original frame rate and does not replace the current release gate.
-
-## v1.0.0 - 2026-08-06
-
-
-### Added
-
-- non-ROS four-camera H.264/H.265 RTSP example, default four-channel `1280x1088@30fps`.
-- Initial version exposes `25/30/40/50/60fps` discrete camera and RTSP configuration.
-- camera ID 0/1/2/3 single-channel diagnostics, 0/90/180/270-degree rotation, and pre-configuration validation.
-- ICM-42688 FIFO/TMST timestamps, `25/50/100/200/500/1000/2000Hz` discrete ODR, and the non-ROS combined `sensor_demo`.
-- ROS2 four-channel NV12 raw, X5 hardware JPEG compressed image, and IMU topic publishing.
-- ROS2 runtime environment script, FastDDS SHM configuration, publish-rate metrics, and IMU frequency check tool.
-- ROS2 install-root environment script `robobaton_ros2_env.bash`, uniformly loading underlay, overlay, FastDDS SHM profile, and log-buffering settings.
-- All in-house SOs provide `*_get_version()` C ABI; delivered executables provide hardware-free `--version`.
-- UART1/UART7 3.3V hardware communication passed V1 acceptance; the combined rated boundary for peripheral power from the two UART 3.3V power pins is `500 mA`.
-
-### Known Limitations
-
-- 40/50/60fps are usable, but under high system CPU pressure frame drops may occur, especially at 60fps.
-- V1 stability and formal delivery default to four-channel `30fps`.
-- The current stable verified four-channel `trigger` mode is `software_gpio`.
-- `180`-degree rotation is supported only under the `30fps` configuration.

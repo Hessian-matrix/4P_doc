@@ -2,6 +2,8 @@
 
 本页记录用户可以依赖的数据格式、字段和时间语义。未公开的物理方位、坐标系、外参和硬同步能力均明确列为限制，不在文档中伪造。
 
+参数与字段描述是当前实现合同，不是完整模式/负载/时长的验收声明；当前结果与限制见{ref}`能力与验证边界 <capability-verification-boundary>`。
+
 ## 相机图像与 RTSP
 
 | 项目 | 合同 |
@@ -11,11 +13,13 @@
 | FOV | 相机 A/B 保持水平 `148.4°`/`115.6°`、垂直 `126.6°`/`96.8°`、对角 `193.8°`/`157.2°`。 |
 | camera FPS | 默认`30fps`，支持`25fps`、`30fps`、`40fps`、`50fps`和`60fps`；其他值在启动副作用前拒绝 |
 | RTSP path | `/PRR` |
-| 端口映射 | CAM1..CAM4 依次对应软件 cam0..cam3 与 `554/555/556/557`，物理映射与 V1 不变。 |
+| 端口映射 | CAM1..CAM4 依次对应软件 cam0..cam3 与 `554/555/556/557`。 |
 
 `libsc132.so` callback 暴露 NV12 原始帧，RTSP 客户端接收 H.264/H.265 编码流。帧信息包含 `width`、`height`、`stride`、`vstride`、Y/UV 虚拟/物理地址及 size。旋转 `90/270` 会交换宽高；消费端须依每帧元数据与 stride/size 处理对齐，不要假设紧凑 `1280x1088`。
 
 完整 C 结构声明、逐字段解释、NV12 行布局与引用有效期见 {ref}`API 图像输出结构参考 <camera-output-structures>`。
+
+仅支持完整四路或单颗相机诊断，不支持 2/3 路组合；旋转 `180` 仅允许 `30fps`。VSE 尺寸是上表的离散集合，不是任意缩放能力。
 
 ## Frame Set 字段
 
@@ -25,7 +29,7 @@
 | `group_id` | 帧组序号。 |
 | `group_timestamp_ns` | 帧组时间戳，单位 `ns`。 |
 | `max_skew_ns` | 当前帧组实际观测到的触发捕获时间跨度，单位 `ns`；测试曝光中点偏移不改变此值。 |
-| `items[i].camera_id` | 软件 ID `0..3`，依次对应物理 CAM1..CAM4，与 V1 不变。 |
+| `items[i].camera_id` | 软件 ID `0..3`，依次对应物理 CAM1..CAM4。 |
 | `items[i].frame_id` | 归一化后的帧 ID。 |
 | `items[i].timestamp_ns` | 单路帧时间戳，单位 `ns`。 |
 
@@ -38,6 +42,8 @@
 | `vin_lpwm` | 所有相机应用及底层库唯一支持的 VIN 硬件触发 | 相机与 IMU FSYNC 共用 LPWM IO；相机时间基准来自随帧传播的 `trig_tv` 硬件捕获，缺失则停止采集，不回退到到帧时间。 |
 
 所有对外传感器时间戳统一为 `CLOCK_REALTIME` 系统时间（Unix epoch，单位 ns）。默认相机表示 LPWM 硬件触发沿，而不是到帧、IRQ 或曝光中心；显式测试模式见 {ref}`曝光中点测试开关 <test-exposure-midpoint>`。底层以 RAW 读数包围 SIF VSYNC 捕获寄存器更新，再减去同一 24 MHz 计数器中的 `VSYNC − trigger`，通过随帧 `trig_tv` 精确匹配历史记录。后台线程继承进程允许的 CPU 集合，使用 `SCHED_FIFO/60`，每轮休眠 `50µs`；扫描内更新使用本次扫描窗口，重读 TRIG 并确认 VSYNC 稳定。无法设置实时调度时启动失败。寄存器读取窗口超过 `500µs`、捕获缺失或匹配失败时停止采集，不回退到到帧时间。该实现需要 X5 固定寄存器映射、`/dev/mem` 只读访问及实时调度权限；窗口上限不是已验证的同步精度。
+
+frame-set 模式默认先丢弃每路 30 帧 warmup；所有启用相机完成 warmup 前立即归还缓冲，不查询曝光、不做图像变换，也不校验这些非交付帧的捕获映射。warmup 结束后的每个交付帧仍须具有有效精确匹配，保留 `500µs` 窗口上限；关闭 warmup 不会豁免首帧校验。
 
 配组在内部触发 RAW 域完成，再为整组使用同一次新采样的 RAW→realtime 桥接；组时间为各路交付时间戳的最小值，`max_skew_ns` 始终表示触发捕获时间差异，不代表曝光或相机/IMU 对齐精度。non-ROS 诊断、RTSP 输入时间、保存图像时间和 ROS2 图像 `header.stamp` 沿用该交付时间戳，默认是 realtime 触发时间，测试模式是估算曝光中点。桥接随运行中的系统校时更新，允许回拨，不使用启动时冻结 offset 或强制递增。内部超时和队列计时仍使用单调时钟；可显式开启下述 FSYNC 触发—样本关联。
 
@@ -84,31 +90,33 @@ non-ROS 联合入口 `sensor_demo` 也可在 `config/sensor_config.yaml` 中设�
 | INT1 DRDY | `34120000.gpio` offset `8`；不用旧 GPIO395 |
 | 读取模式 | sensor timestamp FIFO |
 | FIFO watermark | `1` |
-| 原生 ODR | `25/50/100/200/400/800/1600Hz`，默认 `800Hz`；旧 `500/1000/2000Hz` 配置明确拒绝，不重采样 |
+| 原生 ODR | `25/50/100/200/400/800/1600Hz`，默认 `800Hz`；其他值明确拒绝，不重采样 |
 | FSYNC | V2 输入与相机公共触发网相连；显式开启上升沿捕获后关联触发与其后首个 IMU 样本，不改变连续采样相位。 |
 
 字段语义：
 
 | 字段 | 单位/语义 |
 |---|---|
-| `sample_sequence` / demo `sample_seq` | IMU 样本序号。 |
+| `sample_sequence` / demo `sample_seq` | FIFO 顺序定义的 IMU 样本序号；不由 INT1 通知或 realtime 递增定义。 |
 | `temperature_c` / demo `temp_c` | 摄氏度。 |
 | `accel_mps2` | `m/s^2`。 |
 | `gyro_rps` | `rad/s`。 |
-| `host_timestamp_ns` | 配对 INT1 边沿映射到 `CLOCK_REALTIME` 的纳秒时间戳；不是样本时间戳。 |
+| `host_timestamp_ns` / CLI `fifo_observation_ns` | 包所在 SPI FIFO burst 成功完成时的 RAW 观测，经当次系统时钟桥接转换为 `CLOCK_REALTIME` ns；同 burst 可重复，FSYNC 延迟发布保留转换后的原值、可能早于发布，不在发布时重新桥接旧 RAW；随墙钟回拨，不是 IRQ 沿、样本或曝光时间。 |
 | `sample_timestamp_ns` | FIFO TMST→RAW→`CLOCK_REALTIME` 的逐样本时间戳；每次发布刷新系统时钟桥接，允许系统校时回拨。 |
 | demo `ts_ns` | 原样保留 producer 的 realtime sample 时间，单位 ns；`host_ts_ns` 同样为 realtime，不由 consumer 再加 offset。 |
-| `reserved0` | 当前会话观测到的 FIFO timestamp 低 16 位回绕次数；不表示 V1 20 位 SPI 快照回绕。 |
+| `reserved0` | 当前会话观测到的 FIFO timestamp 低 16 位回绕次数。 |
 | `timestamp_uncertainty_us` | 逐样本时间映射的不确定度，单位 us。 |
-| `gpio_event_gap_count` / `fifo_overflow_count` / `mapper_failure_count` | 当前会话的边沿缺口、FIFO 溢出与时间映射失败累计计数。 |
+| `gpio_event_gap_count` / `fifo_overflow_count` / `mapper_failure_count` | 会话累计可检测缺失 GPIO 通知序号值、FIFO 溢出、时间映射失败。GPIO 缺口仅诊断、不证明物理沿/样本丢失，不单独失败。 |
 
-IMU 独立连续采样；FSYNC 关联识别触发之后的首个硬件标记样本，不表示该样本与相机曝光同时发生。仍不提供曝光中心、TF 外参或标定。不能把主机 INT1 时间或 FSYNC delta 冒充样本时间。
+IMU 独立连续采样；FIFO 顺序与实测芯片 TMST 定义序列和时间，INT1 仅用于唤醒排空 FIFO，不与包逐项配对。FSYNC 使用芯片标记/delta 与实测端点，识别触发后的首个标记样本，不表示与曝光同时发生。仍不提供曝光中心、TF 外参或标定。不能把 host 观测或 FSYNC delta 冒充样本时间；两类 realtime stamp 均随系统校时，不能以唯一 host 或递增墙钟判断采集顺序。
 
 ### FSYNC 触发—样本关联
 
 默认关闭。non-ROS 使用 `sensor_demo --fsync --sample-rate-hz 1600` 或 YAML `imu.fsync_enabled: true`；ROS2 设置 `imu.fsync_enabled:=true` 和 `imu.sample_rate_hz:=1600`。仅支持 `800/1600Hz`，不自动修改采样率。`800Hz` 时间预算较紧，可能有较多 timing drop；`1600Hz` 同样不保证每个触发均有可发布样本。
 
 硬件 FSYNC FIFO 标记把该包的绝对 TMST 替换为触发至样本的 delay。实现等待相邻绝对 TMST，以合法 tick 步长区间约束缺失时间，使用中点并计入半区间不确定度，不按名义 ODR 合成时间。delay 按实测时钟斜率转为 ns，再从样本 RAW 时间减去。端点缺失、回绕歧义或超过 `200µs` 策略时不伪造关联。
+
+首个 FIFO 包若为 FSYNC 标记，保留该包及其原始 burst 完成观测，等后续绝对 TMST 后再重建，不等待或消费对应 GPIO 身份。启动前实测 Arm 时钟沿不是前一个 FIFO 样本：分别检查首包同次转换或晚一个完整合法 ODR 区间，由后续实测端点收窄，仅接受唯一可行假设，不接受分数相位。两次 FIFO 使能写入必须在从 Arm 观测区间起点计算的最短合法 ODR 之前完成，使用实测时钟斜率下界换算；超过即拒绝启动，避免完整 TMST 回绕别名。回绕唯一性、实测时钟和 `200µs` admission 保持不变；无法证明时钟/epoch 时失败，超预算按 strict／allow-counted 策略并保留健康计数。
 
 只在相机组与 FSYNC 沿的 RAW 不确定度区间内存在唯一双向候选时匹配，不用最近邻或 realtime 时间相等来配对。缓存有界（128 组、256 事件），不混配重启 generation。JSON schema 为 `robobaton_fsync_v1`：
 
@@ -127,15 +135,15 @@ IMU 独立连续采样；FSYNC 关联识别触发之后的首个硬件标记样�
 
 整数时间戳和序号必须用无损整数 JSON parser 读取（例如 Python `json.loads` 的 `int`）。epoch 纳秒超过 IEEE-754 安全整数范围；JavaScript 普通 `JSON.parse` 会舍入，须使用支持 BigInt 的无损解析器。关联只声明源帧与源样本身份，不保证它们已通过保存筛选、队列或 DDS 送达；按逐路 stamp、frame metadata 与 IMU 序号核对实际数据。`SENSOR_FSYNC_RESULT health_valid=no` 时 captured/dropped 为 `unknown`，不能当零；stdout 写入损失由 `stdout_dropped` 报告。
 
-负载边界：采集 owner 使用 `SCHED_FIFO/20`，non-ROS IMU consumer 与 ROS2 IMU 发布线程使用 `SCHED_RR/3`；跨优先级队列锁使用优先级继承，避免普通负载饿死持锁线程。SPI 固定为 `10MHz`，INT1 保持 `100µs` 异步复位脉冲。运行需要实时调度权限，设置失败不静默降级。应用不会自动改动系统 IRQ 分布、INT1 IRQ 线程优先级或 SPI dynamic-debug 开关；饱和负载下这些系统设置及订阅端调度仍影响结果。绝对 TMST/INT1 相位检查、唯一双向匹配和 `200µs` 门限保持不变，超界仍拒绝或停止；`800Hz` 的 FSYNC 标记样本也可能大量被拒绝，不能据此宣称任意负载零丢失。
+负载边界：采集 owner 使用 `SCHED_FIFO/20`，non-ROS IMU consumer 与 ROS2 IMU 发布线程使用 `SCHED_RR/3`；跨优先级队列锁使用优先级继承。SPI 为 `10MHz`，INT1 保持 `100µs` 异步复位唤醒脉冲。实时调度设置失败不静默降级。应用不会自动修改 IRQ、SPI dynamic-debug、实时配额、LPWM 或内核；高负载仍受 SPI/调度与订阅端影响。实测 TMST、FSYNC 唯一双向匹配及 `200µs` admission 不变，不承诺任意负载零丢失。
 
-INT1 的内核沿时间属于 MONOTONIC，转换到内部 RAW 时使用沿附近的有界时钟观测，而非把出队时的 offset 直接套给积压沿。独立观测线程继承允许 CPU 集合、使用 `SCHED_FIFO/30`（低于板端默认 GPIO IRQ 的 FIFO/50），每轮休眠 `50µs`；启动时确认调度设置成功。4096 项固定容量历史以至少 `100µs` 间隔入队，避免排空 burst 挤掉旧沿证书；更低 ODR 下不保证覆盖整个256沿队列。采集线程也在等待 INT1 和轮询传感器时钟时补充观测，读取与入队由优先级继承锁串行化。证书选择同时考虑读取半窗口和时钟调速距离；调度延迟不会改变 GPIO 序号或把沿重新配给其他样本。此调速界针对当前 X5 Linux 6.1、未启用 `CONFIG_NTP_PPS` 且未设置 `ntp_tick_adj=` 启动覆盖的内核；更换内核/启动参数必须重新验证时钟界，不得据此降低报告的不确定度。
+INT1 是通知而不是样本时钟或逐包身份来源；GPIO 软件 IRQ 时间戳不代表物理沿硬件锁存，采集不消费该时间戳。可检测通知序号缺口只计入 `gpio_event_gap_count`，连续序号也不能排除事件生成前的丢失/合并。FIFO/TMST 主导设计移除了逐沿配包依赖，**没有修复或证明底层 GPIO/内核原因**；定位该原因仍需匹配 BSP 的 IRQ 捕获或同步物理波形证据。没有 IRQ 时仍以有界超时检查 FIFO 存活，通知缺口不等于样本丢失；须核对 FIFO/序号/最终健康和实际载荷。
 
-传感器 TMST→RAW 拟合要求同一条仿射线同时满足各有效读取区间，不把区间中点当精确观测；不兼容的窄观测不能留下矛盾的旧证书。过宽的 SPI 观测不推进计数器解绕状态；斜率、外推、INT1 相位及 FSYNC 重建误差仍计入发布预算。INT1 IRQ 延迟或 SPI 长时间阻塞引起的超界拒绝、身份失败和 FIFO overflow 仍显式报告，不通过扩大门限或缓存旧样本掩盖。
+传感器 TMST→RAW 拟合要求同一仿射线满足有效读取区间，不把中点当精确观测；矛盾窄观测使旧证书失效，过宽 SPI 观测不推进解绕。斜率、外推与 FSYNC 重建误差计入发布预算。FIFO overflow、坏包、回绕/时钟歧义及无效 epoch 仍失败；长 SPI 阻塞仍可能拒绝或停止，不扩大门限、不按名义 ODR 合成时间或缓存旧样本掩盖。
 
 验收必须使用成功 stop 后的最终 `IMU_RUNTIME_HEALTH final=yes health_valid=yes`：generation 非零，并核对 `published_samples`、`invalid_packet_drop_count`、GPIO 缺口与 FIFO overflow。最终行同时报告 `mapper_failure_count`、`uncertainty_over_200_drop_count`、`max_consecutive_timing_drop_count`、`fsync_captured` 和 `fsync_dropped`，包含最后一个成功样本之后的损失；无效包即使同时被 timing 门限拒绝也计入无效包总数。不能只检查最后一个已发布样本，因为尾部错误未必再有样本承载。timing drop 和 FSYNC dropped 是显式计数，不等于完整关联。保存或 DDS 验收还须回读实际 IMU/四路图像，并按上面的时间戳规则核对关联覆盖率，不能仅凭健康摘要、topic 存在或容器完整判定通过。
 
-`accel_mps2` 按 `[X, Y, Z]` 输出；V2 PCB 的安装方向与加速度符号尚待实板六面/旋转验证，不沿用 V1 顶视图的 `[0, 0, -9.8]` 和左右前后轴向结论。
+`accel_mps2` 按 `[X, Y, Z]` 输出；V2 PCB 的安装方向与加速度符号尚待实板六面/旋转验证，当前不声明相对于主板或相机的正负轴及坐标变换。
 
 ## non-ROS 保存输出
 
@@ -152,7 +160,11 @@ bag 消息的 payload 与记录时刻分开：图像及首帧 CameraInfo 的 `he
 
 MP4 CSV 索引属于 realtime 系统时间轴，但其精度与逐路原始值的区别如上；容器播放时间仍是相对/名义时间，不是 Unix epoch。编码/容器不能接受的时间回拨会报错并保留不完整产物，不伪造递增时间；持续录制前应先完成系统校时。
 
-保存完整性按 recorder 分别判定：bag complete 检查会话成功及 recorder 的队列/写入错误，不独立约束 producer timing drop 为零；MP4 complete 还要求成功 stop 后的有效 final health、published=observed=admitted=written>0、连续样本序号、无 GPIO/FIFO/timing/invalid-packet drop，且最大样本不确定度 ≤`200µs`。默认 `allow-counted` 下可证明身份的 timing 拒绝可能继续采集，因此不能用 bag complete 证明零丢样。曝光不可用和 FSYNC 缺失/歧义也各自检查，不由容器 complete 代替；验收步骤见[数据保存](../usage/save-data-guide.md)。
+保存完整性按 recorder 分别判定：bag complete 检查会话与 recorder 队列/写入错误，不独立要求 producer timing drop 为零；MP4 complete 还要求成功 stop 后有效 final health、published=observed=admitted=written>0、序号连续、无 FIFO/timing/invalid-packet drop、最大不确定度 ≤`200µs`。GPIO 通知缺口仅诊断，不单独使保存不完整。默认 `allow-counted` 可继续处理时钟身份可证明的 timing 拒绝，bag complete 不证明零丢样。曝光与 FSYNC 完整性另行检查，见[数据保存](../usage/save-data-guide.md)。
+
+bag 过载只对完整四路组统一保留/丢弃。默认最小间隔 `10` 使用连续 `source_group_order` 而不是 producer `group_id`；候选必须已编码、完整且未被 writer 领取，已领取组受保护。没有合法旧组或当前组可丢时停止并排空为可读 partial，非零退出；任何丢组均为 `data_complete=false`，策略合规不表示持续压力或全传感器通过。主动隔组保存要求显式最小间隔 `2`，详见[保存队列说明](../usage/save-data-guide.md)。
+
+原生 bag JPEG 仅去除 SOI 后长度为 `4`、只含私有 frameIdx 的 JPU APP9，保留其他 APP 与编码载荷，不改变 ROS2 JPEG 插件输出。`rosbag_info.py --freq` 统计 record time，`--header-freq` 单列已保存消息的 `Header.stamp`；都不能单独证明采集无丢失。producer、consumer、recorder 与回读计数必须分别核对；保存序列连续仍可能遗漏源数据头尾。
 
 ## ROS2 topics
 
@@ -193,8 +205,7 @@ ROS2 当前不发布 RTSP、TF 外参或标定；FSYNC 只提供触发—样本�
 | 波特率 | `serial_port_demo` 默认 `115200`；DEBUG_UART `921600`。 |
 | serial_port_demo 数据格式 | 8N1、raw、无 flow control |
 | demo 模式 | `tx`、`rx`、`txrx`、`echo` |
-| UART1/UART7 TX/RX 信号逻辑电平 | 保持 `3.3V`；DEBUG_UART 为 `1.8V`。 |
-| UART1/UART7 供电脚 | V2 CN2/CN3 的供电用途、电平、额定负载和热插拔边界待确认，勿引用 V1 合计 `500 mA` 限制。 |
-| V1 历史边界 | UART1/UART7 在 V1 板上曾验收；不构成 V2 电气或线束兼容证明。 |
+| UART1/UART7 TX/RX 信号逻辑电平 | `3.3V`；DEBUG_UART 为 `1.8V`。 |
+| UART1/UART7 供电脚 | V2 CN2/CN3 的供电用途、电平、额定负载和热插拔边界待确认，默认断电接线，不接适配器 VCC，不反灌。 |
 
 V2 UART1/UART7 对应 CN2/CN3 5pin 接口与 `/dev/ttyS1`、`/dev/ttyS7`。CN3 有独立 IO 默认作为 PPS 输入，不需要复用或切换 RX/TX；PPS 设备节点按系统枚举识别。完整线序及供电脚用途以正式 V2 标识为准。DEBUG_UART 非用户串口；默认断电接线，核实 TX/RX/GND、对端电平及共地，不接适配器 VCC，不反灌。见[硬件连接与安全](../getting-started/hardware-and-safety.md#uart)。

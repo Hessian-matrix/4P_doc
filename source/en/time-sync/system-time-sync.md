@@ -25,6 +25,8 @@ This chapter uniformly explains the current public time-related configuration me
 5. V2 independent PPS input needs no UART7 pin switching. Confirm official 5-pin order, voltage, and common ground, and wire with power off.
 6. System time sync is not the same as sampling sync. Camera, IMU, PPS, PTP, and ROS `header.stamp` are different layers; field semantics are in [Data Contracts](../development/data-contracts.md).
 7. Camera, IMU, and bag record times use `CLOCK_REALTIME` system time. Hardware capture/sample times pass through internal RAW mappings and continuously refreshed realtime bridges, not a frozen startup offset. System corrections affect subsequent stamps, including backward steps; internal timeouts stay monotonic. Synchronize the clock before acquisition to avoid encoder/container limitations on backward timestamps. A common domain does not establish FSYNC sample/exposure synchronization, and an uncalibrated system clock is not accurate UTC.
+8. IMU `host_timestamp_ns` (producer CLI `fifo_observation_ns`) retains the successful SPI FIFO burst-completion RAW observation converted to realtime using that observation's bridge. Packets may share it; FSYNC-deferred publication never rebridges historical RAW. It is not IRQ, sample, or exposure time, and increasing realtime does not define packet order or identity.
+9. These field semantics do not prove persistent RTC, automatic synchronization after power-off/reboot, or absolute UTC accuracy, nor close current LPWM/FSYNC load and long-tail limits. See {ref}`Capability and Verification Boundaries <capability-verification-boundary>`.
 
 ## Three Sync Methods
 

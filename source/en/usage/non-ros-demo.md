@@ -1,6 +1,8 @@
 # non-ROS Demo Usage
 
-[`RoboBaton_4p_demo`](https://github.com/Hessian-matrix/RoboBaton_4p_demo) is the public V2 non-ROS source repository, providing four-camera SC132 RTSP, four-channel mosaic RTSP, ICM-42670-P IMU, UART, and SocketCAN CAN examples. Old V1 downloads do not provide the V2 hardware/API.
+[`RoboBaton_4p_demo`](https://github.com/Hessian-matrix/RoboBaton_4p_demo) is the public V2 non-ROS source repository, providing four-camera SC132 RTSP, four-channel mosaic RTSP, ICM-42670-P IMU, UART, and SocketCAN CAN examples.
+
+Supported parameters and actual verification scope are separate; see {ref}`Capability and Verification Boundaries <capability-verification-boundary>`. Console association success does not prove saved-image decoding or that every sample was saved. Sustained high rate on every path and long-recording acceptance for the current composition are not promised.
 
 ## 1. Directory and Runtime Package
 
@@ -35,7 +37,7 @@ Deploy the full contents of `demo/`. The top-level `cam_demo`, `sensor_demo`, `m
 
 - Four SC132 cameras;
 - PRRTSP v2 H.264/H.265 RTSP streaming;
-- ICM-42670-P INT1 (`34120000.gpio` offset `8`) + sensor timestamp FIFO IMU acquisition thread.
+- ICM-42670-P sensor timestamp FIFO IMU acquisition thread; INT1 (`34120000.gpio` offset `8`) only wakes acquisition, with bounded FIFO checks even without notifications.
 
 ```bash
 cd /root/demo
@@ -97,7 +99,7 @@ Boundaries:
 - The non-ROS public frame-rate set is 25/30/40/50/60fps; default `30`, other values rejected before the camera starts.
 - `camera.test_exposure_midpoint` defaults to `false`; set `true` and restart `sensor_demo` to use estimated exposure-midpoint image timestamps: trigger time plus half exposure duration. An explicit YAML value overrides `SC132_TEST_EXPOSURE_MIDPOINT`; older files omitting the field preserve the environment setting (off when unset). Rebuild both the application and a supporting `libsc132.so`. IMU stamps and bag record time are unchanged. Use the image `header.stamp` for ROS1 bag alignment; do not add half exposure again. Unavailable exposure stops acquisition; this is not a calibrated actual midpoint. See {ref}`Data Contracts <test-exposure-midpoint>`.
 - `rtsp.codec` supports `h264` and `h265`.
-- IMU native sample rates are `25/50/100/200/400/800/1600Hz`, default `800Hz`; old `500/1000/2000Hz` values are rejected, not resampled.
+- IMU native sample rates are `25/50/100/200/400/800/1600Hz`, default `800Hz`; other values are rejected, not resampled.
 - `save_data.format` defaults to `mp4` and also supports `rosbag`; the save path must be an absolute path.
 
 (non-ros-save)=
@@ -244,23 +246,23 @@ It prints sampled records at `10Hz` by default; the program still consumes all I
 
 Key fields:
 
-- `ts_ns`: IMU sample time in `CLOCK_REALTIME`, in `ns`, provided by the producer's FIFO TMST-to-RAW-to-realtime mapping; `host_ts_ns` is the INT1 edge in the same domain. `TIME_BASE domain=realtime realtime_start_ns=...` reports a startup system reference, not a frozen offset. Runtime clock corrections can move subsequent stamps backward.
+- `ts_ns`: IMU sample time in `CLOCK_REALTIME` `ns`, from measured FIFO TMST-to-RAW-to-realtime mapping. `host_ts_ns` is the RAW observation at that packet's successful SPI FIFO burst completion, converted to realtime using the bridge measured for that observation; packets in one burst may share it, and FSYNC deferral retains the converted value. It is not an IRQ edge, sample time, or exposure time. Both follow clock steps; use `sample_seq` for order. `TIME_BASE domain=realtime realtime_start_ns=...` declares only a startup reference, not a frozen offset.
 - `accel_mps2`: acceleration in `m/s^2`.
 - `gyro_rps`: angular velocity in `rad/s`.
 - `uncertainty_us`, `gpio_gap_count`, `fifo_overflow_count`, `mapper_failure_count`: timestamp mapping and acquisition-link diagnostics.
 
-V2 `accel_mps2` outputs `[X, Y, Z]`; PCB orientation and signs still need six-face/rotation board verification. Do not infer axis signs or camera-frame transforms from V1 top-view images.
+V2 `accel_mps2` outputs `[X, Y, Z]`; PCB orientation and signs still need six-face/rotation board verification. Axis signs and transforms relative to the main board or cameras are not currently declared.
 
 IMU INT1 uses `34120000.gpio` offset `8`, with per-sample FIFO TMST timing. Cameras use LPWM and the VIN-propagated trigger capture, not frame arrival time. Camera and IMU FSYNC share one physical IO; this does not automatically associate FIFO samples one-to-one with exposures.
 
 Use `sensor_demo --fsync --sample-rate-hz 1600` or YAML `imu.fsync_enabled: true` for explicit association (default off, only `800/1600Hz`). Without saving, stdout emits `robobaton_fsync_v1` JSON; saving stores bag `/robobaton/fsync` or MP4 `fsync.jsonl`. Only `status=1` is a unique match. Check timing drops, sequence gaps, and `SENSOR_FSYNC_RESULT`; sample correspondence is not exposure synchronization. See [Data Contracts](../development/data-contracts.md).
 
-Realtime scheduling permission is required: camera capture uses `SCHED_FIFO/60`, IMU owner `SCHED_FIFO/20`, INT1 observer `SCHED_FIFO/30`, and the combined application's IMU consumer `SCHED_RR/3`. Both observers inherit the allowed CPU mask and sleep `50µs` per iteration. Scheduling failure rejects startup. Applications do not automatically change IRQ/debug or realtime quotas; high load can cause counted drops or failure. Storage and association acceptance must also inspect `IMU_RUNTIME_HEALTH final=yes health_valid=yes` after successful stop, not merely continued terminal output.
+Realtime scheduling permission is required: camera capture uses `SCHED_FIFO/60`, IMU owner `SCHED_FIFO/20`, and the combined application's IMU consumer `SCHED_RR/3`. The camera observer inherits the allowed CPU mask and sleeps `50µs` per iteration. IMU no longer uses an independent INT1 clock observer; INT1 is wake-only, and notification sequence gaps are diagnostic, not independently fatal. Scheduling failure rejects startup. Applications do not automatically change IRQ/debug or realtime quotas; this redesign does not fix the GPIO/kernel root cause, and high load can still cause counted drops or failure. Inspect `IMU_RUNTIME_HEALTH final=yes health_valid=yes` after successful stop and actual payloads, not merely continued terminal output.
 
 ## 8. Serial Demo
 
 
-UART1/UART7 retain `3.3V` logic at `/dev/ttyS1` and `/dev/ttyS7`; DEBUG_UART uses `1.8V` and is not for `serial_port_demo`. V2 CN2/CN3 have 5 pins; the separate CN3 IO defaults to PPS input without switching UART7 RX/TX. Use official V2 pin order and power ratings, wire with power off, and do not inherit V1 `500 mA` or hot-plug claims. See [Hardware Connection and Safety](../getting-started/hardware-and-safety.md#uart).
+UART1/UART7 use `3.3V` logic at `/dev/ttyS1` and `/dev/ttyS7`; DEBUG_UART uses `1.8V` and is not for `serial_port_demo`. V2 CN2/CN3 have 5 pins; the separate CN3 IO defaults to PPS input without switching UART7 RX/TX. Complete pin order, power-pin ratings, and hot-plug conditions still await official V2 hardware confirmation. Wire with power off by default, leave adapter VCC disconnected, and prevent reverse feed. See [Hardware Connection and Safety](../getting-started/hardware-and-safety.md#uart).
 
 ```bash
 cd /root/demo
@@ -275,6 +277,8 @@ The default configuration is `/dev/ttyS1`, `115200`, `txrx`. Common examples:
 ./serial_port_demo --port /dev/ttyS1 --mode txrx --baud 115200 --count 10 --text "ping"
 ./serial_port_demo --port /dev/ttyS7 --mode echo --baud 115200
 ```
+
+The UART signal-exit fix covers RX waits only: `SIGINT`/`SIGTERM` exits normally and restores serial settings, other signals do not extend the RX deadline, and genuine I/O errors remain failures. This does not establish every UART mode or hardware reliability.
 
 ## 9. Verification Suggestions
 
@@ -298,7 +302,7 @@ cd /root/demo
 ./start_sensor_demo.sh status     # view autostart and running status
 ```
 
-Boot autostart is implemented through the on-device `/userdata/startup.sh`: the system `S99auto_startup` executes this file after `/userdata` is mounted. The script only appends/removes its own block marked with `SENSOR_DEMO_AUTOSTART_MANAGED` and does not overwrite content written by other scripts (e.g. `wifi_setup.sh`); when canceling autostart, if only comment/blank-line residue remains in the file, it is removed entirely. Boot autostart uses the runtime package's default configuration; edit `config/sensor_config.yaml` directly to adjust it without re-running `enable`. `enable`/`disable` require root privileges.
+Boot autostart is implemented through the on-device `/userdata/startup.sh`: the system `S99auto_startup` executes this file after `/userdata` is mounted. The script only appends/removes its own block marked with `SENSOR_DEMO_AUTOSTART_MANAGED` and does not overwrite other applications' content; when canceling autostart, if only comment/blank-line residue remains in the file, it is removed entirely. The image-provided `wifi_setup` uses a separate boot entry, not this file. Boot autostart uses the runtime package's default configuration; edit `config/sensor_config.yaml` directly to adjust it without re-running `enable`. `enable`/`disable` require root privileges.
 
 (non-ros-can)=
 
@@ -386,6 +390,6 @@ TX-only options require `--mode tx`; `--fd` applies to TX or RX, and `--brs` als
 
 `tx_queued=N` means only that the kernel accepted N frames, not that the peer received them or each transmission completed on the bus. Default SocketCAN local loopback may let another receiver on the same host see transmitted frames; this does not prove external wiring, transceiver, or ACK operation. External acceptance requires a second physical node to verify ID, format, payload, and count, then reverse transmission to verify reception on this board. Also inspect errors, drops, and BUS-OFF with `ip -details -statistics link show can0`. Host datagram logic tests, vcan, and `--help` do not replace this step.
 
-Application FD support is not board-level BSP integrity acceptance. Long FD payloads may be corrupted on affected BSPs; complete frame counts, no bus errors, or passing short frames do not establish reliability. Fix the underlying issue and verify long payloads byte-for-byte, FD/BRS flags, and bidirectional counts at a second physical node.
+Application FD support is not board-level BSP integrity or sustained-throughput acceptance. Long FD payloads may be corrupted on affected BSPs; complete frame counts, no bus errors, or passing short frames do not establish reliability. Use the matching repaired BSP first, then verify long payloads byte-for-byte, FD/BRS flags, and bidirectional counts at a second physical node. Combined-load, latency, and error recovery are not fully closed; no throughput is promised for the current system composition. See {ref}`Capability and Verification Boundaries <capability-verification-boundary>`.
 
 Use `scripts/build_can_demo.sh` for a standalone build and `scripts/package_runtime.sh` for a full package; see [Building the Public Demo Source](../development/open-source-build.md).

@@ -1,12 +1,12 @@
 # Hardware Connection and Safety
 
 ```{warning}
-Connect camera harnesses and UART with power off. UART1/UART7 retain `3.3V` logic; DEBUG_UART retains `1.8V`. Never apply 5V TTL or RS-232 levels or back-feed power. Use official V2 labeling for the 5-pin order, not V1 4-pin photographs. Use V2 hardware specifications for power ratings and hot-plug conditions; V1 `500 mA` or hot-plug acceptance does not carry over.
+Connect camera harnesses and UART with power off. UART1/UART7 use `3.3V` logic; DEBUG_UART uses `1.8V`. Never apply 5V TTL or RS-232 levels or back-feed power. Complete V2 5-pin order, power ratings, and hot-plug conditions still await official hardware confirmation. Check official interface labeling, peer voltage, and common ground before wiring; do not guess pin functions or assume UART hot-plug support.
 ```
 
 ## Camera Interface
 
-Camera hardware and physical mapping remain unchanged from V1:
+Camera physical interfaces map to software as follows:
 
 | Physical silkscreen | Software camera ID | Default RTSP port | ROS2 prefix |
 |---|---:|---:|---|
@@ -21,18 +21,12 @@ RTSP uses `/PRR`, H.264 by default with optional H.265. NV12 native output is `1
 
 | Item | Public conclusion |
 |---|---|
-| Main-board power | Use official V2 input, load, reverse-feed protection, and USB-C power-role specifications; do not inherit V1 DC `12V ~ 24V` claims. |
+| Main-board power | V2 input range, load, reverse-feed protection, and USB-C power role still await official hardware confirmation; use only a power supply confirmed compatible by product support. |
 | Camera FPC / coaxial cable | Connect with power off; hot-plug is not supported. |
-| UART | UART1/UART7 use `3.3V`; official V2 labeling defines the complete 5-pin order and power-pin load rating; no hot-plug promise. |
+| UART | UART1/UART7 use `3.3V`; complete 5-pin order and power-pin load ratings await official V2 hardware confirmation. Wire with power off by default; no hot-plug promise. |
 | Thermal | Keep heatsink and airflow clear; verify V2 thermal control and full-load cooling on the actual system. |
 
 ## UART
-
-```{figure} ../../image/uart.jpg
-:alt: Historical V1 UART photograph; replace before V2 product release
-
-V1 interface image: replace with actual V2 5-pin interface views and pin order before release. Not V2 wiring or IMU-axis guidance.
-```
 
 | Interface | Purpose | On-device node | Logic level and connector |
 |---|---|---|---|

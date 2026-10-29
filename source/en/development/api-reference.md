@@ -2,6 +2,8 @@
 
 This page covers the C ABI/API in the current public headers. Examples only show the minimal integration skeleton and do not reproduce the underlying producer source. The version-string getters do not require hardware initialization; the runtime-health-snapshot getter is only valid after the most recent acquisition has successfully stopped.
 
+Header contracts and target-environment verification are separate layers. See {ref}`Capability and Verification Boundaries <capability-verification-boundary>` for current capabilities and throughput/pressure/long-recording limits. Callable APIs or passing package verification do not establish system acceptance.
+
 ## Release Version Query
 
 The product release version follows SemVer and is independent of the SO SONAME/ABI version. The version-string getters require no hardware initialization and return a process-static read-only string that the caller must not modify or free:
@@ -16,7 +18,7 @@ Delivered executables also support `--version`. The non-ROS `cam_demo`/`sensor_d
 
 ## `libsc132.so`
 
-Header: `include/sc132camera.h`. ABI: `SC132_ABI_VERSION_MAJOR=2`, `SC132_ABI_VERSION_MINOR=2`; the real SO is `libsc132.so.2.0.0`, SONAME still `libsc132.so.2`.
+Header: `include/sc132camera.h`. ABI: `SC132_ABI_VERSION_MAJOR=3`, `SC132_ABI_VERSION_MINOR=0`; real SO `libsc132.so.3.0.0`, SONAME `libsc132.so.3`, symbol node `LIBSC132_3.0`. Consumers must follow the current headers' time-domain, trigger-mode, and frame-info field semantics. Consumers of other ABIs must be rebuilt and relinked as a complete set; a `.so.2 -> .so.3` compatibility link is forbidden.
 
 Status codes:
 
@@ -38,7 +40,7 @@ Core structures:
 
 By default public camera `timestamp_ns` and `group_timestamp_ns` values are hardware trigger-edge times mapped to `CLOCK_REALTIME` Unix nanoseconds, following runtime clock corrections including backward steps, not arrival/IRQ or exposure-midpoint times. The opt-in {ref}`Exposure-Midpoint Test Switch <test-exposure-midpoint>` adds half exposure duration. Read-only X5 `/dev/mem` access is required; missing/out-of-window mappings stop acquisition. See [Time Data Contracts](data-contracts.md).
 
-ABI 2.2 appends `exposure` (`sc132_exposure_info_t`) to `sc132_frame_info_t`. `sc132_frame_get_info()` accepts the current `sizeof(info)` or the old prefix size ending before `exposure`, writes only the declared size, and returns `struct_size` unchanged. New consumers require matching headers/SOs.
+ABI 3.0 appends `exposure` (`sc132_exposure_info_t`) to `sc132_frame_info_t`. `sc132_frame_get_info()` accepts the current `sizeof(info)` or the old prefix size ending before `exposure`, writes only the declared size, and returns `struct_size` unchanged. New consumers require matching headers/SOs.
 
 (camera-output-structures)=
 ### Public Image Output Structures and Fields
@@ -254,7 +256,7 @@ int run_camera(void) {
 
 ## `libicm42670.so`
 
-non-ROS header: `include/icm42670_driver.h`; ROS2: `include/robobaton_4p_ros2_demo/icm42670_driver.h`; producer: `include/icm42670_x5/icm42670_driver.h`. ABI is `2.1`; real SO `libicm42670.so.2.0.0` and SONAME `libicm42670.so.2` remain unchanged. The original nine C functions retain node `ICM42670_X5_2.0`; new `icm42670_set_fsync_callback()` uses `ICM42670_X5_2.1`. This is incompatible with V1 ICM-42688; migrate headers, SOs, and consumers together.
+non-ROS header: `include/icm42670_driver.h`; ROS2: `include/robobaton_4p_ros2_demo/icm42670_driver.h`; producer: `include/icm42670_x5/icm42670_driver.h`. ABI is `3.0`; real SO `libicm42670.so.3.0.0`, SONAME `libicm42670.so.3`. All ten C exports use only `ICM42670_X5_3.0`, without old-node aliases. Field names and layouts remain unchanged, but host-observation semantics are incompatible: rebuild headers, SOs, and consumers together, remove old `.2` libraries, and do not substitute cross-major links for migration. Software VERSION is unchanged.
 
 Status codes:
 
@@ -269,8 +271,9 @@ Status codes:
 Core structures and constraints:
 
 - `icm42670_config_t` defaults to `sample_rate_hz=800`, `fifo_watermark_samples=1`, `read_mode=ICM42670_READ_MODE_SENSOR_TIMESTAMP_FIFO`.
-- `sample_rate_hz` accepts only native `25/50/100/200/400/800/1600`; old `500/1000/2000Hz` and other invalid values are explicitly rejected, not silently resampled. Only sensor timestamp FIFO read mode is accepted.
-- `sample_timestamp_ns` follows FIFO TMST-to-RAW-to-`CLOCK_REALTIME`; `host_timestamp_ns` is the INT1 edge in the same domain. Bridges refresh at publication without a frozen offset and follow backward system-clock steps. A common domain does not guarantee FSYNC sample/exposure synchronization.
+- `sample_rate_hz` accepts only native `25/50/100/200/400/800/1600`; other values are explicitly rejected, not silently resampled. Only sensor timestamp FIFO read mode is accepted.
+- FIFO order and measured TMST define sample sequence/time; INT1 only wakes acquisition. `sample_timestamp_ns` remains measured FIFO TMST-to-RAW-to-`CLOCK_REALTIME`. `host_timestamp_ns` is the RAW observation at the packet's successful SPI FIFO burst completion, converted to realtime using the bridge measured for that observation: packets in one burst may share it and FSYNC-deferred publication retains the converted value, without remapping historical RAW through a later wall-clock bridge. It is not IRQ-edge, sample, or exposure time. Both stamps follow backward wall-clock steps. Order by `sample_sequence`, not unique host observations or increasing realtime. The `200µs` admission gate is unchanged.
+- Producer CLI `fifo_observation_ns` and this field `host_timestamp_ns` identify the same FIFO burst-completion observation; the non-ROS demo's `host_ts_ns` also preserves it. There is no per-packet GPIO identity or independent INT1-to-RAW observer. Bounded FIFO checks continue without notifications, and required realtime scheduling failure rejects startup.
 - The callback is invoked serially by the acquisition thread; `sample` is a borrowed reference.
 - `stop/destroy` wait for the acquisition thread and must not be called from the callback.
 - `user_data` must remain valid until `icm42670_stop()` returns.
@@ -281,7 +284,7 @@ Core structures and constraints:
 - FSYNC callback runs serially after the same admitted sample's callback. The event is borrowed, with the same exception and stop/destroy rules. `sample_sequence` and `sample_timestamp_ns` identify that actual sample; `fsync_to_sample_ns` is hardware delay, and `uncertainty_ns` includes missing-TMST reconstruction. RAW fields are association-only; public time remains realtime.
 - After successful stop, health `reserved[ICM42670_HEALTH_FSYNC_CAPTURED_INDEX]` counts captured hardware tags; `reserved[ICM42670_HEALTH_FSYNC_DROPPED_INDEX]` counts tags without published associations, including tail packets missing a following absolute TMST. `fsync_sequence` includes dropped tags and may have gaps. See [Data Contracts](data-contracts.md) for matching and status semantics.
 
-`icm42670_runtime_health_t` is initialized with `ICM42670_RUNTIME_HEALTH_INIT`. Field meanings: `session_generation` (the most recent start generation), `published_samples` (samples published by the producer), `gpio_event_gap_count` (GPIO edge gaps), `fifo_overflow_count` (FIFO overflows), `mapper_failure_count` (time-mapping failures), `uncertainty_over_200_drop_count` (samples dropped because uncertainty exceeded 200 us), `max_consecutive_timing_drop_count` (maximum consecutive timing drops), and `invalid_packet_drop_count` (invalid FIFO packets dropped, including drops after the last sample publication). Use the final snapshot after successful stop, not the last sample's counters. When the call returns a non-`ICM42670_STATUS_OK` value, do not read the output structure as a valid snapshot.
+Initialize `icm42670_runtime_health_t` with `ICM42670_RUNTIME_HEALTH_INIT`. `session_generation` identifies the latest start and `published_samples` counts producer publications. `gpio_event_gap_count` counts detectable missing GPIO notification sequence values: diagnostic, not proof of physical-edge/sample loss or independently fatal. `fifo_overflow_count` counts FIFO overflows, `mapper_failure_count` mapping failures, `uncertainty_over_200_drop_count` samples rejected above 200 us, `max_consecutive_timing_drop_count` the longest timing-drop run, and `invalid_packet_drop_count` invalid FIFO packet drops, including trailing drops after the last publication. FIFO overflow, bad packets, ambiguous clocks, and invalid epochs still fail. Use the final successful-stop snapshot, not the last sample; do not read the output as valid after a non-`ICM42670_STATUS_OK` return. The architecture does not fix the GPIO/kernel root cause or guarantee zero loss under arbitrary load.
 
 ```c
 icm42670_runtime_health_t health = ICM42670_RUNTIME_HEALTH_INIT;
@@ -413,3 +416,5 @@ int open_rtsp(prrtsp_stream_t **stream) {
 ## Whole-Package Deployment Requirement
 
 `libsc132.so`, `libicm42670.so`, `libprrtsp.so`, the public headers, and the demo programs must come from the same public delivery package. Do not replace the current `.so` alone into unmigrated programs; the ROS2 install path uses the public headers, runtime libraries, and manifest carried by `RoboBaton_4P_ROS2_demo` itself, and must not be mixed with the non-ROS `/root/demo` runtime package.
+
+The current library set is `libicm42670.so.3.0.0` / `ICM42670_X5_3.0`, `libsc132.so.3.0.0` / `LIBSC132_3.0`, and `libprrtsp.so.2.0.1` / `LIBPRRTSP_2.0`. Remove old ICM42670 and SC132 `.2` libraries and rebuild every consumer, without cross-major aliases; ROS2 does not carry PRRTSP.

@@ -7,14 +7,14 @@ This page helps first-time RoboBaton 4P users complete pre-power-on checks, log 
 Power, camera cables, UART, and thermal boundaries are governed by [Hardware Connection and Safety](hardware-and-safety.md). Before powering on, confirm:
 
 - Camera FPC/coaxial cables are connected with power off; camera/FPC/coaxial cables do not support hot-plug and must be disconnected from power before plug/unplug.
-- V2 rated input range, USB-C power role, full-load current, and fan thresholds are pending confirmation. Use only a power supply and system confirmed for V2 by product support; do not inherit V1 `12V ~ 24V`/`600 mA` claims.
-- Keep heatsink, fan, and airflow clear; V1 fan/LED boot patterns are not V2 readiness criteria.
+- V2 rated input range, USB-C power role, full-load current, and fan thresholds are pending confirmation. Use only a power supply and system confirmed for V2 by product support.
+- Keep heatsink, fan, and airflow clear; check readiness from actual system status.
 - V2 UART1/UART7 have 5 pins and retain `3.3V` logic; DEBUG_UART retains `1.8V`, `921600` baud. Use official V2 labeling for complete pin order and power-pin function; leave generic USB-UART VCC disconnected and wire with power off after checking common ground.
-- V1 UART `500 mA`/hot-plug acceptance is not a V2 rating or hot-plug promise.
+- UART power-pin ratings and hot-plug conditions await confirmation. Wire with power off by default; do not power peripherals or back-feed power.
 
 ## 2. Connect and Power On
 
-Confirm V2 power, harnesses, and actual pinout first, then complete camera, power, network, and optional debug wiring with power off. Check actual system status after power-on rather than infer readiness from V1 LED/fan images. Do not hot-plug camera harnesses, stop or reconfigure `cam-service`, or start multiple camera applications together.
+Confirm V2 power, harnesses, and actual pinout first, then complete camera, power, network, and optional debug wiring with power off. Check readiness from actual system status after power-on. Do not hot-plug camera harnesses, stop or reconfigure `cam-service`, or start multiple camera applications together.
 
 ## 3. Network and Login
 
@@ -108,7 +108,7 @@ passwd
 If the user has changed the IP and needs to enter the system through the debug port to check the address, only DEBUG_UART can be used: `1.8V` logic, debug terminal baud rate `921600`, board TX to adapter RX, board RX to adapter TX, with common ground. Do not use a `3.3V` or `5V` USB-UART on DEBUG_UART.
 
 ```{note}
-The V2 system image has not been released; do not recover V2 using a V1 image. See [System Flashing](../ops/system-flashing.md) for release status. Official flashing overwrites on-board eMMC and user data.
+The V2 system image has not been released; no public image download or confirmed recovery procedure is currently available. See [System Flashing](../ops/system-flashing.md) for release status. Official flashing overwrites on-board eMMC and user data.
 ```
 
 ## 4. Minimal System Check

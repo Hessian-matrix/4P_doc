@@ -12,15 +12,15 @@
 
 ## 板载 Wi-Fi 配置失败
 
-完整上传、交互配置和日志路径见 [板载 Wi-Fi 配置](getting-started/wifi-configuration.md)。
+完整镜像集成、交互配置和日志路径见 [板载 Wi-Fi 配置](getting-started/wifi-configuration.md)。
 
 | 项目 | 内容 |
 |---|---|
-| 现象 | `/userdata/wifi_setup.sh` 提示缺少命令、扫描不到 SSID、认证失败、DHCP 失败、AP 无法启动，或开机后没有恢复 Wi-Fi。 |
-| 检查 | 使用有线网络或 `1.8V` DEBUG_UART 登录；执行 `/userdata/wifi_setup.sh --status`；检查 `ip link show wlan0`、`iw dev wlan0 info`、`/userdata/wifi/logs/` 和 `/userdata/wifi/boot.log`。 |
-| 正常结果 | AP 模式显示 hostapd `ENABLED`，客户端能获得配置网段地址；STA 模式显示已关联并获得 DHCP 地址；启用开机恢复时 `/userdata/startup.sh` 和 `current.conf` 存在。 |
-| 常见原因 | Wi-Fi 用户态工具缺失、天线或信号问题、SSID/密码错误、隐藏 SSID、路由器 DHCP 异常、AP 信道/IP/DHCP 网段配置错误，或已有非本脚本管理的 `/userdata/startup.sh`。 |
-| 恢复/需收集信息 | 不要在同一条 Wi-Fi SSH 会话中切换模式；通过有线入口重新配置。需要停用时执行 `/userdata/wifi_setup.sh --disable`；收集脚本完整错误、接口状态和去除凭据后的日志。 |
+| 现象 | `wifi_setup` 提示缺少命令、扫描不到 SSID、认证失败、DHCP 失败、AP 无法启动，或开机后没有恢复 Wi-Fi。 |
+| 检查 | 使用有线网络或 `1.8V` DEBUG_UART 登录；执行 `wifi_setup --status`；检查 `ip link show wlan0`、`iw dev wlan0 info`、`/userdata/wifi/logs/` 和 `/userdata/wifi/boot.log`。 |
+| 正常结果 | AP 模式显示 hostapd `ENABLED`，客户端能获得配置网段地址；STA 模式显示已关联并获得 DHCP 地址；启用开机恢复时 `/userdata/wifi/autostart.enabled` 和 `current.conf` 存在。 |
+| 常见原因 | Wi-Fi 用户态工具缺失、天线或信号问题、SSID/密码错误、隐藏 SSID、路由器 DHCP 异常、AP 信道/IP/DHCP 网段配置错误，或专用启动入口早于 userdata 挂载/驱动就绪。 |
+| 恢复/需收集信息 | 不要在同一条 Wi-Fi SSH 会话中切换模式；通过有线入口重新配置。需要停用时执行 `wifi_setup --disable`；收集脚本完整错误、接口状态和去除凭据后的日志。 |
 
 ## 运行包校验失败
 
@@ -38,7 +38,7 @@
 |---|---|
 | 现象 | `error while loading shared libraries` 或运行到 `bin/` 程序时报 `.so` 缺失。 |
 | 检查 | `ls -l /root/demo/lib`；从 `/root/demo` 顶层启动脚本运行；直接运行 `bin/` 前执行 `. ./env.sh`。 |
-| 正常结果 | `libsc132.so*`、`libicm42670.so*`、`libprrtsp.so*` 存在，且优先从 `/root/demo/lib` 加载；ICM SONAME 为 `libicm42670.so.2`。 |
+| 正常结果 | `libsc132.so*`、`libicm42670.so*`、`libprrtsp.so*` 存在，且优先从 `/root/demo/lib` 加载；ICM SONAME 为 `libicm42670.so.3`，实体为 `libicm42670.so.3.0.0`，没有旧 `.2` 库或跨 major 链接。 |
 | 常见原因 | 只复制单个 ELF、漏复制 `lib/`、未加载 `env.sh`、混用了其他工程的同名 `.so`。 |
 | 恢复/需收集信息 | 重新整包部署并提供 `ls -l /root/demo /root/demo/lib` 和完整错误文本。 |
 
@@ -101,7 +101,7 @@
 | 检查 | 使用`ros2 run robobaton_4p_ros2_demo robobaton_imu_rate_monitor`并查看启动后的连续统计窗口。 |
 | 正常结果 | C++ monitor每秒输出`ROB2_IMU_RATE topic=/robobaton/imu/data hz=...`，稳定值接近配置目标。 |
 | 常见原因 | YAML未生效、DDS接收链路丢样、进程资源争用或仍在观察首个不完整统计窗口。 |
-| 恢复/需收集信息 | 确认 `imu.sample_rate_hz` 为 `25/50/100/200/400/800/1600` 中之一；旧 `500/1000/2000` 会被拒绝。收集 node 参数、连续 monitor 输出和进程日志。 |
+| 恢复/需收集信息 | 确认 `imu.sample_rate_hz` 为 `25/50/100/200/400/800/1600` 中之一；其他值会被拒绝。收集 node 参数、连续 monitor 输出和进程日志。 |
 
 ## ROS2 topic 无数据或资源冲突
 
@@ -128,7 +128,7 @@
 | 项目 | 内容 |
 |---|---|
 | 现象 | 只有某个 camera ID 无图或单颗诊断失败。 |
-| 检查 | `./cam_demo --camera-id <0|1|2|3> --diagnostics`；开发机拉对应端口 RTSP。CAM1..CAM4 依次对应软件 cam0..cam3，物理映射与 V1 保持一致。 |
+| 检查 | `./cam_demo --camera-id <0|1|2|3> --diagnostics`；开发机拉对应端口 RTSP。CAM1..CAM4 依次对应软件 cam0..cam3。 |
 | 正常结果 | 对应 camera ID 单独启动并能在端口 `554/555/556/557` 中的对应端口出流。 |
 | 常见原因 | 对应 FPC、供电、I2C、MIPI/VIN 链路异常。 |
 | 恢复/需收集信息 | 记录失败 camera ID、端口、demo 日志。 |
@@ -163,6 +163,10 @@
 | 常见原因 | 客户端软件解码或渲染吞吐不足；四路H.265仍可能超过客户端能力。 |
 | 恢复/需收集信息 | 更换支持H.265硬解的播放器，或从`30fps`降到`25fps`并减少播放路数；收集客户端型号、播放器、codec 和帧率。 |
 
+## 相机缺少有界 LPWM 映射
+
+`missing bounded LPWM clock mapping; fail closed` 表示正式交付帧未取得有效触发时间，不使用到帧时间或最近邻代替。`reason=exact_record_rejected` 表示精确触发已记录但未通过有界重建；保留 `record_vsync_ticks`、`record_trigger_ticks`、`lower_raw_ns`、`upper_raw_ns`，检查计数器关系及 `500000ns` 采样窗口上限。`reason=not_retained` 只说明查找时历史中没有该触发，不能仅凭历史已满断言覆盖；请求等于 `last_overwritten_trigger_ns` 才证明最近一次覆盖了该身份。收集整行日志、启动配置和系统调度状态，不放宽窗口或把此诊断当作稳定性修复。
+
 ## IMU 无数据或异常
 
 | 项目 | 内容 |
@@ -172,6 +176,10 @@
 | 正常结果 | 能持续输出样本；无系统校时的窗口应 `timestamp_duplicates=0`、`timestamp_regressions=0`，校时允许 realtime 回拨。最终健康有效，计数与实际载荷符合业务要求。 |
 | 常见原因 | SPI 设备、供电/焊接/设备树或采样率错误；实时调度权限不足；IRQ/SPI 长延迟触发 timing 拒绝，或身份/时钟证书失效。默认 counted drop 不等于零丢失。 |
 | 恢复/需收集信息 | 保留完整启动/退出日志、校时状态、`SENSOR_IMU_RESULT` 和成功 stop 后 `IMU_RUNTIME_HEALTH final=yes health_valid=yes`、`/dev/spidev2.0` 状态。不要扩大不确定度门限或把旧样本填回。 |
+
+INT1 仅用于唤醒排空 FIFO，不再逐项认证包/沿身份。`gpio_event_gap_count` 只统计可检测的缺失通知序号值：不证明物理沿或样本丢失，也不单独导致失败；缺少通知时仍通过有界等待检查 FIFO。FIFO overflow、坏包、时钟歧义和无效 epoch 仍失败，应保留完整日志、样本序号、TMST/RAW 与最终健康证据。host 时间是原始 burst 完成观测，允许重复和系统回拨；不能要求唯一 host、用 host 或递增 realtime 判定样本顺序。该架构不修复 GPIO/IRQ/kernel 根因；仍需匹配 BSP 的 IRQ/SPI 延迟证据，不放宽 `200µs` 或合成样本时间。重复启动通过不代表持续采集通过。
+
+排查 IRQ/SPI 延迟时，同时检查 BSP 的 spidev 逐传输 dynamic-debug 是否开启，以及内核日志速率。高频同步调试输出会改变采集运行条件；与普通应用 stdout 日志不同，减少应用打印不会关闭它。先保留原 flags 和失败日志，仅在获准的独立对照实验中关闭对应打印点，结束后恢复并核对。应用与 SO 不自动修改全局 debug、IRQ 或系统实时配额；关闭调试后通过不等于原环境通过，也不豁免身份与不确定度检查。
 
 ## 曝光观测不可用或 FSYNC 不完整
 
@@ -186,10 +194,10 @@
 | 项目 | 内容 |
 |---|---|
 | 现象 | `serial_port_demo` 发送或接收无数据。 |
-| 检查 | `ls -l /dev/ttyS1 /dev/ttyS7`；UART1/UART7 为 `3.3V`，DEBUG_UART 为 `1.8V`。CN2/CN3 5pin 完整线序以正式 V2 标识为准；核实线序和对端电平后断电接线，不按 V1 4pin 照片接线。 |
+| 检查 | `ls -l /dev/ttyS1 /dev/ttyS7`；UART1/UART7 为 `3.3V`，DEBUG_UART 为 `1.8V`。CN2/CN3 5pin 完整线序待正式 V2 硬件资料确认；核实线序、对端电平和共地后断电接线，不猜测针脚用途。 |
 | 软件示例预期 | 设备节点存在，双方 8N1/raw/no-flow-control 参数一致；`serial_port_demo` 只适用于 UART1/UART7，不适用于 DEBUG_UART。 |
 | 常见原因 | 端口选错、波特率不一致、TX/RX 未交叉或接线错误、对端未发送。 |
-| 恢复/需收集信息 | 收集设备节点、baud、mode 和已核实的接线方向；V1 UART 硬件验收不构成 V2 验收。`serial_port_demo` 仅用于普通用户 UART，不用于 DEBUG_UART。 |
+| 恢复/需收集信息 | 收集设备节点、baud、mode 和已核实的接线方向；供电脚额定值和热插拔条件待确认，不接适配器 VCC，不反灌。`serial_port_demo` 仅用于普通用户 UART，不用于 DEBUG_UART。 |
 
 ## 退出后资源未释放
 

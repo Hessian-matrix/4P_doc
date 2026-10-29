@@ -5,7 +5,7 @@
 适用范围：
 
 - [`RoboBaton_4p_demo`](https://github.com/Hessian-matrix/RoboBaton_4p_demo)：non-ROS 四目 RTSP、IMU、UART 和 SocketCAN CAN 示例。
-- [`RoboBaton_4P_ROS2_demo`](https://github.com/Hessian-matrix/RoboBaton_4P_ROS2_demo)：ROS2 四目 NV12/raw+compressed 图像、CameraInfo、IMU 和温度 topic 示例。
+- [`RoboBaton_4P_ROS2_demo`](https://github.com/Hessian-matrix/RoboBaton_4P_ROS2_demo)：ROS2 四目 NV12/raw+compressed 图像、CameraInfo、曝光观测、IMU、温度及可选 FSYNC topic 示例。
 
 ## 1. 编译边界
 
@@ -32,6 +32,14 @@ RoboBaton_4P_ROS2_demo
 - ROS2：`include/robobaton_4p_ros2_demo/`、`lib/libicm42670.so*`、`lib/libsc132.so*`，构建时还需要 X5 交叉编译包提供目标侧 ROS2、`hb_media_codec.h`、`libmultimedia.so.1`、`libhbmem.so.1` 和 `libalog.so.1`。
 
 这些仓库不编译底层 ICM42670、SC132 或 PRRTSP producer 源码。如果没有 X5 交叉编译工具链，不能重新编译源码，只能直接使用仓库里的 `demo/` 或已生成的 install 包部署运行。
+
+每套库固定为一份普通文件 `libNAME.so.M.m.p`，加两个同目录相对链接 `libNAME.so.M -> libNAME.so.M.m.p`、`libNAME.so -> libNAME.so.M`。non-ROS 使用 ICM42670、SC132、PRRTSP；ROS2 只使用前两者。同步、打包和 install 保留链接，verifier 拒绝展开别名、错误/绝对/断裂链接。完整复制使用 `tar`、`cp -a` 或 `rsync -a`，不要解引用链接。
+
+non-ROS `runtime-provenance.json` 使用 v3：普通文件字节与链接原始文本分别绑定，源码输入中的链接按链接文本哈希。旧 provenance 的运行包须用当前脚本重新生成；软件版本与 SONAME/ABI 不因此改变。两个 SHA-256 manifest 仍包含别名解析后的字节哈希，不能单独代替链接元数据检查。
+
+当前成套库为 ICM42670 `libicm42670.so.3.0.0`、SONAME `libicm42670.so.3`、所有导出 `ICM42670_X5_3.0`；SC132 `libsc132.so.3.0.0`、SONAME `libsc132.so.3`、`LIBSC132_3.0`；PRRTSP `libprrtsp.so.2.0.1`、SONAME `libprrtsp.so.2`、`LIBPRRTSP_2.0`。升级前同步公开头与库，移除 ICM42670/SC132 旧 `.2` 库，重新构建所有 consumer，不能建立跨 major 链接。软件 `2.0.0`、硬件 V2.2、文档修订及 SO ABI 独立；编译成功不认证当前组成的吞吐、压力或长录，见{ref}`能力与验证边界 <capability-verification-boundary>`。
+
+干净目标系统中 `python3`/`libstdc++` 的镜像与运行包归属仍待确认。构建、链接与 package/install verifier 不等于所有干净镜像运行依赖已经验证；部署前按实际系统确认依赖，不依靠文档版本推断。
 
 ## 2. 准备交叉编译环境
 

@@ -12,15 +12,15 @@
 
 ## On-Board Wi-Fi Configuration Failure
 
-For the full upload, interactive configuration, and log paths see [Wi-Fi Configuration](getting-started/wifi-configuration.md).
+For full image integration, interactive configuration, and log paths see [Wi-Fi Configuration](getting-started/wifi-configuration.md).
 
 | Item | Content |
 |---|---|
-| Symptom | `/userdata/wifi_setup.sh` reports a missing command, cannot scan any SSID, authentication fails, DHCP fails, AP cannot start, or Wi-Fi is not restored after boot. |
-| Check | Log in through the wired network or `1.8V` DEBUG_UART; run `/userdata/wifi_setup.sh --status`; check `ip link show wlan0`, `iw dev wlan0 info`, `/userdata/wifi/logs/`, and `/userdata/wifi/boot.log`. |
-| Normal result | AP mode shows hostapd `ENABLED` and clients get addresses in the configured subnet; STA mode shows association and a DHCP address; with boot-restore enabled, `/userdata/startup.sh` and `current.conf` exist. |
-| Common causes | Missing Wi-Fi user-space tools, antenna/signal problems, wrong SSID/password, hidden SSID, router DHCP problems, AP channel/IP/DHCP subnet misconfiguration, or a pre-existing `/userdata/startup.sh` not managed by this script. |
-| Recovery / info to collect | Do not switch modes in the same Wi-Fi SSH session; reconfigure through the wired entry. To disable, run `/userdata/wifi_setup.sh --disable`; collect full script errors, interface state, and credential-stripped logs. |
+| Symptom | `wifi_setup` reports a missing command, cannot scan any SSID, authentication fails, DHCP fails, AP cannot start, or Wi-Fi is not restored after boot. |
+| Check | Log in through wired Ethernet or `1.8V` DEBUG_UART; run `wifi_setup --status`; check `ip link show wlan0`, `iw dev wlan0 info`, `/userdata/wifi/logs/`, and `/userdata/wifi/boot.log`. |
+| Normal result | AP mode shows hostapd `ENABLED` and clients get addresses in the configured subnet; STA mode shows association and a DHCP address; with boot restore enabled, `/userdata/wifi/autostart.enabled` and `current.conf` exist. |
+| Common causes | Missing Wi-Fi user-space tools, antenna/signal problems, wrong SSID/password, hidden SSID, router DHCP problems, AP channel/IP/DHCP subnet misconfiguration, or the dedicated entry running before userdata mounting/driver readiness. |
+| Recovery / info to collect | Do not switch modes in the same Wi-Fi SSH session; reconfigure through the wired entry. To disable, run `wifi_setup --disable`; collect full script errors, interface state, and credential-stripped logs. |
 
 ## Runtime Package Verification Failure
 
@@ -38,7 +38,7 @@ For the full upload, interactive configuration, and log paths see [Wi-Fi Configu
 |---|---|
 | Symptom | `error while loading shared libraries`, or `.so` missing when running a `bin/` program. |
 | Check | `ls -l /root/demo/lib`; run from the `/root/demo` top-level launcher script; run `. ./env.sh` before directly running `bin/`. |
-| Normal result | `libsc132.so*`, `libicm42670.so*`, and `libprrtsp.so*` exist and load preferentially from `/root/demo/lib`; ICM SONAME is `libicm42670.so.2`. |
+| Normal result | `libsc132.so*`, `libicm42670.so*`, and `libprrtsp.so*` exist and load preferentially from `/root/demo/lib`; ICM uses SONAME `libicm42670.so.3` and real file `libicm42670.so.3.0.0`, without old `.2` libraries or cross-major links. |
 | Common causes | Only a single ELF copied, `lib/` omitted, `env.sh` not loaded, or same-named `.so` mixed from other projects. |
 | Recovery / info to collect | Re-deploy the full package and provide `ls -l /root/demo /root/demo/lib` and the full error text. |
 
@@ -101,7 +101,7 @@ For the full upload, interactive configuration, and log paths see [Wi-Fi Configu
 | Check | Use `ros2 run robobaton_4p_ros2_demo robobaton_imu_rate_monitor` and view the consecutive statistics windows after startup. |
 | Normal result | The C++ monitor outputs `ROB2_IMU_RATE topic=/robobaton/imu/data hz=...` every second, with the stable value close to the configured target. |
 | Common causes | YAML not applied, DDS receive-link sample loss, process resource contention, or still observing the first incomplete statistics window. |
-| Recovery / info to collect | Confirm `imu.sample_rate_hz` is one of `25/50/100/200/400/800/1600`; old `500/1000/2000` values are rejected. Collect node parameters, consecutive monitor output, and process logs. |
+| Recovery / info to collect | Confirm `imu.sample_rate_hz` is one of `25/50/100/200/400/800/1600`; other values are rejected. Collect node parameters, consecutive monitor output, and process logs. |
 
 ## ROS2 Topic Has No Data or Resource Conflict
 
@@ -128,7 +128,7 @@ For the full upload, interactive configuration, and log paths see [Wi-Fi Configu
 | Item | Content |
 |---|---|
 | Symptom | Only a certain camera ID has no image or a single-sensor diagnostic fails. |
-| Check | `./cam_demo --camera-id <0|1|2|3> --diagnostics`; pull the corresponding RTSP port from the host. CAM1..CAM4 map respectively to software cam0..cam3, with physical mapping unchanged from V1. |
+| Check | `./cam_demo --camera-id <0|1|2|3> --diagnostics`; pull the corresponding RTSP port from the host. CAM1..CAM4 map respectively to software cam0..cam3. |
 | Normal result | The corresponding camera ID starts alone and streams on the matching port among `554/555/556/557`. |
 | Common causes | The corresponding FPC, power, I2C, or MIPI/VIN link is abnormal. |
 | Recovery / info to collect | Record the failed camera ID, port, and demo log. |
@@ -163,6 +163,10 @@ For the full upload, interactive configuration, and log paths see [Wi-Fi Configu
 | Common causes | Insufficient client software-decode/render throughput; four-channel H.265 may still exceed client capability. |
 | Recovery / info to collect | Switch to a player with H.265 hardware decode, or drop from `30fps` to `25fps` and reduce the number of channels; collect client model, player, codec, and frame rate. |
 
+## Camera Has No Bounded LPWM Map
+
+`missing bounded LPWM clock mapping; fail closed` means a delivered frame has no valid trigger time; arrival time and nearest-neighbor matches are not substitutes. `reason=exact_record_rejected` means the exact trigger was recorded but bounded reconstruction rejected it. Retain `record_vsync_ticks`, `record_trigger_ticks`, `lower_raw_ns`, and `upper_raw_ns` to check counter relationships and the `500000ns` observation-window limit. `reason=not_retained` only means the trigger was absent at lookup; full history alone does not prove eviction. Only equality with `last_overwritten_trigger_ns` proves that the most recent overwrite removed that identity. Collect the complete log line, startup configuration, and scheduling state; do not widen the window or treat these diagnostics as a stability fix.
+
 ## IMU Has No Data or Is Abnormal
 
 | Item | Content |
@@ -172,6 +176,10 @@ For the full upload, interactive configuration, and log paths see [Wi-Fi Configu
 | Normal result | Samples continue; windows without clock corrections should have `timestamp_duplicates=0` and `timestamp_regressions=0`, while realtime may step backward during correction. Final health is valid and counters agree with actual payloads and application requirements. |
 | Common causes | SPI, power/soldering/device-tree, or sample-rate errors; missing realtime scheduling permission; long IRQ/SPI delays causing timing rejection, or invalid identity/clock certificates. Default counted drops are not zero loss. |
 | Recovery / info to collect | Keep full startup/exit logs, clock-correction state, `SENSOR_IMU_RESULT`, `IMU_RUNTIME_HEALTH final=yes health_valid=yes` after successful stop, and `/dev/spidev2.0` state. Do not widen uncertainty gates or fill gaps with old samples. |
+
+INT1 only wakes FIFO draining; packets and edges are no longer individually identity-certified. `gpio_event_gap_count` counts detectable missing notification sequence values: it is not proof of physical-edge/sample loss or independently fatal. Bounded waits still check FIFO without notifications. FIFO overflow, bad packets, ambiguous clocks, and invalid epochs still fail; preserve full logs, sample sequences, TMST/RAW observations, and final health. Host time is the original burst-completion observation, so duplicates and wall-clock steps are valid; do not require unique host stamps or infer sample order from host or increasing realtime. This architecture does not fix the GPIO/IRQ/kernel root cause. Matching-BSP IRQ/SPI latency evidence remains necessary; never widen `200µs` or synthesize sample times. Passing repeated starts does not establish sustained acquisition.
+
+When investigating IRQ/SPI latency, also check whether the BSP enables per-transfer spidev dynamic-debug and measure the kernel-log rate. High-frequency synchronous debug output changes acquisition conditions; reducing application stdout does not disable it. Preserve the original flags and failure log first. Disable only the relevant print site in a separately authorized comparison, then restore and verify it afterward. Applications and SOs do not automatically change global debug, IRQ settings, or system realtime quotas. Passing with debug disabled does not establish a pass in the original environment or waive identity and uncertainty checks.
 
 ## Unavailable Exposure Observations or Incomplete FSYNC
 
@@ -186,10 +194,10 @@ For the full upload, interactive configuration, and log paths see [Wi-Fi Configu
 | Item | Content |
 |---|---|
 | Symptom | `serial_port_demo` sends or receives no data. |
-| Check | `ls -l /dev/ttyS1 /dev/ttyS7`; UART1/UART7 use `3.3V`, DEBUG_UART uses `1.8V`. Use official V2 labeling for the complete CN2/CN3 5-pin order; verify peer voltage and wire with power off, not from V1 4-pin photographs. |
+| Check | `ls -l /dev/ttyS1 /dev/ttyS7`; UART1/UART7 use `3.3V`, DEBUG_UART uses `1.8V`. The complete CN2/CN3 5-pin order awaits official V2 hardware confirmation. Check pin order, peer voltage, and common ground, then wire with power off; do not guess pin functions. |
 | Software-example expectation | Device nodes exist and both sides agree on 8N1/raw/no-flow-control; `serial_port_demo` applies only to UART1/UART7, not DEBUG_UART. |
 | Common causes | Wrong port, mismatched baud rate, TX/RX not crossed or miswired, or the peer not sending. |
-| Recovery / info to collect | Collect the node, baud, mode, and confirmed wiring direction; V1 UART hardware acceptance is not V2 acceptance. `serial_port_demo` applies to normal user UARTs, not DEBUG_UART. |
+| Recovery / info to collect | Collect the node, baud, mode, and confirmed wiring direction. Power-pin ratings and hot-plug conditions await confirmation; leave adapter VCC disconnected and prevent reverse feed. `serial_port_demo` applies to normal user UARTs, not DEBUG_UART. |
 
 ## Resources Not Released After Exit
 

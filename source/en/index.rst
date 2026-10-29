@@ -27,6 +27,7 @@ Code repositories
    getting-started/hardware-and-safety
    getting-started/first-boot
    getting-started/wifi-configuration
+   getting-started/tf-card
    time-sync/system-time-sync
    quick-start
    development/code-and-interfaces
