@@ -1,6 +1,6 @@
 # Wi-Fi 配置
 
-本页说明镜像内 `wifi_setup` 命令的使用方法；源码来自 non-ROS 公开仓库 `scripts/wifi_setup.sh`。镜像需同时集成命令与专用启动入口，不再单独上传脚本到 `/userdata`。支持：
+本页说明 `wifi_setup` 命令的使用方法；支持：
 
 - **AP 模式**：把 X5 变成 2.4 GHz Wi-Fi 热点，并通过 DHCP 给客户端分配地址；
 - **客户端（STA）模式**：扫描可见 Wi-Fi，连接路由器并通过 DHCP 获取地址；
@@ -16,14 +16,14 @@
 
 - 使用 `root` 登录 X5；
 - X5 已识别板载 Wi-Fi 接口，默认接口名为 `wlan0`；
-- 镜像提供 Bash、`/usr/bin/env`、`ip`、`iw`、`hostapd`、`dnsmasq`、`wpa_supplicant`、`wpa_cli`、`udhcpc`、`killall`、`awk`、`sed`、`flock`、`mountpoint`、`seq` 和常用 BusyBox 命令；
+- 系统提供 Bash、`/usr/bin/env`、`ip`、`iw`、`hostapd`、`dnsmasq`、`wpa_supplicant`、`wpa_cli`、`udhcpc`、`killall`、`awk`、`sed`、`flock`、`mountpoint`、`seq` 和常用 BusyBox 命令；
 - `/userdata` 是已挂载的持久化分区，`/run` 是每次开机清空的运行态目录；
-- 镜像包含 `/usr/bin/wifi_setup`、`/etc/init.d/S99wifi_setup`，启动入口晚于 userdata 挂载和无线驱动就绪；
+- 系统包含 `/usr/bin/wifi_setup`、`/etc/init.d/S99wifi_setup`，启动入口晚于 userdata 挂载和无线驱动就绪；
 - 本工具独占无线服务进程。现有全局停止操作不适合与其他接口的 DHCP/DNS 管理器共用。
 
-## 2. 检查镜像集成
+## 2. 使用入口
 
-使用镜像维护者提供的 rootfs 集成包，按随包说明合入匹配的 BSP 后重新构建烧录。此包不包含驱动、固件或无线工具，也不预置现场凭据。烧录后在板端检查：
+系统内置 `/usr/bin/wifi_setup` 和 `/etc/init.d/S99wifi_setup`，分别作为 Wi-Fi 配置命令和开机恢复入口。正常使用无需额外上传或安装脚本。可在板端检查入口和帮助：
 
 ```bash
 command -v wifi_setup
@@ -32,21 +32,19 @@ mountpoint /userdata
 wifi_setup --help
 ```
 
-镜像维护者需移除旧 Wi-Fi 自动启动调用，包括旧 `S41wifi_manager` 和共享 `/userdata/startup.sh` 中的 Wi-Fi 调用，但保留其他应用内容。新命令不再改写该共享文件，也不自动迁移旧自启动设置；重新配置一次即可。不能只复制脚本后期望开机恢复生效。
-
 ## 3. 启动交互配置
 
 需要保留交互式终端，因此推荐使用 `ssh -t`：
 
 ```bash
-X5_IP=192.168.1.12  # 改成实际板卡地址
+X5_IP='BOARD_IP'  # 将 BOARD_IP 替换为实际板卡地址
 ssh -t root@${X5_IP} "wifi_setup"
 ```
 
 也可以先登录板端再运行：
 
 ```bash
-X5_IP=192.168.1.12  # 改成实际板卡地址
+X5_IP='BOARD_IP'  # 将 BOARD_IP 替换为实际板卡地址
 ssh root@${X5_IP}
 wifi_setup
 ```
@@ -137,7 +135,7 @@ AP 或 STA 启动成功后，脚本会询问：
 `/etc/init.d/S99wifi_setup` 在 userdata 挂载与驱动就绪后执行：
 
 ```bash
-wifi_setup --boot
+/usr/bin/wifi_setup --boot
 ```
 
 未启用时不触碰接口；启用但配置缺失时明确失败，不建立默认开放热点。一次开机成功恢复后重复 start 不重置连接；`/run/wifi_setup.boot-applied` 只记录本次恢复，不代表实时连接健康。`--stop` 清除该运行态标记，但不删除持久化启用标记。没有后台重连监督或新增 DHCP 续租服务。
@@ -177,7 +175,7 @@ wifi_setup --help
 
 | 路径 | 内容 |
 |---|---|
-| `/usr/bin/wifi_setup` | 镜像内 Wi-Fi 配置程序。 |
+| `/usr/bin/wifi_setup` | Wi-Fi 配置程序。 |
 | `/etc/init.d/S99wifi_setup` | 专用开机恢复入口。 |
 | `/userdata/wifi/autostart.enabled` | 持久化开机启用标记。 |
 | `/userdata/wifi/current.conf` | 已保存模式和凭据，权限为 `600`。 |
@@ -198,7 +196,7 @@ wifi_setup --help
 
 ### 提示缺少命令
 
-脚本启动时会检查全部 AP/STA 依赖。出现 `缺少命令` 时，说明当前系统镜像不包含完整 Wi-Fi 用户态工具；不要从未知来源覆盖系统命令，应记录缺失命令和系统版本并联系产品支持。
+脚本启动时会检查全部 AP/STA 依赖。出现 `缺少命令` 时，说明当前系统不包含完整 Wi-Fi 用户态工具；不要从未知来源覆盖系统命令，应记录缺失命令和系统版本并联系产品支持。
 
 ### STA 未扫描到 SSID
 
@@ -254,9 +252,9 @@ cat /userdata/wifi/boot.log
 wifi_setup --status
 ```
 
-确认专用启动入口在 userdata 挂载和驱动就绪之后执行；首次未配置时没有 boot.log 属正常。完整冷启动需用最终镜像实板验收，手动 start 不代替整机重启。若沿用静态有线路由，镜像中的 `S41eth0-route-fallback` 在 `S40network` 后设置 `net.ipv4.conf.eth0.ignore_routes_with_linkdown=1`；不改变地址、网关或 metric，只处理无载波的 IPv4 路由，不检测上游故障或 IPv6。
+确认专用启动入口在 userdata 挂载和驱动就绪之后执行；首次未配置时没有 boot.log 属正常。应在实际设备上确认冷启动恢复，手动 start 不代替整机重启。若沿用静态有线路由，`S41eth0-route-fallback` 在 `S40network` 后设置 `net.ipv4.conf.eth0.ignore_routes_with_linkdown=1`；不改变地址、网关或 metric，只处理无载波的 IPv4 路由，不检测上游故障或 IPv6。
 
-### 需要恢复有线配置入口
+### 停止 Wi-Fi
 
 通过有线以太网或 `1.8V` DEBUG_UART 登录后执行：
 

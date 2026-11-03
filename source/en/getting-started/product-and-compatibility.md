@@ -6,7 +6,7 @@ This page describes compatibility between current RoboBaton 4P V2 source, non-RO
 
 See [Release, License, and Support](../release-and-support.md#documentation-version-policy) for the current documentation revision, software releases, and shared version definitions. A documentation revision does not require software versions to increase with it.
 
-Current hardware revision V2.2, software `2.0.0`, documentation, and SO ABI are identified independently. Supported parameters do not mean all mode/load/duration combinations passed. See {ref}`Capability and Verification Boundaries <capability-verification-boundary>` for high-rate, pressure, long-recording, and peripheral limits.
+Hardware identity, software `2.0.0`, documentation, and SO ABI are identified independently. Supported parameters do not mean all mode/load/duration combinations passed. See {ref}`Capability and Verification Boundaries <capability-verification-boundary>` for high-rate, pressure, long-recording, and peripheral limits.
 
 V2 uses ICM-42670-P, API `icm42670_*`, ABI 3.0, real SO `libicm42670.so.3.0.0`, and SONAME `libicm42670.so.3`. Every export uses only `ICM42670_X5_3.0`, without old aliases. Field layouts remain unchanged, but host time becomes the SPI FIFO burst-completion observation and INT1 is wake-only; FIFO order and measured TMST define samples. Synchronize headers, libraries, consumers, and configuration, rebuild every consumer, and remove old `.2` libraries without cross-major links. Software VERSION is unchanged. Native ODRs are `25/50/100/200/400/800/1600Hz`, default `800Hz`; unsupported rates are explicitly rejected, not silently resampled.
 

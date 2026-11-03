@@ -1,5 +1,20 @@
 # 故障排查
 
+## 局域网预览无画面或 IMU 失效
+
+| 项目 | 内容 |
+|---|---|
+| 现象 | `sensor_demo` 运行，但页面打不开、单路等待关键帧、视频停顿或六轴显示失效。 |
+| 检查 | 确认当前运行包包含匹配的 `bin/sensor_web` 与 SO；检查有效 `web.enabled`、`rtsp.enabled`、H.264 配置、应用日志中的 `web=degraded` 及源采集错误。确认 HTTP TCP 80（或显式端口）与媒体 UDP/TCP 8189 均可达；检查端口 owner，勿终止其他服务。 |
+| 正常结果 | 默认仅 Web 开启，四路解码帧数持续增加；IMU 新值持续到达。RTSP 关闭时没有其 listener，网页不依赖 RTSP。 |
+| 常见原因 | 混用旧工件、80/8189 冲突、跨网段/防火墙、H.265 不受 Web 支持、浏览器不支持真实 H.264 profile/level、源启动失败或遥测超过 500ms 未更新。 |
+| 恢复/需收集信息 | 整包校验后部署；有端口冲突时显式配置备用端口，不抢占。提供版本、有效配置、源/Web 日志、浏览器版本、逐路 decoded/lost/decoder 及网络信息。`decoder: unknown` 只表示诊断未提供，不证明软解或硬解失败。匿名 HTTP 仅用于可信 LAN；不开放公网来排障。 |
+
+### Windows 视频彩色竖条，但 decoded 仍增加
+
+旧 H.264 producer 可能声明 Main 却保留 SDK 默认的 High-only 8×8 transform；部分硬解器会持续输出错误画面，即使 lost 为零。当前 producer 显式关闭该功能，H.265 不受此修改影响。校验并更新完整运行包后正常重启 `sensor_demo`，再刷新网页；只换网页资源无法修复正在运行的编码器。可在独立浏览器进程临时禁用加速视频解码作对照，但这不是正式修复，也不要据此关闭所有用户浏览器。收集实际截图、浏览器/系统/驱动版本及源 SPS/PPS；当前 SDK 仍可能输出取值为零的 PPS 扩展字段，不承诺严格 Main 语法合规或全部硬解器兼容。
+
+
 ## SSH 无法连接
 
 | 项目 | 内容 |
@@ -194,7 +209,7 @@ INT1 仅用于唤醒排空 FIFO，不再逐项认证包/沿身份。`gpio_event_
 | 项目 | 内容 |
 |---|---|
 | 现象 | `serial_port_demo` 发送或接收无数据。 |
-| 检查 | `ls -l /dev/ttyS1 /dev/ttyS7`；UART1/UART7 为 `3.3V`，DEBUG_UART 为 `1.8V`。CN2/CN3 5pin 完整线序待正式 V2 硬件资料确认；核实线序、对端电平和共地后断电接线，不猜测针脚用途。 |
+| 检查 | `ls -l /dev/ttyS1 /dev/ttyS7`；UART1/UART7 为 `3.3V`，DEBUG_UART 为 `1.8V`。UART1 为 CN1 4pin，UART7 为 CN2 5pin；对照{ref}`接口接线示意图 <wiring-diagram>`核实线序、对端电平和共地后断电接线，不凭插头左右位置猜测针序。 |
 | 软件示例预期 | 设备节点存在，双方 8N1/raw/no-flow-control 参数一致；`serial_port_demo` 只适用于 UART1/UART7，不适用于 DEBUG_UART。 |
 | 常见原因 | 端口选错、波特率不一致、TX/RX 未交叉或接线错误、对端未发送。 |
 | 恢复/需收集信息 | 收集设备节点、baud、mode 和已核实的接线方向；供电脚额定值和热插拔条件待确认，不接适配器 VCC，不反灌。`serial_port_demo` 仅用于普通用户 UART，不用于 DEBUG_UART。 |

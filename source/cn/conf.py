@@ -25,7 +25,7 @@ exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
 language = "zh_CN"
 
 html_theme = "sphinx_book_theme"
-html_title = "RoboBaton 4P 产品文档"
+html_title = "RoboBaton 4P V2 产品文档"
 html_show_sourcelink = False
 html_static_path = ["_static"]
 html_css_files = ["custom.css"]

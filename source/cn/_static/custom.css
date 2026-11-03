@@ -25,3 +25,39 @@
   outline: 2px solid var(--pst-color-primary);
   outline-offset: 2px;
 }
+
+/* Center short cell contents beside multiline descriptions throughout the docs. */
+.bd-article table th,
+.bd-article table td {
+  vertical-align: middle;
+}
+
+/* Dimension drawings wrap when two readable columns do not fit. */
+.dimension-drawings {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 1.5rem;
+  margin: 1.5rem 0;
+}
+
+.dimension-drawings > figure {
+  flex: 1 1 16rem;
+  min-width: 0;
+  max-width: 20rem;
+  margin: 0;
+}
+
+/* Keep the quantity column readable beside long accessory descriptions. */
+.product-composition th:nth-child(2),
+.product-composition td:nth-child(2) {
+  white-space: nowrap;
+  text-align: center;
+}
+
+/* Parameter names stay on one line; descriptions retain normal wrapping. */
+.product-parameters th:first-child,
+.product-parameters td:first-child {
+  white-space: nowrap;
+}

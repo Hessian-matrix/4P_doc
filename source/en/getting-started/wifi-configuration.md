@@ -1,6 +1,6 @@
 # Wi-Fi Configuration
 
-This page describes the image-provided `wifi_setup` command, sourced from `scripts/wifi_setup.sh` in the public non-ROS repository. Integrate both the command and its dedicated boot entry; uploading only a script to `/userdata` is no longer the installation method. Features:
+This page describes how to use the `wifi_setup` command. Features:
 
 - **AP mode**: turn the X5 into a 2.4 GHz Wi-Fi hotspot and assign addresses to clients via DHCP;
 - **Client (STA) mode**: scan visible Wi-Fi, connect to a router, and obtain an address via DHCP;
@@ -16,14 +16,14 @@ When switching AP/STA or disabling Wi-Fi, the script stops existing `hostapd`, `
 
 - Log into the X5 as `root`;
 - The X5 recognizes the on-board Wi-Fi interface, default interface name `wlan0`;
-- The image provides Bash, `/usr/bin/env`, `ip`, `iw`, `hostapd`, `dnsmasq`, `wpa_supplicant`, `wpa_cli`, `udhcpc`, `killall`, `awk`, `sed`, `flock`, `mountpoint`, `seq`, and common BusyBox commands;
+- The system provides Bash, `/usr/bin/env`, `ip`, `iw`, `hostapd`, `dnsmasq`, `wpa_supplicant`, `wpa_cli`, `udhcpc`, `killall`, `awk`, `sed`, `flock`, `mountpoint`, `seq`, and common BusyBox commands;
 - `/userdata` is a mounted persistent partition; `/run` is runtime storage cleared on every boot;
-- The image includes `/usr/bin/wifi_setup` and `/etc/init.d/S99wifi_setup`, ordered after userdata mounting and wireless driver readiness;
+- The system includes `/usr/bin/wifi_setup` and `/etc/init.d/S99wifi_setup`, ordered after userdata mounting and wireless driver readiness;
 - This tool exclusively owns wireless service processes. Its global stop operations are unsuitable for shared DHCP/DNS managers on other interfaces.
 
-## 2. Check Image Integration
+## 2. Command Entry
 
-Use the image maintainer's rootfs integration package and its instructions to rebuild and flash the matching BSP. The package does not include drivers, firmware, wireless utilities, or site credentials. After flashing, check on the device:
+The system includes `/usr/bin/wifi_setup` and `/etc/init.d/S99wifi_setup` as the Wi-Fi configuration command and boot-restore entry, respectively. Normal use requires no additional script upload or installation. Check the entries and help on the device:
 
 ```bash
 command -v wifi_setup
@@ -32,21 +32,19 @@ mountpoint /userdata
 wifi_setup --help
 ```
 
-The image maintainer must remove old Wi-Fi boot calls, including old `S41wifi_manager` and Wi-Fi calls in shared `/userdata/startup.sh`, preserving other applications. The new command never rewrites this shared file or automatically migrates old autostart settings; configure once again. Copying the script alone does not install boot restore.
-
 ## 3. Start Interactive Configuration
 
 An interactive terminal must be preserved, so `ssh -t` is recommended:
 
 ```bash
-X5_IP=192.168.1.12  # change to the actual board address
+X5_IP='BOARD_IP'  # replace BOARD_IP with the actual board address
 ssh -t root@${X5_IP} "wifi_setup"
 ```
 
 Alternatively, log into the device first and then run:
 
 ```bash
-X5_IP=192.168.1.12  # change to the actual board address
+X5_IP='BOARD_IP'  # replace BOARD_IP with the actual board address
 ssh root@${X5_IP}
 wifi_setup
 ```
@@ -137,7 +135,7 @@ After successful configuration, mode and credentials are saved to `/userdata/wif
 After userdata mounting and driver readiness, `/etc/init.d/S99wifi_setup` executes:
 
 ```bash
-wifi_setup --boot
+/usr/bin/wifi_setup --boot
 ```
 
 Disabled restore never touches the interface; enabled restore with missing configuration fails explicitly without creating an open default hotspot. Repeated start after a successful restore in the same boot does not reset the connection. `/run/wifi_setup.boot-applied` records only that restore, not live connection health. `--stop` clears this runtime marker but preserves the persistent opt-in marker. No background reconnection supervisor or new DHCP renewal service is added.
@@ -177,7 +175,7 @@ After choosing "Disable Wi-Fi" in the interactive menu, it also asks whether to 
 
 | Path | Content |
 |---|---|
-| `/usr/bin/wifi_setup` | Image-provided Wi-Fi configuration program. |
+| `/usr/bin/wifi_setup` | Wi-Fi configuration program. |
 | `/etc/init.d/S99wifi_setup` | Dedicated boot-restore entry. |
 | `/userdata/wifi/autostart.enabled` | Persistent boot opt-in marker. |
 | `/userdata/wifi/current.conf` | Saved mode and credentials, permissions `600`. |
@@ -198,7 +196,7 @@ After choosing "Disable Wi-Fi" in the interactive menu, it also asks whether to 
 
 ### Missing Command Prompt
 
-The script checks all AP/STA dependencies at startup. A `missing command` prompt means the current system image does not include the complete Wi-Fi user-space tools; do not overwrite system commands from unknown sources — record the missing commands and system version and contact product support.
+The script checks all AP/STA dependencies at startup. A `missing command` prompt means the current system does not include the complete Wi-Fi user-space tools; do not overwrite system commands from unknown sources — record the missing commands and system version and contact product support.
 
 ### STA Scans No SSID
 
@@ -254,9 +252,9 @@ cat /userdata/wifi/boot.log
 wifi_setup --status
 ```
 
-Confirm the dedicated entry runs after userdata mounting and driver readiness. No boot.log is normal before first configuration. Validate cold boot on the final image; manual start is not a substitute for a full reboot. With static Ethernet routes, the image's `S41eth0-route-fallback` sets `net.ipv4.conf.eth0.ignore_routes_with_linkdown=1` after `S40network`. Addresses, gateway, and metric remain unchanged. This handles carrier-down IPv4 routes only, not upstream failures or IPv6.
+Confirm the dedicated entry runs after userdata mounting and driver readiness. No boot.log is normal before first configuration. Verify cold-boot restoration on the actual device; manual start is not a substitute for a full reboot. With static Ethernet routes, `S41eth0-route-fallback` sets `net.ipv4.conf.eth0.ignore_routes_with_linkdown=1` after `S40network`. Addresses, gateway, and metric remain unchanged. This handles carrier-down IPv4 routes only, not upstream failures or IPv6.
 
-### Restore the Wired Configuration Entry
+### Stop Wi-Fi
 
 Log in through wired Ethernet or the `1.8V` DEBUG_UART and run:
 

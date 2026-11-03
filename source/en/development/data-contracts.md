@@ -110,6 +110,12 @@ Field semantics:
 
 The IMU samples continuously and independently. FIFO order and measured chip TMST define sequence and time; INT1 only wakes FIFO draining, without per-packet pairing. FSYNC uses chip tags/deltas and measured endpoints to identify the first tagged sample after a trigger, not exposure simultaneity. Exposure midpoint, TF extrinsics, and calibration remain unavailable. Neither host observations nor FSYNC deltas are sample time. Both realtime stamps follow clock corrections; unique host values and increasing wall time are not acquisition-order requirements.
 
+### Web Attitude Preview Inputs
+
+The `sensor_demo` IMU SSE retains `schema_version: 1` and adds three-element arrays `attitude_accel_mps2` (`m/s²`) and `attitude_gyro_rps` (`rad/s`) for browser attitude preview only. Raw `accel_mps2` / `gyro_rps`, values/traces, native sampling, saved data, and C ABI are unchanged. Nanosecond timestamps, sequences, and session IDs remain decimal strings to preserve precision.
+
+The device processes all six axes at every native sample through four cascaded one-pole low-pass stages before extracting telemetry. Each pole is `min(10Hz, telemetry limit×0.2, source rate×0.2)`, with about 64ms low-frequency group delay at the default 800→50Hz. The timestamp identifies the current input sample, not a delay-compensated measurement or a single raw observation. Invalid input produces JSON `null` attitude-array elements. Non-increasing timestamps, a sequence reset, or native-sample gaps over 100ms reseed history without synthesizing missing samples. Filtering estimates neither attitude nor bias; the browser independently fuses inputs and uses raw axes for stationary-quality checks. Absolute heading and removal of vibration-rectification error are not guaranteed.
+
 ### FSYNC Trigger-to-Sample Association
 
 Disabled by default. Non-ROS uses `sensor_demo --fsync --sample-rate-hz 1600` or YAML `imu.fsync_enabled: true`; ROS2 sets `imu.fsync_enabled:=true` and `imu.sample_rate_hz:=1600`. Only `800/1600Hz` are supported; the rate is not changed automatically. The tighter `800Hz` budget can cause more timing drops; `1600Hz` also does not guarantee an admissible sample for every trigger.
@@ -206,6 +212,6 @@ ROS2 does not publish RTSP, TF extrinsics, or calibration. FSYNC provides trigge
 | serial_port_demo data format | 8N1, raw, no flow control |
 | demo modes | `tx`, `rx`, `txrx`, `echo` |
 | UART1/UART7 TX/RX signal logic level | `3.3V`; DEBUG_UART uses `1.8V`. |
-| UART1/UART7 power pins | V2 CN2/CN3 power function, voltage, rated load, and hot-plug limits await confirmation. Wire with power off by default, leave adapter VCC disconnected, and prevent reverse feed. |
+| UART1/UART7 power pins | Pin 1 is the 3V3 power pin; leave it disconnected by default. Rated load and hot-plug limits await confirmation. Wire with power off, leave adapter VCC disconnected, and prevent reverse feed. |
 
-V2 UART1/UART7 use CN2/CN3 5-pin connectors and `/dev/ttyS1`, `/dev/ttyS7`. CN3 has an independent IO enabled as PPS input by default, without RX/TX mux switching; discover the enumerated PPS device. Use official V2 labeling for complete pin order and power-pin function. DEBUG_UART is not a user serial port. Wire with power off after checking TX/RX/GND, peer voltage, and common ground; leave adapter VCC disconnected and prevent reverse feed. See [Hardware Connection and Safety](../getting-started/hardware-and-safety.md#uart).
+UART1 uses CN1 GH1.25 4-pin and `/dev/ttyS1`; UART7 uses CN2 GH1.25 5-pin and `/dev/ttyS7`. UART7 pin 4 is the independent PPS input, enabled by default without RX/TX mux switching; discover the enumerated PPS device. See the {ref}`Interface Wiring Diagram <wiring-diagram>` for pin numbers and signal order, and check orientation against physical labeling before crimping. DEBUG_UART is not a user serial port. Wire with power off after checking TX/RX/GND, peer voltage, and common ground; leave adapter VCC disconnected and prevent reverse feed. See [Hardware Connection and Safety](../getting-started/hardware-and-safety.md#uart).

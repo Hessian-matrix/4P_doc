@@ -1,5 +1,20 @@
 # Troubleshooting
 
+## LAN Preview Has No Video or IMU Is Stale
+
+| Item | Content |
+|---|---|
+| Symptom | `sensor_demo` is running, but the page is unreachable, a camera waits for a keyframe/freezes, or six-axis data is stale. |
+| Check | Confirm matching `bin/sensor_web` and SOs in the runtime. Check effective `web.enabled`, `rtsp.enabled`, H.264 configuration, `web=degraded` logs, and source errors. Allow both HTTP TCP 80 (or the explicit port) and media UDP/TCP 8189. Inspect port owners without stopping other services. |
+| Normal result | Only Web is enabled by default; decoded frames keep increasing for all cameras and fresh IMU values arrive. Disabled RTSP has no listener; Web does not depend on RTSP. |
+| Common causes | Mixed artifacts, 80/8189 conflicts, routing/firewall issues, unsupported Web H.265, unsupported actual H.264 profile/level, source startup failure, or no fresh telemetry for 500ms. |
+| Recovery / info to collect | Verify and deploy the whole package. Use an explicit alternate port for conflicts, without taking over services. Collect versions, effective configuration, source/Web logs, browser version, per-camera decoded/lost/decoder stats, and network details. `decoder: unknown` means diagnostics are unavailable, not proven software decoding or hardware failure. Anonymous HTTP is for trusted LANs; do not expose it publicly for diagnosis. |
+
+### Windows Video Shows Colored Vertical Stripes While Decoded Frames Increase
+
+An older H.264 producer may advertise Main while retaining the SDK's default High-only 8×8 transform. Some hardware decoders continue producing incorrect pixels even with zero packet loss. The current producer explicitly disables that tool; H.265 is unchanged. Verify and update the whole runtime package, stop and restart `sensor_demo` normally, then refresh the page. Replacing page assets alone cannot fix a running encoder. Temporarily disabling accelerated video decoding in an isolated browser process can provide a comparison, not a permanent fix; do not close unrelated user browsers. Collect screenshots, browser/OS/driver versions, and source SPS/PPS. The current SDK may still emit zero-valued PPS extension fields, so strict Main syntax conformance or compatibility with every hardware decoder is not guaranteed.
+
+
 ## SSH Cannot Connect
 
 | Item | Content |
@@ -194,7 +209,7 @@ When investigating IRQ/SPI latency, also check whether the BSP enables per-trans
 | Item | Content |
 |---|---|
 | Symptom | `serial_port_demo` sends or receives no data. |
-| Check | `ls -l /dev/ttyS1 /dev/ttyS7`; UART1/UART7 use `3.3V`, DEBUG_UART uses `1.8V`. The complete CN2/CN3 5-pin order awaits official V2 hardware confirmation. Check pin order, peer voltage, and common ground, then wire with power off; do not guess pin functions. |
+| Check | `ls -l /dev/ttyS1 /dev/ttyS7`; UART1/UART7 use `3.3V`, DEBUG_UART uses `1.8V`. UART1 uses CN1 4-pin and UART7 CN2 5-pin. Check pin order, peer voltage, and common ground against the {ref}`Interface Wiring Diagram <wiring-diagram>`, then wire with power off; do not infer pin order from connector left-to-right placement. |
 | Software-example expectation | Device nodes exist and both sides agree on 8N1/raw/no-flow-control; `serial_port_demo` applies only to UART1/UART7, not DEBUG_UART. |
 | Common causes | Wrong port, mismatched baud rate, TX/RX not crossed or miswired, or the peer not sending. |
 | Recovery / info to collect | Collect the node, baud, mode, and confirmed wiring direction. Power-pin ratings and hot-plug conditions await confirmation; leave adapter VCC disconnected and prevent reverse feed. `serial_port_demo` applies to normal user UARTs, not DEBUG_UART. |

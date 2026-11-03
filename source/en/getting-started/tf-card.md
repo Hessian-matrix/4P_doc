@@ -2,10 +2,10 @@
 
 ## 1. Purpose and Safety Boundaries
 
-A TF card can serve as a data disk on an already flashed system; this does not require reflashing or change the system boot medium. This guide applies to boards with a TF slot and an SD-enabled BSP. It is not a TF boot or flashing guide.
+A TF card can serve as a data disk on an already flashed system; this does not require reflashing or change the system boot medium.
 
 ```{warning}
-The TF hot-plug hardware repair is user-confirmed, not certification of every board/BSP/card model or permission to remove a card during recording/writes. Finish acquisition and saving, wait for finalization, sync, and successfully unmount before removal. Hardware not confirmed to have the applicable repair still requires normal shutdown and power-off insertion/removal. Back up existing data first. Never partition, format, repair, or write raw data to an unidentified device, especially the system eMMC. This guide does not provide automatic formatting or boot-time mounting scripts.
+Do not remove the card or cut power during recording or writes. Before removal, finish every application writing to the card normally, wait for finalization, sync, and successfully unmount. Back up existing data first. Never partition, format, repair, or write raw data to an unidentified device, especially the system eMMC. This guide does not provide automatic formatting or boot-time mounting scripts.
 ```
 
 “Inserted,” “controller present,” “SD block device present,” “filesystem mounted,” and “successful I/O and recording” are separate states. Creating a directory or seeing `/media` does not establish a TF mount: `/media` itself may be tmpfs. Continuing after a failed mount can write into RAM or the system disk.
@@ -147,13 +147,13 @@ Use `Ctrl+C` to finish foreground recording normally, then wait for finalization
    ```
 
 3. Unmounting is complete only if `umount` succeeds and the last command reports no mount record. For `target is busy`, inspect users with `fuser -m "$TF_MOUNT"` and exit each application through its own normal protocol. Do not kill unknown processes or bypass the problem with forced/lazy unmounting.
-4. On hardware matching the confirmed TF repair, remove the card only after successful unmount and confirmation that no users remain. Shut down and disconnect power on other hardware. Never remove it or cut power during writes; after reinsertion, repeat enumeration and mount-identity checks from section 2.
+4. Remove the card only after successful unmount and confirmation that no users remain. Never remove it or cut power during recording or writes; after reinsertion, repeat enumeration and mount-identity checks from section 2.
 
 ## 7. Troubleshooting
 
 | Symptom | Checks |
 |---|---|
-| Card inserted but no SD block device | Shut down and disconnect power, then check orientation and seating. Inspect the card with a reader or try a known-good card. After restarting, inspect `dmesg`, `/sys/class/mmc_host/`, and `device/type`. Formatting does not solve failure to enumerate. |
+| Card inserted but no SD block device | Check orientation and seating. Inspect the card with a reader or try a known-good card. After reinsertion, inspect `dmesg`, `/sys/class/mmc_host/`, and `device/type`. Formatting does not solve failure to enumerate. |
 | MMC host exists but no SD device | A host only establishes controller presence. Read `/sys/kernel/debug/mmcN/ios` if the BSP exposes it. `0 Hz` or `power mode: off` alone cannot distinguish contact, detect-signal, power, or driver causes. Product support should inspect the actual device tree and card-detect path; do not arbitrarily toggle GPIO, unbind the driver, or rescan. |
 | SD device exists but no `p1` | The card may lack a partition table or it was not parsed. Inspect with `lsblk`/`blkid` without writing, then back up before changes. |
 | `unknown filesystem type` / `wrong fs type` | Cross-check the partition, `blkid`, and kernel support; filesystem damage is another possibility. Do not repeatedly force mounting, repair a mounted filesystem, or immediately format. |
@@ -161,4 +161,4 @@ Use `Ctrl+C` to finish foreground recording normally, then wait for finalization
 | Failure near 4GiB per file | Check for FAT32; after backup, consider ext4/exFAT supported by the target BSP. |
 | Directory survives reboot but the card is unmounted | Manual mounts are not persistent. Repeat sections 2–4. A directory or free space reported by `df` does not prove TF backing; verify the exact mountpoint and device number. |
 
-See [Linux mount(8)](https://man7.org/linux/man-pages/man8/mount.8.html) for mount options and ext4 read-only journal behavior. The TF hot-plug repair is user-confirmed, not a new real-board retest by this guide. It implies neither a new hardware version nor acceptance of every card model, capacity, automatic mount, or long recording. Actual detection and functionality still apply; see {ref}`Capability and Verification Boundaries <capability-verification-boundary>`.
+See [Linux mount(8)](https://man7.org/linux/man-pages/man8/mount.8.html) for mount options and ext4 read-only journal behavior.

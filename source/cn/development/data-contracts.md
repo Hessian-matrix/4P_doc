@@ -110,6 +110,12 @@ non-ROS 联合入口 `sensor_demo` 也可在 `config/sensor_config.yaml` 中设�
 
 IMU 独立连续采样；FIFO 顺序与实测芯片 TMST 定义序列和时间，INT1 仅用于唤醒排空 FIFO，不与包逐项配对。FSYNC 使用芯片标记/delta 与实测端点，识别触发后的首个标记样本，不表示与曝光同时发生。仍不提供曝光中心、TF 外参或标定。不能把 host 观测或 FSYNC delta 冒充样本时间；两类 realtime stamp 均随系统校时，不能以唯一 host 或递增墙钟判断采集顺序。
 
+### Web 姿态预览输入
+
+`sensor_demo` 的 IMU SSE 保持 `schema_version: 1`，增加 `attitude_accel_mps2`（`m/s²`）和 `attitude_gyro_rps`（`rad/s`）三个元素数组；只供浏览器姿态预览。原始 `accel_mps2` / `gyro_rps`、数值/趋势、原生采样、保存数据与 C ABI 不变。纳秒时间戳、序号与会话 ID 仍用十进制字符串保持精度。
+
+设备在每个原生样本上对六轴执行四级一阶低通后再抽取遥测；单级极点为 `min(10Hz, 遥测上限×0.2, 原生采样率×0.2)`，默认 800→50Hz 的低频群延迟约 64ms。时间戳表示当前输入样本，不补偿为无延迟测量，也不代表单次原始样本。无效输入的姿态数组元素为 JSON `null`；时间不递增、序号重置或大于 100ms 原生样本缺口后重新播种，不合成缺失样本。滤波不估计姿态或零偏；浏览器仍独立融合并用原始六轴执行静置质量检查。无绝对航向或振动整流误差消除保证。
+
 ### FSYNC 触发—样本关联
 
 默认关闭。non-ROS 使用 `sensor_demo --fsync --sample-rate-hz 1600` 或 YAML `imu.fsync_enabled: true`；ROS2 设置 `imu.fsync_enabled:=true` 和 `imu.sample_rate_hz:=1600`。仅支持 `800/1600Hz`，不自动修改采样率。`800Hz` 时间预算较紧，可能有较多 timing drop；`1600Hz` 同样不保证每个触发均有可发布样本。
@@ -206,6 +212,6 @@ ROS2 当前不发布 RTSP、TF 外参或标定；FSYNC 只提供触发—样本�
 | serial_port_demo 数据格式 | 8N1、raw、无 flow control |
 | demo 模式 | `tx`、`rx`、`txrx`、`echo` |
 | UART1/UART7 TX/RX 信号逻辑电平 | `3.3V`；DEBUG_UART 为 `1.8V`。 |
-| UART1/UART7 供电脚 | V2 CN2/CN3 的供电用途、电平、额定负载和热插拔边界待确认，默认断电接线，不接适配器 VCC，不反灌。 |
+| UART1/UART7 供电脚 | 1 号针为 3V3 供电脚，默认不接；额定负载和热插拔边界待确认。断电接线，不接适配器 VCC，不反灌。 |
 
-V2 UART1/UART7 对应 CN2/CN3 5pin 接口与 `/dev/ttyS1`、`/dev/ttyS7`。CN3 有独立 IO 默认作为 PPS 输入，不需要复用或切换 RX/TX；PPS 设备节点按系统枚举识别。完整线序及供电脚用途以正式 V2 标识为准。DEBUG_UART 非用户串口；默认断电接线，核实 TX/RX/GND、对端电平及共地，不接适配器 VCC，不反灌。见[硬件连接与安全](../getting-started/hardware-and-safety.md#uart)。
+UART1 对应 CN1 GH1.25 4pin 与 `/dev/ttyS1`，UART7 对应 CN2 GH1.25 5pin 与 `/dev/ttyS7`。UART7 的 4 号针为独立 PPS 输入，系统默认启用，不需要复用或切换 RX/TX；PPS 设备节点按系统枚举识别。针号与线序见{ref}`接口接线示意图 <wiring-diagram>`，压接前按实物标识核对方向。DEBUG_UART 非用户串口；默认断电接线，核实 TX/RX/GND、对端电平及共地，不接适配器 VCC，不反灌。见[硬件连接与安全](../getting-started/hardware-and-safety.md#uart)。

@@ -37,7 +37,7 @@ RoboBaton_4P_ROS2_demo
 
 non-ROS `runtime-provenance.json` 使用 v3：普通文件字节与链接原始文本分别绑定，源码输入中的链接按链接文本哈希。旧 provenance 的运行包须用当前脚本重新生成；软件版本与 SONAME/ABI 不因此改变。两个 SHA-256 manifest 仍包含别名解析后的字节哈希，不能单独代替链接元数据检查。
 
-当前成套库为 ICM42670 `libicm42670.so.3.0.0`、SONAME `libicm42670.so.3`、所有导出 `ICM42670_X5_3.0`；SC132 `libsc132.so.3.0.0`、SONAME `libsc132.so.3`、`LIBSC132_3.0`；PRRTSP `libprrtsp.so.2.0.1`、SONAME `libprrtsp.so.2`、`LIBPRRTSP_2.0`。升级前同步公开头与库，移除 ICM42670/SC132 旧 `.2` 库，重新构建所有 consumer，不能建立跨 major 链接。软件 `2.0.0`、硬件 V2.2、文档修订及 SO ABI 独立；编译成功不认证当前组成的吞吐、压力或长录，见{ref}`能力与验证边界 <capability-verification-boundary>`。
+当前成套库为 ICM42670 `libicm42670.so.3.0.0`、SONAME `libicm42670.so.3`、所有导出 `ICM42670_X5_3.0`；SC132 `libsc132.so.3.0.0`、SONAME `libsc132.so.3`、`LIBSC132_3.0`；PRRTSP `libprrtsp.so.2.0.1`、SONAME `libprrtsp.so.2`、`LIBPRRTSP_2.0`。升级前同步公开头与库，移除 ICM42670/SC132 旧 `.2` 库，重新构建所有 consumer，不能建立跨 major 链接。软件 `2.0.0`、硬件标识、文档修订及 SO ABI 独立；编译成功不认证当前组成的吞吐、压力或长录，见{ref}`能力与验证边界 <capability-verification-boundary>`。
 
 干净目标系统中 `python3`/`libstdc++` 的镜像与运行包归属仍待确认。构建、链接与 package/install verifier 不等于所有干净镜像运行依赖已经验证；部署前按实际系统确认依赖，不依靠文档版本推断。
 
@@ -98,13 +98,19 @@ git clone https://github.com/Hessian-matrix/RoboBaton_4p_demo.git
 cd RoboBaton_4p_demo
 ```
 
-完整编译六个 demo：
+完整编译六个 demo 及应用拥有的 `sensor_web`，额外需要精确的 Go `1.27.3`（主机工具，不安装到板端）。预先安装并核对工具链，以允许联网的依赖准备阶段执行 `go mod download`；实际构建强制 `GOTOOLCHAIN=local`、离线 module cache 与 readonly modules，不自动下载工具链或依赖。
 
 ```bash
+export GO=/path/to/go1.27.3/bin/go # 改为已安装的精确工具链
+GOTOOLCHAIN=local "$GO" env GOVERSION # 必须为 go1.27.3
+(cd web/server && GOTOOLCHAIN=local "$GO" mod download)
 cmake -S . -B build_x5 \
-  -DCMAKE_TOOLCHAIN_FILE="$TOOLCHAIN_FILE"
+  -DCMAKE_TOOLCHAIN_FILE="$TOOLCHAIN_FILE" \
+  -DSENSOR_WEB_GO_EXECUTABLE="$GO"
 cmake --build build_x5 -j
 ```
+
+`sensor_web` 为静态 Linux ARM64 可执行程序，嵌入页面和 Pion；`sensor_demo` 目标依赖它。运行包包含 `licenses/sensor_web/` 的完整 notice 和 module 锁。修改 Web 源码/资源/锁后必须重建，verifier 从 ELF 读取固定 Go/module、应用版本与源码摘要，拒绝旧 binary 配新资源；不要 strip 此 Go ELF，也不要仅修改 sidecar 哈希。独立构建使用 `scripts/build_sensor_web.sh --go "$GO" --output build_x5/sensor_web`；完整打包可用 `scripts/package_runtime.sh --go "$GO"`。
 
 也可以只编译单个目标：
 

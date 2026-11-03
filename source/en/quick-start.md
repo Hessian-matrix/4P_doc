@@ -2,25 +2,28 @@
 
 This page only covers "get it running as fast as possible". If `/root/demo` or `/root/ros2_demo/install` is not yet deployed, complete the safe deployment per [Deployment, Upgrade, and Rollback](development/deployment-and-upgrade.md) first; for single-sensor diagnostics, UART, detailed parameters, and error isolation see [non-ROS Demo Usage](usage/non-ros-demo.md), [ROS2 Demo Usage](usage/ros2-demo.md), [Hardware Connection and Safety](getting-started/hardware-and-safety.md), and [Troubleshooting](troubleshooting.md) respectively.
 
+With the release system pre-flashed on the supplied board, `sensor_demo` starts automatically at boot. Open `http://192.168.1.12/` (adjust to the actual board address) in a browser on the same trusted LAN to view four cameras/IMU and control recording, without the manual launch commands below. See {ref}`First Power-On: Browser Use <first-boot-web>` for the illustration and steps.
+
 ## 1. Choose a Path
 
 | Goal | Usage path | Suitable scenario |
 |---|---|---|
+| Browser preview and recording | Boot-started `sensor_demo` | View sensors and start/stop recording directly in the browser, without SSH. |
 | Four-channel RTSP, IMU, UART examples | non-ROS `/root/demo` | Not using ROS2; fastest way to confirm video streams and sensor output. |
 | ROS2 image and IMU topics | ROS2 `/root/ros2_demo/install` | Subscribe to raw/compressed images, CameraInfo, exposure observations, IMU, temperature, and optional FSYNC. |
 
-Do not let the two paths occupy camera resources at the same time; before switching, exit the old camera application and keep `cam-service` running.
+Do not let the two paths occupy camera resources at the same time. Before running the manual or ROS2 commands below, stop the boot-started instance per [First Power-On: Stop the Application](getting-started/first-boot.md#7-stop-the-application) and confirm a graceful exit. Keep `cam-service` running. The browser's Stop Recording does not exit the application.
 
 ## 2. Shortest non-ROS Run
 
-In the X5 SSH terminal:
+Only when a manual run is needed and the previous camera application has exited, run in the X5 SSH terminal. This command explicitly enables RTSP for the player checks below:
 
 ```bash
 cd /root/demo
-./sensor_demo
+./sensor_demo --rtsp
 ```
 
-`sensor_demo` runs four SC132 cameras, PRRTSP v2 H.264 RTSP streaming, and ICM-42670-P IMU acquisition (native default `800Hz`). The default image is `1280x1088@30fps`, supporting `25/30/40/50/60fps`; the output canvas supports `1280x1088`/`640x480`/`720x480`/`1280x720`. This is the implemented parameter set, not a guarantee of sustained target rate or zero loss on every saving/ROS2 path. See {ref}`Capability and Verification Boundaries <capability-verification-boundary>` for demonstrated scope and unresolved issues.
+`sensor_demo` defaults to four SC132 cameras, H.264 browser preview, and ICM-42670-P IMU acquisition (native default `800Hz`). RTSP defaults off; this section explicitly enables PRRTSP v2 streaming with `--rtsp`. The default image is `1280x1088@30fps`, supporting `25/30/40/50/60fps`; the output canvas supports `1280x1088`/`640x480`/`720x480`/`1280x720`. This is the implemented parameter set, not a guarantee of sustained target rate or zero loss on every saving/ROS2 path. See {ref}`Capability and Verification Boundaries <capability-verification-boundary>` for demonstrated scope and unresolved issues.
 
 Saving and FSYNC default off. See [non-ROS Demo Usage](usage/non-ros-demo.md) and [Saving Data](usage/save-data-guide.md) for bag/MP4 recording, explicit `--fsync --sample-rate-hz 1600`, and per-frame ISP exposure estimates. Cameras need read-only `/dev/mem` and realtime scheduling permission; configuration failure rejects startup. Exposure estimates do not change default trigger stamps; explicit exposure-midpoint test mode is described in [Data Contracts](development/data-contracts.md).
 
@@ -82,6 +85,8 @@ Expect `/robobaton/cam0..3/image_raw`, `/robobaton/cam0..3/image_raw/compressed`
 ## 4. Stop the Program
 
 Foreground `sensor_demo`, ROS2 launch, or nodes stop with `Ctrl+C`. Confirm exit:
+
+Gracefully stop the boot-started background application with `/root/demo/start_sensor_demo.sh stop` and wait for success; do not launch duplicates or force-kill it. The browser's Stop Recording only stops saving, not acquisition.
 
 ```bash
 pgrep -af 'sensor_demo|cam_demo|robobaton_sensors_node|ros2 launch|ros2 run' || true

@@ -16,16 +16,28 @@ This document applies to runtime packages whose `sensor_demo --help` includes bo
 
 ROS1 bag and MP4 are two mutually exclusive save modes and currently cannot be enabled simultaneously in the same process.
 
+### Dynamic Web Sessions
+
+With a complete runtime supporting Web recording, open `http://<device-ip>/` and use the always-present “录制与保存” (Recording and Saving) card on the homepage. Its single form shows format, fixed storage, start/stop/query, device state, duration, and bytes written by default. Frame skipping and minimum drop interval are in the initially closed Advanced Options section; free space, drop counts, session, path, final integrity, and other details are in the initially closed Recording Details and Usage section. Actual errors, uncertain commands, and stopping/finalization messages remain outside the folds. Existing fresh-state/capability checks and command locks remain; controls do not act on missing/stale status or an uncertain command outcome. Cameras, IMU, and preview keep running after recording stops; mutually exclusive sessions can be repeated. CLI/YAML startup recording remains and can be stopped from Web. See [Web Recording Control](non-ros-demo.md#web-recording-control) for operation and access boundaries.
+
+Expanding or collapsing advanced options or recording details does not send stop, reset options or bias, or recreate WebRTC, SSE, or the attitude Worker. Invalid hidden advanced values automatically open the section before browser validation feedback. `Esc` only exits single-camera expansion and is not a recording control. Refresh still resets browser-local options to defaults and clears preview bias without changing device recording state.
+
+Web allows only fixed runtime storage (standard package `/root/demo/bin/recordings`) or `/mnt/sdcard/recordings` on mounted TF. The device allocates session names, with no custom paths or eMMC fallback for absent TF. Start requires at least 64 MiB free, not a guarantee of sufficient space throughout recording. Recording/storage failures report failed/partial and clean up that session rather than masquerading as success; source failures still stop acquisition.
+
+Stop only requests finalization. Wait for device `published_complete`, `data_complete=true`, and `cleanup_complete=true`, then cross-check actual payloads. Web results and `SENSOR_RECORDING_RESULT` are session results and do not require acquisition-process exit. `partial`, `failed`, `aborted`, or incomplete cleanup is not complete data. Collapsing details, closing the browser, and network loss do not stop recording. Query actual state after a timeout; do not blindly retry. Incomplete cleanup blocks a new session.
+
+Dynamic MP4 uses `imu_health_scope=callback_window` to check native samples, sequence continuity, counter differences, and queue writes for that window. It waits for the first valid IDR and boundedly waits for a common encoded group at stop. This does not establish losslessness outside the window or for the whole producer. Final producer health after process shutdown applies only to a still-active startup-auto session. Preview filtering, attitude bias, and telemetry decimation do not alter saved values. There is no authentication: anyone reaching the device can start/stop disk writes. Use only a trusted isolated LAN.
+
 H.264 MP4 saving is recommended first: the four `cameraN.mp4` files play directly and reuse RTSP encoding. ROS1 bag stores JPEG messages for ROS1 tooling or later extraction. Supported frame rates are a parameter range, not a zero-loss guarantee; see section 9 for load boundaries. Startup and acceptance are in sections 5/7 respectively.
 
-Pressure bags may legally stop at strict drop-policy exhaustion; that is not a sustained-pressure pass. The current composition's `8h` MP4 + FSYNC recording has not started. Premature IMU admission closure at image-policy stop is fixed: normal finalization keeps IMU input open until producer shutdown and consumer drain, then closes the writer. The historical DDS publication/reception difference still cannot be exactly attributed. Continuous saved sequences do not prove every path retains all head/tail data; see {ref}`Capability and Verification Boundaries <capability-verification-boundary>`.
+Pressure bags may legally end their session at strict drop-policy exhaustion; that is not a sustained-pressure pass. The current composition's `8h` MP4 + FSYNC recording has not started. Normal application-exit finalization retains IMU input until producer shutdown and consumer drain, then closes the writer. Dynamic stop instead ends its callback window without stopping the producer. The historical DDS publication/reception difference still cannot be exactly attributed. Continuous saved sequences do not prove every path retains all head/tail data; see {ref}`Capability and Verification Boundaries <capability-verification-boundary>`.
 
 | Mode | Entry | Main output | Complete-save criterion |
 |---|---|---|---|
 | H.264 MP4 | `--record-mp4-dir` | One session directory | `SENSOR_MP4_RESULT ... outcome=published_complete data_complete=yes cleanup_complete=yes ... success=yes` |
 | ROS1 bag | `--record-bag` | One `.bag` file | `SENSOR_BAG_RESULT ... bag_outcome=published_complete data_complete=yes cleanup_complete=yes ... success=yes` |
 
-Only when the process exit code is 0 and the corresponding `SENSOR_*_RESULT` explicitly reports completeness can the data be used as formally complete data. `.partial`, a nonzero exit code, or `data_complete=no` can only be used as recovery or diagnostic data.
+For startup command-line recording, also check process exit code 0 and an explicitly complete corresponding `SENSOR_*_RESULT`. Dynamic Web sessions use the session final result described above. Partial, `data_complete=no`, or relevant errors are recovery/diagnostic data only.
 
 Here, complete is first the individual recorder's publication result, not universal proof that every hardware sample, exposure observation, or FSYNC association is complete. Default `--imu-sample-drop-policy allow-counted` continues after counted timing rejection when identity remains provable. Bag completeness checks the session and recorder queue/write errors; it does not independently require zero producer timing drops. MP4 additionally requires valid final producer health, published=observed=admitted=written>0, continuous sequences, zero FIFO/timing/invalid-packet drops, and maximum sample uncertainty at most `200µs`. `gpio_event_gap_count` diagnoses missing wake-notification sequence values, not physical-edge/sample loss, and does not independently fail bag/MP4 completeness. For a zero-loss dataset, check final health and actual saved payloads in both modes. `strict` fails on timing/invalid-packet rejection but does not guarantee success under arbitrary load. Repeated host observations and wall-clock rollback are valid; sample sequence defines order.
 
@@ -96,6 +108,10 @@ df -i /root/data/robobaton
 Before starting, reserve enough capacity for video, temporary staging, final publication, and failure recovery.
 
 For TF storage, follow [TF Card Usage](../getting-started/tf-card.md) to identify the SD device, partition, and exact mount backing first. Do not create the save directory or start recording when unmounted, to avoid writing into tmpfs or the system disk.
+
+**eMMC/TF write-pressure warning:** Four-camera bag/MP4 recording is itself a sustained high-volume write workload. Keep it as the only high-throughput disk-writing task where possible, choosing either bag or MP4. Avoid concurrent recording, storage stress tools, large file copies/downloads, archive extraction, or dataset extraction/conversion, especially writes to the same target medium. Copy, extract, and convert data after recording has stopped normally and finalization has completed.
+
+Reducing concurrent writes lowers bandwidth contention and write-stall risk, but does not guarantee that a single recording cannot build a backlog. Actual JPEG size, bit rate, sustained media throughput, free space, and filesystem state still affect the result. After changing eMMC/TF storage or recording parameters, check final status and actual payloads. Existing whole-group drops, partial output, and explicit-stop semantics remain; this advice is not a zero-loss guarantee.
 
 ### 3.3 Environment and External Tools
 

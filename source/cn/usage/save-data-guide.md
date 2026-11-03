@@ -16,16 +16,28 @@
 
 ROS1 bag 与 MP4 是两种互斥的保存模式，当前不能在同一个进程中同时开启。
 
+### 网页动态会话
+
+运行支持网页录制的完整包后，打开 `http://<设备IP>/`，直接使用首页常驻的“录制与保存”卡片。唯一表单默认显示格式、固定存储、开始/停止/查询、设备状态、时长和已写入量；图像隔帧与最小丢组间隔在默认折叠的“高级选项”中，可用空间、丢弃计数、会话、路径和最终完整性等在默认折叠的“录制详情与使用说明”中。实际错误、不确定命令和停止收尾提示不折叠。沿用实时状态/能力检查与命令锁定，状态缺失/过期或命令结果不确定时不执行控制。相机、IMU 和预览不随停录而停止，可连续录制多个互斥会话。CLI/YAML 启动自动录制仍可用，网页可停止该会话。详细操作及访问边界见[网页控制录制](non-ros-demo.md#网页控制录制)。
+
+展开或收起高级选项与录制详情不发送停止、不重置选项或零偏，也不重建 WebRTC、SSE 或姿态 Worker。隐藏高级值无效时会先自动展开再显示校验提示。`Esc` 仅退出单路视频放大，不用于录制控制；刷新仍恢复浏览器本地选项默认值并清除预览零偏，不改变设备录制状态。
+
+网页仅允许固定运行目录（标准包 `/root/demo/bin/recordings`）或已挂载 TF 的 `/mnt/sdcard/recordings`；设备生成会话名，不接受自定义路径。TF 缺失不会退回 eMMC。开始时至少需要 64 MiB 可用空间，此检查不是整个录制期间空间充足的保证。录制/存储故障报告 failed/partial 并清理本次会话，不伪装成功；源故障仍停止采集。
+
+停止仅表示请求收尾；必须等待设备报告 `published_complete`、`data_complete=true`、`cleanup_complete=true`，并按实际载荷核对。网页最终结果和 `SENSOR_RECORDING_RESULT` 是会话结果，不必等采集进程退出。`partial`、`failed`、`aborted`、清理未完成都不能当作完整数据。收起详情、关闭浏览器和断网不会停录；超时后查询实际状态，不要盲目重发。未清理完成时禁止新会话。
+
+动态 MP4 用 `imu_health_scope=callback_window` 检查本次窗口的原生样本、序号、计数差值与队列写入，等待首个有效 IDR，停止时有界等待共同编码组；这不证明窗口外或整个 producer 无丢失。进程退出后的 producer final health 仅用于仍活跃的启动自动会话。预览滤波、姿态零偏和遥测降频不改变保存值。无身份认证，能访问设备的人都能开始/停止写盘；仅用于可信隔离 LAN。
+
 推荐优先使用 H.264 MP4 保存：四路 `cameraN.mp4` 可直接播放，并复用 RTSP 编码结果；ROS1 bag 保存 JPEG 消息，适合 ROS1 消息工具或后续解包分析。支持的帧率是参数范围，不是零丢失保证，负载边界见第 9 节。两种模式的启动与验收分别见第 5/7 节。
 
-高压 bag 在严格丢组策略耗尽时合法停止，不是持续压力通过；当前新组成 `8h` MP4 + FSYNC 长录尚未启动。已修复图像策略停止时提前关闭 IMU 接纳的缺陷；正常收尾保持 IMU 输入直到 producer 停止、consumer 排空后再关闭 writer。历史 DDS 发布/接收差额仍未精确归因，不能仅凭保存序列连续证明所有路径头尾无损；统一结论见{ref}`能力与验证边界 <capability-verification-boundary>`。
+高压 bag 在严格丢组策略耗尽时合法结束本次会话，不是持续压力通过；当前新组成 `8h` MP4 + FSYNC 长录尚未启动。应用退出的正常收尾保持 IMU 输入直到 producer 停止、consumer 排空后再关闭 writer；动态停录以本次 callback window 为边界，不停止 producer。历史 DDS 发布/接收差额仍未精确归因，不能仅凭保存序列连续证明所有路径头尾无损；统一结论见{ref}`能力与验证边界 <capability-verification-boundary>`。
 
 | 模式 | 入口 | 主要输出 | 完整保存判据 |
 |---|---|---|---|
 | H.264 MP4 | `--record-mp4-dir` | 一个 session 目录 | `SENSOR_MP4_RESULT ... outcome=published_complete data_complete=yes cleanup_complete=yes ... success=yes` |
 | ROS1 bag | `--record-bag` | 一个 `.bag` 文件 | `SENSOR_BAG_RESULT ... bag_outcome=published_complete data_complete=yes cleanup_complete=yes ... success=yes` |
 
-只有进程退出码为 0 且对应 `SENSOR_*_RESULT` 明确报告完整，才可把数据作为正式完整数据使用。`.partial`、非零退出码或 `data_complete=no` 只能作为恢复或诊断数据。
+启动命令行录制在进程退出时，还须检查退出码为 0 且对应 `SENSOR_*_RESULT` 明确完整。网页动态会话按上面的会话最终结果判断；`.partial`、`data_complete=no` 或相关错误只能作为恢复或诊断数据。
 
 这里的 complete 首先是各 recorder 的发布结果，不是所有硬件样本、曝光或 FSYNC 关联都完整的统一证明。默认 `--imu-sample-drop-policy allow-counted` 允许可证明身份的 timing 拒绝计数后继续；bag 的 complete 判定检查会话和 recorder 队列/写入错误，不单独强制 producer timing drop 为零。MP4 还要求最终 producer 健康有效、published=observed=admitted=written>0、序号连续、FIFO/timing/invalid-packet drop 为零，最大样本不确定度不超过 `200µs`。`gpio_event_gap_count` 是缺失唤醒通知序号诊断，不证明物理沿或样本丢失，也不单独使 bag/MP4 失败。若要求零丢失数据集，两种模式都要核对最终健康与实际保存载荷；`strict` 可使 timing/无效包拒绝立即失败，但不保证任意负载成功。重复 host 与系统校时回拨合法，不能代替样本序号判断顺序。
 
@@ -96,6 +108,10 @@ df -i /root/data/robobaton
 开始前应为视频、临时 staging、最终 publication 和故障保留空间预留足够容量。
 
 保存到 TF 卡时，先按[TF 卡使用](../getting-started/tf-card.md)确认 SD 设备、分区与精确挂载身份；未挂载时不要创建保存目录或启动录制，避免误写 tmpfs 或系统盘。
+
+**eMMC／TF 写入压力提醒：** 四目 bag／MP4 本身就是大数据量持续写入。录制期间尽量只保留一个大吞吐写盘任务，bag 与 MP4 二选一；避免同时运行其他录制、存储压测、大文件复制／下载、解压或数据解包／转换，尤其不要向同一目标介质并行写入。数据复制、解包和转换应在录制正常停止并完成 finalize 后进行。
+
+减少并行写入可以降低带宽竞争和写盘停顿风险，但不保证单个录制任务永不积压：实际 JPEG 字节量、码率、介质持续写入能力、剩余空间与文件系统状态仍会影响结果。更换 eMMC／TF 或录制参数后仍须检查最终状态和实际载荷；保留既有整组丢弃、partial 与显式停止语义，不将此建议视为零丢失保证。
 
 ### 3.3 环境与外部工具
 

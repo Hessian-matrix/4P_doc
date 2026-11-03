@@ -12,6 +12,8 @@
 - 用户侧故障排查、进阶部署/开发/API/数据合同；
 - 发布、授权和支持信息清单。
 
+说明和使用类文档统一维护在本仓库；non-ROS 与 ROS2 代码仓的 README 仅保留仓库简介、最小运行方式和文档引用，避免重复维护。
+
 不得写入内部测试资料、原始证据、历史调试记录、用户修改后的板卡 IP、唯一设备数据、非默认账号/凭据、内部路径或交付前检查清单。产品负责人确认的官方出厂默认 IP、账号和密码可在首次上电等公开资料中发布。
 
 ## 代码仓库
@@ -28,7 +30,7 @@
 
 完整公开政策见 [中文发布说明](source/cn/release-and-support.md#文档版本政策) 和 [English release policy](source/en/release-and-support.md#documentation-version-policy)。主仓门禁命令为 `python3 -B tests/version_reporting_contract_test.py`；中英文仍须分别通过严格 HTML 构建和 linkcheck。
 
-当前文档修订为 `2.0.14`，软件仍为 `2.0.0`；硬件 V2.2 与 SO ABI 独立识别。本次仅同步文档，不改变软件行为。当前参数支持范围与实际完成的验证范围分别维护在[中文能力与验证边界](source/cn/release-and-support.md#capability-verification-boundary)和[English capability and verification boundaries](source/en/release-and-support.md#capability-verification-boundary)：不承诺所有路径持续 `60fps`、任意负载零丢失或当前新组成已完成 `8h` 长录。
+当前文档修订为 `2.0.57`，软件仍为 `2.0.0`；硬件标识与 SO ABI 独立识别。首次上电页说明随板预烧录系统开机自启 `sensor_demo`、网页查看传感器和录包；出厂预烧录不表示已有公开镜像下载。USB 页面按匹配系统说明 USB3 RNDIS 默认配置、网络和切换边界，不再声称已集成五模式菜单。NTP 页面仅说明板端自动授时、服务器配置、自建局域网源和手动恢复，正常使用不需要逐板安装脚本。当前源码 Web 预览与本文档修订不代表新软件发布或真实双机/GPU验收。当前参数支持范围与实际完成的验证范围分别维护在[中文能力与验证边界](source/cn/release-and-support.md#capability-verification-boundary)和[English capability and verification boundaries](source/en/release-and-support.md#capability-verification-boundary)：不承诺所有路径持续 `60fps`、任意负载零丢失或当前新组成已完成 `8h` 长录。
 
 ## 当前在线文档目录
 

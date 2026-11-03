@@ -37,7 +37,7 @@ Each library family has one regular `libNAME.so.M.m.p` file and two exact same-d
 
 Non-ROS `runtime-provenance.json` uses v3: regular-file bytes and raw link text are bound separately; source-input links are hashed by link text. Regenerate packages with older provenance using the current script. This does not change software versions or SONAME/ABI. Both SHA-256 manifests still include resolved-byte hashes for aliases; these do not replace link-metadata verification.
 
-The current matched set is ICM42670 `libicm42670.so.3.0.0`, SONAME `libicm42670.so.3`, all exports `ICM42670_X5_3.0`; SC132 `libsc132.so.3.0.0`, SONAME `libsc132.so.3`, `LIBSC132_3.0`; PRRTSP `libprrtsp.so.2.0.1`, SONAME `libprrtsp.so.2`, `LIBPRRTSP_2.0`. Synchronize public headers and libraries before upgrading, remove old ICM42670/SC132 `.2` libraries, and rebuild every consumer, without cross-major links. Software `2.0.0`, hardware V2.2, documentation revision, and SO ABI are independent. Successful compilation does not certify current-composition throughput, pressure, or long recording; see {ref}`Capability and Verification Boundaries <capability-verification-boundary>`.
+The current matched set is ICM42670 `libicm42670.so.3.0.0`, SONAME `libicm42670.so.3`, all exports `ICM42670_X5_3.0`; SC132 `libsc132.so.3.0.0`, SONAME `libsc132.so.3`, `LIBSC132_3.0`; PRRTSP `libprrtsp.so.2.0.1`, SONAME `libprrtsp.so.2`, `LIBPRRTSP_2.0`. Synchronize public headers and libraries before upgrading, remove old ICM42670/SC132 `.2` libraries, and rebuild every consumer, without cross-major links. Software `2.0.0`, hardware identity, documentation revision, and SO ABI are independent. Successful compilation does not certify current-composition throughput, pressure, or long recording; see {ref}`Capability and Verification Boundaries <capability-verification-boundary>`.
 
 Clean-target-image versus runtime-package ownership of `python3`/`libstdc++` remains unresolved. Builds, links, and package/install verifiers do not establish runtime-dependency validation on every clean image. Confirm dependencies on the actual system before deployment, rather than infer them from documentation versions.
 
@@ -98,13 +98,19 @@ git clone https://github.com/Hessian-matrix/RoboBaton_4p_demo.git
 cd RoboBaton_4p_demo
 ```
 
-Build all six demos:
+Building all six demos and application-owned `sensor_web` additionally requires exact Go `1.27.3` on the host, not the device. Install and verify it first; use `go mod download` during a network-enabled dependency-provisioning step. Actual builds enforce `GOTOOLCHAIN=local`, an offline module cache, and readonly modules, without automatic compiler/dependency downloads.
 
 ```bash
+export GO=/path/to/go1.27.3/bin/go # replace with the installed exact compiler
+GOTOOLCHAIN=local "$GO" env GOVERSION # must be go1.27.3
+(cd web/server && GOTOOLCHAIN=local "$GO" mod download)
 cmake -S . -B build_x5 \
-  -DCMAKE_TOOLCHAIN_FILE="$TOOLCHAIN_FILE"
+  -DCMAKE_TOOLCHAIN_FILE="$TOOLCHAIN_FILE" \
+  -DSENSOR_WEB_GO_EXECUTABLE="$GO"
 cmake --build build_x5 -j
 ```
+
+`sensor_web` is a static Linux ARM64 executable embedding assets and Pion; the `sensor_demo` target depends on it. The runtime contains complete notices and the module lock under `licenses/sensor_web/`. Rebuild after changes to Web source/assets/locks. The verifier reads fixed Go/module identity, application version, and source digest from ELF and rejects stale binaries; do not strip this Go ELF or merely update sidecar hashes. Build it alone with `scripts/build_sensor_web.sh --go "$GO" --output build_x5/sensor_web`, or package everything with `scripts/package_runtime.sh --go "$GO"`.
 
 Or build a single target:
 

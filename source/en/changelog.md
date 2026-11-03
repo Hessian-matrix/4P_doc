@@ -8,6 +8,20 @@ The following updates are implemented in current source but have not been releas
 
 ### Improvements and Fixes
 
+- The Web homepage adds a top-right `CH` / `EN` language toggle and language-matched online documentation. Static text, dynamic status, and accessibility labels switch without reloading or recreating connections/the Worker or changing recording/attitude state. The browser retains language preferences when local storage is available; online documentation opens in a new tab while the device page remains usable offline.
+- Runtime `start_sensor_demo.sh` adds `stop`/`restart`, identifying processes by this package's executable paths and Linux pidfds, and waiting for recording/Web cleanup after a graceful stop. A timeout fails without force-killing or launching a replacement; restart uses package YAML and writes background logs. Lifecycle commands do not change boot-autostart settings or manage `cam-service`. Linux pidfds/Python ≥3.10 are required; surviving the first 2 seconds does not establish hardware or Web readiness.
+- Current `sensor_demo` source adds default-on Web/default-off RTSP for four H.264 videos and read-only six-axis LAN preview, sharing one encoder per camera. Web child/IPC/session backpressure is independent of saving; pinned tooling, embedded assets, licenses, and ELF provenance join the runtime. A short real four-video/IMU smoke passed with one board and one Chromium receiver; two-computer/GPU and resource acceptance remain incomplete. This is not a new software release. Existing other entries retain RTSP defaults.
+- The Web page adds browser-Worker six-axis quaternion fusion, an animated board, Roll/Pitch/relative Yaw, reset, and stale freezing. It reuses ≤50Hz telemetry without device-side attitude computation or changes to sampling/saving. No absolute heading or navigation accuracy is guaranteed; rebuild the runtime and restart normally to update embedded assets.
+- The Web attitude Worker automatically initializes three-axis gyro bias after about 3 seconds of continuous low-motion, gravity-consistent telemetry, checking a minimum sample count, timestamp continuity, accelerometer/gyro variance, and first-versus-last segment mean changes. Detected motion, strong vibration, sparse data, or gaps reset the window; no learning occurs during detected motion. Once bias is known, conservative rate-limited exponential tracking requires a complete approximately 3-second stationary window with mean residual angular-rate vector magnitude ≤0.002 rad/s (about 0.11°/s); accepting an automatic estimate neither jumps attitude nor re-zeros heading. Status text indicates automatic stationary estimation/tracking. Explicit approximately 3-second “静置校准零偏” (Calibrate gyro bias while stationary) remains available; rejection preserves known bias. All integration uses corrected gyro rates, without Yaw freezing, a hard deadband, or display damping. Same-session reset retains bias; a new source/reload clears it for stationary re-estimation. Slow residual rotation below the threshold may be absorbed, so motion detection is not perfect; genuine rotation ≥0.005 rad/s after calibration must remain measurable. No absolute or drift-free heading is guaranteed; this does not establish board deployment or acceptance.
+- The Web page brings four-video playback, attitude, raw six-axis values/traces, and an always-visible recording card onto one homepage, removing left-side page navigation and separate hash views without old-view compatibility routes. At widths ≥1440px, four equal-height columns prioritize cameras; telemetry is widened to slightly exceed attitude while reducing camera side margins. At 1100–1439px, the first three columns sit above a full-width recording row. At 768–1099px, cameras/recording each span a row while attitude/telemetry sit side by side; mobile stacks all cards. Only viewports ≥1440px wide and ≥680px high use a compact viewport-filling workspace with panel-internal overflow; other windows use normal document scrolling. Diagnostics expand inline below with actual decoder/fps/loss text.
+- The always-visible “录制与保存” (Recording and Saving) card has one form, defaulting to format/fixed storage, start/stop/query, device state, device-timed duration, and bytes written. Native advanced options are initially closed and contain frame skipping/minimum drop interval. A second initially closed section contains space, drop counts, final outcome, session, path, integrity/cleanup, health scope, and use boundaries. Actual errors, uncertain-command messages, and stopping/finalization notices stay outside the folds. Invalid hidden advanced values open the section before validation feedback. Expanding/collapsing does not navigate, reset options/accepted bias, or recreate WebRTC/SSE/the attitude Worker; refresh still resets browser-local options and bias. Closing the page/network does not stop recording. Existing APIs, limits, fresh-state/uncertain-command safeguards, storage paths, native saving, and the unauthenticated trusted isolated LAN boundary are unchanged.
+- The Web camera card uses a small single-line “相机” (Cameras) heading aligned with source parameters, removing the eyebrow, per-camera header rows, and expansion buttons. CAM labels/playback states overlay the top-left/bottom-right corners. Double-click an image or focus it and press Enter/Space to expand/restore; `Esc` only exits expansion, not recording. Grid and expansion retain full-image source-aspect `contain`, without cropping or stretching; compact desktops maximize images against remaining width/height and retain source-image bars. Actions do not recreate connections/the Worker or change recording. All four outer cards stay equal-height, without new authentication, hardware controls, or synchronization/accuracy guarantees.
+- Web six-axis trends use a fixed 1-second window without a selector. Acceleration and angular rate each overlay X/Y/Z on shared time and vertical axes, with vertical limits automatically following all three axes in the current window; numeric vertical ticks, title units, and relative-second ticks remain. The short relative-heading drift note is removed from the attitude card; the attitude algorithm and accuracy boundaries are unchanged. Traces retain absolute raw values without smoothing or gravity/bias subtraction; receive gaps over 250ms break the trace. Sampling/saving/attitude and connections are unchanged; compact desktop overflow scrolls within the panel.
+- Removed the trend explanation row below the six-axis telemetry heading, tightened left-side panel whitespace, and sized the vertical-axis gutter from measured tick-label widths while retaining complete numeric ticks. The 1-second window, shared-axis autoscaling, raw data, and full-image video aspect ratio are unchanged.
+- Web recording written size now uses decimal MB and automatically switches to GB at 1 GB, with two decimal places. Conversion preserves the full 64-bit byte count; device statistics, APIs, and recorded data are unchanged.
+- Web attitude inputs now pass through four native-rate one-pole low-pass stages before decimation, adding separate `attitude_accel_mps2` / `attitude_gyro_rps` SSE fields. Raw axes, traces, saving, and driver ABI are unchanged. Browser integration and bias means use filtered inputs while raw axes retain stationary-quality checks. Accepted stationary-window bias tracking uses a 6-second time constant with the unchanged 0.002 rad/s residual gate, without Yaw freezing or a deadband.
+- Shared Web UDP sends are nonblocking. Independent media workers use bounded pacing; IPC preserves its chunk position across transient backpressure and resumes within the original frame-age deadline. Fixed a race between fresh-frame publication and age sampling. Transient congestion makes only the affected RTP session wait for IDR; deleting one session does not interrupt other peers through a shared write deadline.
+- The H.264 producer explicitly disables the SDK's default 8×8 transform that conflicts with its Main declaration, fixing corruption on some Windows hardware decoders. Read/set failures reject startup; H.265, public ABI, and SONAME are unchanged. Update the whole package and restart the application normally. Increasing decode counters do not prove correct pixels; universal GPU compatibility or strict Main PPS syntax conformance is not guaranteed.
 - Added standalone `can_demo`: classical CAN by default, explicit `--fd` for up-to-64-byte FD transmission and mixed classical/FD reception, and `--brs` for TX data-phase bit-rate switching, with standard/extended IDs. FD transmission accepts exactly encodable lengths without implicit padding. Integrated into builds, full runtime packaging, and verification. Users/BSP still configure the interface; application support does not replace BSP long-payload integrity acceptance, and local loopback or queued sends do not constitute external-bus acceptance.
 - Camera, IMU, CLI, saving, and ROS2 public sensor timestamps now use `CLOCK_REALTIME` system time. Bounded VSYNC cross-sampling and the same-counter trigger delta reconstruct camera hardware trigger edges, without IRQ/arrival-time fallbacks; missing valid mappings stop acquisition.
 - RAW remains internal to mapping/grouping. Sensor sample/trigger publication refreshes realtime bridges and follows backward clock steps; IMU host time instead retains the original burst-completion observation without rebridging at deferred publication. Bag record time independently reads realtime without a monotonic clamp; chunk indexes are time-sorted. A common domain does not establish hardware sample/exposure synchronization. Consumers of old time semantics must migrate headers, SOs, and applications together.
@@ -29,6 +43,253 @@ The following updates are implemented in current source but have not been releas
 - `rosbag_info.py --freq` explicitly identifies its bag record-time basis; new `--header-freq` separately reports saved IMU/CompressedImage/CameraInfo `Header.stamp` rates. Batched-write frequency is not sensor sampling rate or proof of losslessness.
 - ROS1 bag overload now selects candidates with a strict default minimum drop interval of 10 consecutive frame-set arrival ordinals, not sparse producer IDs; all cameras share each retain/evict decision. If neither an old nor incoming group can legally be dropped, recording explicitly stops, drains to a partial bag, and exits nonzero. Bag metadata and final status expose ordinals, intervals, and the reason; source/IMU losses are outside this guarantee. Intentional alternate saving explicitly requires interval 2.
 - Fixed premature IMU admission closure on strict bag image stops and ROS2 callback rejection before producer shutdown completes. Normal finalization keeps IMU input open until acquisition is quiescent, then drains queues. On SIGINT/SIGTERM, ROS2 cleans up the node while its context remains valid and shuts down the context last. A normal `publish()` return is not DDS receipt, nor a zero-loss guarantee under arbitrary load.
+- Document automatic boot-time NTP, board-side server settings, and manual recovery, without per-board script installation for normal use. UTC is not retained over power loss without a battery; check system synchronization before recording.
+
+## 2.0.58 - 2026-11-03
+
+- Update matching V2 Buildroot USB3 Host/Device commands, RNDIS/ECM addressing and DHCP, real four-camera UVC, ADB permission, dedicated MSD, and boot defaults. State exclusive ownership, safe ejection, independent management, and the unflashed real-board verification boundary.
+- The image candidate preinstalls complete current-source non-ROS `/root/demo/` and ROS2 `/root/ros2_demo/install/` packages, including config, launch, matching producers, and runtime dependencies. The ROS2 underlay is preinstalled at `/opt/ros/humble`, without first-boot extraction. Only non-ROS retains the existing boot-start policy; the two acquisition paths cannot run concurrently.
+- This documentation revision does not change software versions or SO ABI/SONAME. Building an image candidate is not public release, flashing, or USB/sensor system acceptance.
+
+## 2.0.57 - 2026-11-03
+
+- Remove “no GND on this 2P port” and its Chinese equivalent from the CAN note in both wiring diagrams, retaining H-to-H/L-to-L, pin mappings, and other wiring guidance.
+- Update images and the documentation revision only; software versions, public SO ABI/SONAME, and hardware definitions remain unchanged.
+
+## 2.0.56 - 2026-11-03
+
+- Correct USB guidance against the matching V2 Buildroot system: RNDIS on the USB3 controller by default, USB-specific addressing/DHCP without gateway/DNS, and distinctions between controller selection, physical routing, function classes, and negotiated speed.
+- Remove the unintegrated `switch_usb_gadget` five-mode menu and `/etc/usb_gadget_default` persistence steps. Explain ECM network configuration, the missing UVC video backend, ADB acceptance limits, and MSD ownership/unmounting risks. Retain the independent-management prerequisite and no switching during acquisition/saving.
+- Align First Power-On, release boundaries, and version information. Documentation only: no system-default, SDK/board artifact, software-version, or public SO ABI/SONAME changes; no mode-switching, re-enumeration, reboot, or performance acceptance.
+
+## 2.0.55 - 2026-11-03
+
+- Add a browser-workspace illustration to Product Introduction. English pages use a translated English-interface image, also reused by First Power-On and non-ROS usage, retaining the original camera images and example state.
+- Document direct phone/tablet browser preview on the same LAN in Product Introduction, First Power-On, and non-ROS usage: no app/SSH, narrow-screen scrolling, network reachability, autoplay and WebRTC/H.264/device-performance limits, plus device-side recording and trusted-network boundaries.
+- Reverse GH1.25 Ethernet pin numbering 1–8 in both wiring diagrams and synchronize wire colors and RJ45 annotations. Warn that the supplied cable is not twisted pair, may lose packets, and is for testing/temporary use only; reliable Gigabit connections require a suitable user-prepared twisted-pair cable.
+- Update documentation and illustrations only; software versions and public SO ABI/SONAME remain unchanged. This is not mobile-compatibility or network-reliability acceptance.
+
+## 2.0.54 - 2026-11-03
+
+- Update non-ROS Demo features and usage order around the actual browser workspace: boot-autostart entry, four videos, attitude/bias, six-axis data/temperature/trends, language and diagnostics, Web recording, and final-outcome checks. Reuse the workspace illustration.
+- Distinguish browser fixed storage from YAML/CLI startup recording, no eMMC fallback for unmounted TF, and stopping recording from releasing camera/IMU resources. Require graceful shutdown of autostart before manual or standalone Demo runs; MP4 needs no RTSP network output. Complete the YAML drop-interval example and update verification guidance.
+- Revise bilingual documentation only; software versions and public SO ABI/SONAME remain unchanged. No board deployment, process control, reboot, or new hardware-acceptance claim.
+
+## 2.0.53 - 2026-11-03
+
+- Add the supplied board's pre-flashed system, automatic boot startup of `sensor_demo`, factory browser URL, four-camera/IMU preview, and Web recording steps to First Power-On, with an interface illustration excluding browser chrome. Distinguish factory pre-flashing from public image-download status.
+- Align Quick Start and non-ROS guidance to avoid duplicate launches, distinguish stopping recording from exiting the application, and clarify recording completeness, fixed storage, and trusted-LAN boundaries. The manual RTSP example explicitly passes `--rtsp`.
+- Update only the documentation revision; software versions and public SO ABI/SONAME remain unchanged. This documentation update does not flash, deploy, or reboot a board or add hardware-acceptance claims.
+
+## 2.0.52 - 2026-11-03
+
+- Use `CH` / `EN` target-language abbreviations on the page language button, retaining full accessibility labels, language preference, and existing switching behavior. Synchronize bilingual usage guidance; software versions and public SO ABI/SONAME remain unchanged.
+
+## 2.0.51 - 2026-11-03
+
+- Synchronize bilingual guidance for the page language toggle, browser language preference, and matching online documentation. Switching does not reload, recreate WebRTC/SSE/the attitude Worker, or reset options, recording, or accepted bias.
+- Distinguish the Internet requirement for online documentation from the device page's embedded offline assets. Only the documentation revision changes; software versions and public SO ABI/SONAME remain unchanged, without board deployment or hardware-acceptance claims.
+
+## 2.0.50 - 2026-11-03
+
+- Synchronize bilingual guidance for the compact camera heading aligned with source parameters and removal of per-camera header rows/expansion buttons; CAM labels overlay top-left corners and playback states bottom-right corners.
+- Document double-click or focused Enter/Space expansion/restore and `Esc` returning to the grid, without recreating WebRTC, SSE, or the attitude Worker or changing device recording.
+- Maximize the four-video grid against remaining width/height while preserving source aspect ratio and the complete uncropped, unstretched image. Software versions, APIs, filenames, and public SO ABI/SONAME remain unchanged. Only the documentation revision changes; this is not a software release or hardware-acceptance claim.
+
+## 2.0.49 - 2026-11-02
+
+- Synchronize bilingual guidance for the always-visible single-form recording card and responsive four-column workspace: at ≥1440px, equal-height columns prioritize cameras, with attitude slightly wider than telemetry. At 1100–1439px, recording spans a row below three columns; at 768–1099px, cameras/recording each span a row while attitude/telemetry sit side by side; mobile stacks. Compact viewport filling and panel-internal scrolling apply only at ≥1440px wide and ≥680px high.
+- Document default-visible recording controls/state/duration/bytes, initially closed advanced options and detailed state/use boundaries, and errors, uncertain-command messages, and stopping/finalization notices outside the folds. Invalid hidden advanced values open the section before validation feedback.
+- Clarify that collapsing does not navigate, recreate connections/the Worker, or reset options/bias; refresh still resets browser-local state, and `Esc` only exits video expansion. Closing the page/network does not stop recording; storage/API/native-data contracts and the unauthenticated trusted-LAN boundary remain unchanged.
+- Only the documentation revision changes. Historical version entries, software versions, and public SO ABI/SONAME remain unchanged, without a software-release, deployment, or hardware-acceptance claim.
+
+## 2.0.48 - 2026-11-02
+
+- Label cameras CAM1–CAM4 for internal indices 0–3. Enlarge compact-desktop frames at the source aspect ratio, reduce the camera card's horizontal whitespace, and remove its explanatory footer while keeping all three outer cards equal in height.
+- APIs, recording filenames, software versions, and public SO ABI/SONAME remain unchanged; only the documentation revision changes, without a software-release or hardware-acceptance claim.
+
+## 2.0.47 - 2026-11-02
+
+- At widths ≥1100px, give the camera, attitude, and raw six-axis telemetry card frames equal heights with aligned top and bottom edges. Compact desktops still fill the workspace; video retains its source aspect ratio and narrower screens still stack the cards.
+- Only the documentation revision changes; software versions and public SO ABI/SONAME remain unchanged, without a software-release or hardware-acceptance claim.
+
+## 2.0.46 - 2026-11-02
+
+- Move camera titles, states, and expansion buttons into their own row above the image to avoid obscuring the source. Preserve source aspect ratio, expansion, and `Esc`.
+- Fill the compact-desktop workspace with equal-height attitude and telemetry cards. Make attitude slightly wider and grow the model/traces with available space; scroll overflow inside each card while narrower screens retain normal stacking.
+- Only the documentation revision changes; software versions and public SO ABI/SONAME remain unchanged, without a software-release or hardware-acceptance claim.
+
+## 2.0.45 - 2026-11-02
+
+- Synchronize the wider Web homepage layout: at widths ≥1100px, attitude is on the left and raw six-axis telemetry/traces on the right, aligned at the top; narrower windows still stack them.
+- Preserve source-aspect four-video playback, calibration/reset, the recording modal, and diagnostics. Only the documentation revision changes; software versions and public SO ABI/SONAME remain unchanged, without a software-release or hardware-acceptance claim.
+
+## 2.0.44 - 2026-11-02
+
+- Synchronize bilingual single-homepage guidance, removing left-side page navigation, separate hash views, and the outside recording shortcut from current instructions while preserving historical version entries.
+- Prioritize the four-video grid beside a narrow sidebar containing attitude, calibration/reset, raw six-axis values, and traces, with inline expandable diagnostics below. Preserve source-aspect `contain`, single-camera expansion/`Esc`, compact desktop/scrollable-sidebar behavior at ≥1100px wide and ≥680px high, and normal document scrolling in smaller windows.
+- Document the single form in the native “录制与保存” (Recording and Saving) modal, always-visible homepage device status/options summary, and Close/`Esc` focus restoration without stopping recording, resetting options/bias, or recreating connections/the Worker. Refresh still resets browser-local options and bias.
+- Existing APIs, recording limits, freshness/uncertain-command safeguards, storage paths, native saving, and security boundaries remain unchanged. Only the documentation revision changes; software versions and public SO ABI/SONAME remain unchanged, without a software-release, deployment, runtime-acceptance, hardware-synchronization, or accuracy claim.
+
+## 2.0.43 - 2026-11-02
+
+- Synchronize camera-first desktop Overview guidance: at viewport width ≥1100px and height ≥680px, narrow left-side vertical navigation accompanies a compact title and four health summaries on the top row. A larger 2×2 video grid is centered in the camera column, with its panel hugging the grid.
+- The narrow right sidebar shows a small IMU model, three angle readings, and vertical calibration/reset controls. A separate recording shortcut card retains current options, status, and full configuration/stop access. Cameras maximizes its centered grid; IMU retains full readouts and traces.
+- Preserve full-source-aspect `contain` video, single-camera expansion and `Esc`, and connections/bias across view switches. Narrow and short screens use stacked content and normal document scrolling. Only the documentation revision changes; software versions and public SO ABI/SONAME remain unchanged, without a software-release, board-deployment, hardware-synchronization, or accuracy claim.
+
+## 2.0.42 - 2026-11-02
+
+- Shrink the desktop camera panel around its 2×2 grid to reduce empty side margins. Overview gives remaining width to the attitude panel; Cameras centers the complete group.
+- Preserve full-image aspect ratio, single-camera expansion, short-screen panel scrolling, and narrow-screen responsiveness. Acquisition, encoding, recording, and attitude computation are unchanged.
+- Synchronize bilingual guidance and update only the documentation revision. Software versions and public SO ABI/SONAME are unchanged; this is not a software release or board-deployment claim.
+
+## 2.0.41 - 2026-11-02
+
+- Correct desktop four-video frames to shrink to the source aspect ratio in a compact centered grid, instead of widening containers and adding bars. The full image remains uncropped and unstretched; source-image bars remain.
+- Allow camera-panel scrolling on short screens to keep titles and expand controls readable. Small windows and mobile devices retain normal document scrolling; single-camera expansion remains aspect-preserving.
+- Synchronize bilingual usage guidance and update only the documentation revision. Software versions and public SO ABI/SONAME are unchanged; this is not a software release or board-deployment claim.
+
+## 2.0.40 - 2026-11-02
+
+- Synchronize bilingual height-adaptive desktop workspace guidance: compact chrome at viewport width ≥1100px and height ≥680px, full-image aspect-preserving `contain` video, and panel scrolling for long errors/help. Smaller windows and mobile devices retain normal document scrolling.
+- Document that Overview's start-recording shortcut directly uses the current Recording-page control values and reuses validation, live-state/capability limits, command locking, and device acknowledgment/queries. Overview shows only the selected format/storage/frame-skip summary, status, and a configuration/stop link, without duplicate configuration or a stop button.
+- Clarify that choices remain page-local and reset to page defaults on refresh, without persistence. Stopping remains a Recording-page action; closing the page or switching views does not stop device recording.
+- Update only the documentation revision. Software versions and public SO ABI/SONAME remain unchanged; no authentication is added, and this is not a software release, deployment claim, or long-recording/zero-loss acceptance claim.
+
+## 2.0.39 - 2026-11-02
+
+- Synchronize the Web recording page, ROS bag/four-camera H.264 MP4 start/stop/status, and fixed storage paths. CLI/YAML startup recording remains; cameras, IMU, and preview run independently.
+- Clarify final drain/remux results, recording-failure isolation, timeout-state queries, recording across disconnects, and the unauthenticated trusted-LAN boundary. Dynamic MP4 health covers only its callback window, not whole-process final health.
+- Update only documentation revision, without software-version or public SO ABI/SONAME changes. This is not a software release, TF fault-matrix acceptance, or long-term-stability acceptance.
+
+## 2.0.38 - 2026-11-01
+
+- Synchronize bilingual guidance for preview-only filtering before decimation, separate SSE arrays, approximately 64ms default low-frequency group delay, gap/invalid-input handling, and matched runtime rebuilding.
+- Clarify that the device only filters; attitude and bias remain browser computations. Raw stationary-quality checks and the 0.002 rad/s gate remain, with a 6-second bias-tracking time constant after qualifying windows.
+- Short-window motion admission retains raw angular rates so filter delay cannot hide late turns; invalid observations discard partial automatic windows and interrupt manual calibration without replacing accepted bias.
+- Update only the documentation revision. Native sampling, raw axes, saving, software versions, and public ABI/SO SONAME are unchanged. This is not a software release or absolute-heading/long-term-stability acceptance.
+
+## 2.0.37 - 2026-11-01
+
+- Synchronize bilingual source-intrinsic-aspect-ratio layout guidance for Overview, the camera grid, and single-camera expansion: no cropping, stretching, or viewport-dependent fixed height; bars already present in the source remain.
+- Synchronize approximately 3-second automatic stationary three-axis bias estimation, window-quality checks, resets after detected motion/vibration/sparse data/gaps, and the ≤0.002 rad/s residual gate and rate-limited exponential tracking once bias is known. Accepting an automatic estimate neither jumps attitude nor re-zeros heading. Status text indicates automatic estimation/tracking; manual calibration remains available and rejection preserves known bias.
+- Clarify that all integration uses corrected gyro rates, without Yaw freezing, a hard deadband, or display damping. Same-session reset retains bias; a new source/reload clears it for stationary re-estimation. Slow rotation below the threshold may be absorbed, while genuine rotation ≥0.005 rad/s after calibration must remain measurable. Six-axis preview still provides no absolute or drift-free heading.
+- Update only the documentation revision. Native sampling, telemetry schema/rate, saving, device-side computation, HTTP API, software versions, and public ABI/SO SONAME are unchanged. This is not a software release, board-deployment claim, or long-term-stability/system-acceptance claim.
+
+## 2.0.36 - 2026-10-31
+
+- Synchronize bilingual four-view layout, direct hash navigation, responsive top navigation, and the contents and actual diagnostic fields of Overview/Cameras/IMU/Diagnostics.
+- Clarify that view switching reuses WebRTC, SSE, and the attitude Worker while preserving browser gyro-bias calibration. Calibration is available in Overview and IMU; refresh still clears it. Six-axis relative Yaw and the absence of absolute heading remain unchanged.
+- Update only the documentation revision. No new HTTP API, authentication, or hardware controls; software versions and public ABI/SO SONAME are unchanged. Deployment means only an authorized local runtime-package update on the user's device, not a software-version release or a full-acceptance claim.
+
+## 2.0.35 - 2026-10-31
+
+- Synchronize bilingual instructions for explicit stationary gyro-bias calibration, quality checks and rejection, retention/clearing across relative-heading resets, time discontinuities, and source sessions, plus actual-stillness, temperature, and unobservable-heading limits.
+- Clarify that there is no automatic Yaw freeze/deadband or continuous bias learning during motion. Deployment requires rebuilding the embedded helper and full runtime package and restarting the application normally; a browser refresh alone is insufficient.
+- Update only the documentation revision. Native sampling, telemetry schema/rate, saving, device-side computation, software versions, and public ABI/SO SONAME are unchanged, without implying board deployment, acceptance, or a new software release.
+
+## 2.0.34 - 2026-10-31
+
+- Synchronize bilingual client-side attitude preview, gravity alignment/relative heading, stale/reconnection behavior, computation location, and accuracy limits.
+- Update only the documentation revision; software versions and SO SONAME/ABI are unchanged, without implying deployment or a new software release.
+
+## 2.0.33 - 2026-10-31
+
+- Synchronize bilingual Windows vertical-stripe troubleshooting, the H.264 transform fix, whole-package update/application-restart requirements, and SDK/hardware-decoder compatibility limits.
+- Update only the documentation revision; software versions and SO SONAME/ABI are unchanged.
+
+## 2.0.32 - 2026-10-30
+
+- Record the limited scope of the real four-video/IMU smoke and document Web pacing, IPC resume, and fresh-frame age-race fixes.
+- Update only the documentation revision; software versions and SO SONAME/ABI remain unchanged. No expanded two-computer, GPU, resource, or saving/FSYNC acceptance claim.
+
+## 2.0.31 - 2026-10-30
+
+- Synchronize Chinese/English LAN preview usage, switches, ports, trusted-LAN/hardware-decoder boundaries, troubleshooting, and pinned Go build instructions.
+- Update documentation independently; software `VERSION` and SO SONAME/ABI remain unchanged. Host synthetic streams do not establish board or GPU acceptance.
+
+## 2.0.30 - 2026-10-30
+
+- Simplify Wi-Fi configuration wording to focus on device-side commands, configuration, and troubleshooting.
+- Simplify pin explanations in Time Synchronization and PPS Sync while retaining PPS wiring, logic levels, device identification, and usage steps.
+- Update only the documentation revision to `2.0.30`; software versions and SO SONAME/ABI are unchanged.
+
+## 2.0.29 - 2026-10-30
+
+- Simplify the TF card introduction by removing board-applicability and non-boot/flashing scope notes.
+- Remove hardware minor-revision labels from hardware guidance and wiring-diagram artwork. Interfaces, pin numbers, signal order, and electrical parameters are unchanged.
+- Update only the documentation revision to `2.0.29`; software versions and SO SONAME/ABI are unchanged.
+
+## 2.0.28 - 2026-10-30
+
+- Simplify TF card usage and support guidance to data safety: no removal during recording or writes, normal finalization, synchronization, and unmounting.
+- Update only the documentation revision to `2.0.28`; software versions and SO SONAME/ABI are unchanged.
+
+## 2.0.27 - 2026-10-30
+
+- Simplify PPS guidance to wiring, 3.3V logic and safety requirements, device identification, and `ppstest` usage; remove voltage derivation and align hardware and support pages.
+- Maintain usage instructions in `4P_doc`, adding debug-console passwordless-login controls and standalone IMU final-status guidance. Reduce non-ROS Chinese/English READMEs and the ROS2 README to repository overviews, minimum run commands, and documentation links.
+- Update only the documentation revision to `2.0.27`; software versions and SO SONAME/ABI are unchanged.
+
+## 2.0.26 - 2026-10-30
+
+- Add eMMC/TF recording write-pressure guidance: choose bag or MP4, avoid other concurrent high-throughput disk writes, and defer copying, extraction, and conversion until normal finalization. A single recording still depends on media capability and actual payload size; zero loss is not guaranteed.
+- Align recording and long-recording support boundaries. Update only the documentation revision to `2.0.26`; software versions and SO SONAME/ABI are unchanged, with no new real-board or sustained-recording acceptance claims.
+
+## 2.0.25 - 2026-10-30
+
+- Document 3.3V logic for the independent PPS input on CN2 pin 4, level conversion, and prevention of back-feed when unpowered; align hardware and known-limitations pages.
+- Update only the documentation revision to `2.0.25`; software versions and SO SONAME/ABI are unchanged. No new voltage measurements or external PPS acceptance claims.
+
+## 2.0.24 - 2026-10-30
+
+- Use an English-labeled wiring diagram on the English hardware page and update the full-resolution download. The Chinese diagram is unchanged; pin numbers, signal order, and board orientation remain consistent.
+- Update only the documentation revision to `2.0.24`; software versions and SO SONAME/ABI are unchanged.
+
+## 2.0.23 - 2026-10-30
+
+- Add the full-resolution interface wiring diagram, original-image download, and reading guidance to both hardware-and-safety pages, with direct links from first power-on.
+- Align XT30 `12–27 V DC`, UART1 CN1 4-pin, UART7 CN2 5-pin, and independent PPS pin numbers with the diagram. Correct old wiring descriptions in serial, PPS, data-contract, and troubleshooting pages; retain power-pin load, PPS electrical, and hot-plug limits.
+- Update only the documentation revision to `2.0.23`; software versions and SO SONAME/ABI are unchanged, with no new real-board acceptance claims.
+
+## 2.0.22 - 2026-10-30
+
+- Add bilingual external 1 Hz PPS usage examples covering safe wiring, provider identification, `ppstest`, event interpretation, and stopping observation. Input events do not establish system-clock discipline or camera/IMU synchronization.
+- Update only the documentation revision to `2.0.22`; software versions and SO SONAME/ABI are unchanged. Example output is quoted from LinuxPPS documentation, without new real-board acceptance claims.
+
+## 2.0.21 - 2026-10-30
+
+- Rename the final Wi-Fi troubleshooting section to “Stop Wi-Fi” to match `wifi_setup --disable`; this operation does not change wired network configuration.
+- Update only the documentation revision to `2.0.21`; software versions and SO SONAME/ABI are unchanged.
+
+## 2.0.20 - 2026-10-30
+
+- Describe configuration and boot restore through the built-in Wi-Fi command in the unified system image, without additional script installation for normal use.
+- Update only the documentation revision to `2.0.20`; software versions and SO SONAME/ABI are unchanged, with no new real-board acceptance claims.
+
+## 2.0.19 - 2026-10-30
+
+- Align bilingual Wi-Fi usage guidance around `/usr/bin/wifi_setup` and `/etc/init.d/S99wifi_setup` as the configuration and boot-restore entries.
+- Clarify that saved configuration is in `/userdata/wifi/current.conf` and boot restore still requires explicit opt-in through `/userdata/wifi/autostart.enabled`.
+- Update only the documentation revision to `2.0.19`, independently of software versions and SO SONAME/ABI, with no new real-board acceptance claims.
+
+## 2.0.18 - 2026-10-30
+
+- Reframe NTP documentation as a board-side usage guide: automatic synchronization, server changes, private LAN sources, temporary start/stop, synchronization checks, and manual recovery. Remove production instructions intended for system integrators.
+- Align bilingual first-use instructions, the time synchronization overview, and Demo READMEs; distinguish automatic discipline from manual one-shot calibration. Documentation only; software versions and SO ABIs are unchanged.
+- Align bilingual specification tables with the latest product information, including the DC 12 V / 1.5 A adapter. Normalize interface names, units, spacing, and quantity notation; keep the composition table's quantity column on one line and preserve the responsive drawing layout.
+- Use RoboBaton 4P V2 consistently in HTML site titles, correcting the sidebar site name, browser tabs, and English home-page heading without changing actual product parameters.
+- Vertically center content in all bilingual documentation tables so short entries align with multiline cells. Keep Product Introduction parameter names on one line and preserve existing horizontal alignment and wrapping elsewhere, including horizontal scrolling within tables on narrow screens. Parameter and body content are unchanged.
+
+## 2.0.17 - 2026-10-30
+
+- Add the V2 main-board dimensions and mounting-hole drawing to Product Introduction and fix the old image reference. Reduce the main-board drawing and place it beside the camera-board drawing, wrapping on narrow screens. Both drawings identify the board and millimeter units.
+- Synchronize bilingual product composition and parameters, correct the NV12 format description, and distinguish the non-ROS default YAML's `1600Hz` from the ROS2 default YAML's `800Hz`. Correct the Chinese home-page heading format. Documentation only; software versions, configuration, and SO ABIs are unchanged.
+
+## 2.0.16 - 2026-10-30
+
+- Document a private LAN chrony server and usage boundaries without Internet or any networking. Distinguish manual one-shot calibration from persistent time-source configuration.
+- Clarify that saving configuration without a battery does not retain time, an isolated server's local clock does not certify UTC, and system-clock discipline services must not compete. Software remains `2.0.0`, with unchanged SO ABIs; no additional real-board acceptance is claimed.
 
 ## 2.0.15 - 2026-10-29
 
@@ -44,7 +305,7 @@ This revision synchronizes public documentation in both languages only. Software
 - Centralize accepted parameters, independent software/hardware/documentation/SO ABI versions, and verification boundaries on the support page. Align complete rebuild and migration requirements for ICM42670/SC132 ABI `3.0` and PRRTSP ABI `2.0`.
 - Align FIFO/TMST, wake-only INT1, original burst host observations, backward realtime steps, default trigger stamps and explicit exposure-midpoint test mode, plus FSYNC, exposure, and realtime-scheduling contracts.
 - Synchronize strict bag drop spacing, partial stops, producer/sink/DDS count distinctions, and JPEG/record-time semantics. High frame rate, pressure recording, and the current composition's `8h` recording do not establish complete acceptance; historical results cannot certify this composition.
-- Add user-facing LPWM, RTSP, SHM, USB, CAN, RTC/UTC, and runtime-dependency limits. Retain TF hardware repair and single-camera diagnostics as user-confirmed without generalizing to every environment.
+- Add user-facing LPWM, RTSP, SHM, USB, CAN, RTC/UTC, and runtime-dependency limits. Retain single-camera diagnostics as user-confirmed.
 
 
 ## 2.0.13 - 2026-10-23
@@ -85,11 +346,11 @@ Document acquisition-startup fixes. Software versions and SO SONAME/ABI are unch
 
 ## 2.0.10 - 2026-10-22
 
-Add bilingual instructions for TF cards as data disks. Software versions and SO ABI are unchanged; this is not new hardware or card-compatibility acceptance.
+Add bilingual instructions for TF cards as data disks. Software versions and SO ABI are unchanged.
 
 ### Improvements and Fixes
 
-- Document TF (microSD) versus system eMMC identification, filesystem selection, manual mounting, acquisition output paths, normal unmounting, and enumeration troubleshooting. Check SD type and mount device number before saving to avoid writing into RAM or the system disk after a failed mount. No automatic formatting, mounting, or hot-plug safety claim.
+- Document TF (microSD) versus system eMMC identification, filesystem selection, manual mounting, acquisition output paths, normal unmounting, and enumeration troubleshooting. Check SD type and mount device number before saving to avoid writing into RAM or the system disk after a failed mount. No automatic formatting or mounting.
 
 ## 2.0.9 - 2026-10-22
 

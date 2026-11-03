@@ -6,7 +6,7 @@
 
 当前文档修订号、软件发布版本和统一版本定义见 [发布、授权与支持](../release-and-support.md#文档版本政策)。文档修订不要求软件版本同步递增。
 
-当前硬件修订 V2.2、软件 `2.0.0`、文档和 SO ABI 独立识别。参数受支持不等于所有模式/负载/时长已通过；当前高帧率、压力、长录及外设限制见{ref}`能力与验证边界 <capability-verification-boundary>`。
+硬件标识、软件 `2.0.0`、文档和 SO ABI 独立识别。参数受支持不等于所有模式/负载/时长已通过；当前高帧率、压力、长录及外设限制见{ref}`能力与验证边界 <capability-verification-boundary>`。
 
 V2 IMU 为 ICM-42670-P，API `icm42670_*`，ABI 3.0，real SO `libicm42670.so.3.0.0`、SONAME `libicm42670.so.3`；全部导出仅使用 `ICM42670_X5_3.0`，无旧别名。字段布局不变但 host 时间改为 SPI FIFO burst 完成观测，INT1 仅唤醒；FIFO 顺序与实测 TMST 定义样本。必须同步头文件、库、consumer 与配置并重建全部 consumer，移除旧 `.2` 库，不建立跨 major 链接；软件 VERSION 不变。原生 ODR `25/50/100/200/400/800/1600Hz`，默认 `800Hz`；不支持的速率明确拒绝，不静默重采样。
 

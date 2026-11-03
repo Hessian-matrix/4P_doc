@@ -1,8 +1,8 @@
-RoboBaton 4P Product Documentation
-==================================
+RoboBaton 4P V2 Product Documentation
+=====================================
 
-This is the public online product documentation for RoboBaton 4P, aimed at users
-who have the 4P hardware, the non-ROS demo, or the ROS2 demo. It helps with
+This is the public online product documentation for RoboBaton 4P V2, aimed at users
+who have the 4P V2 hardware, the non-ROS demo, or the ROS2 demo. It helps with
 deployment, operation, parameter configuration, and common troubleshooting.
 
 Public boundary
