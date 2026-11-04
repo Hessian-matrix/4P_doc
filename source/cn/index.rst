@@ -12,7 +12,7 @@ RoboBaton 4P 产品文档
 --------
 
 - non-ROS Demo：`RoboBaton_4p_demo <https://github.com/Hessian-matrix/RoboBaton_4p_demo>`_
-- ROS2 Demo：`RoboBaton_4P_ROS2_demo <https://github.com/Hessian-matrix/RoboBaton_4P_ROS2_demo>`_，发布四目 NV12/raw+compressed 图像、CameraInfo、IMU 和温度 topic。
+- ROS2 Demo：`RoboBaton_4P_ROS2_demo <https://github.com/Hessian-matrix/RoboBaton_4P_ROS2_demo>`_，发布四目 NV12/raw+compressed 图像、CameraInfo、IMU、温度及 IMU timing topic。
 
 .. toctree::
    :maxdepth: 1

@@ -5,7 +5,7 @@
 适用范围：
 
 - [`RoboBaton_4p_demo`](https://github.com/Hessian-matrix/RoboBaton_4p_demo)：non-ROS 四目 RTSP、IMU、UART 和 SocketCAN CAN 示例。
-- [`RoboBaton_4P_ROS2_demo`](https://github.com/Hessian-matrix/RoboBaton_4P_ROS2_demo)：ROS2 四目 NV12/raw+compressed 图像、CameraInfo、曝光观测、IMU、温度及可选 FSYNC topic 示例。
+- [`RoboBaton_4P_ROS2_demo`](https://github.com/Hessian-matrix/RoboBaton_4P_ROS2_demo)：ROS2 四目 NV12/raw+compressed 图像、CameraInfo、曝光观测、IMU、温度及IMU 时钟元数据 topic 示例。
 
 ## 1. 编译边界
 
@@ -37,7 +37,7 @@ RoboBaton_4P_ROS2_demo
 
 non-ROS `runtime-provenance.json` 使用 v3：普通文件字节与链接原始文本分别绑定，源码输入中的链接按链接文本哈希。旧 provenance 的运行包须用当前脚本重新生成；软件版本与 SONAME/ABI 不因此改变。两个 SHA-256 manifest 仍包含别名解析后的字节哈希，不能单独代替链接元数据检查。
 
-当前成套库为 ICM42670 `libicm42670.so.3.0.0`、SONAME `libicm42670.so.3`、所有导出 `ICM42670_X5_3.0`；SC132 `libsc132.so.3.0.0`、SONAME `libsc132.so.3`、`LIBSC132_3.0`；PRRTSP `libprrtsp.so.2.0.1`、SONAME `libprrtsp.so.2`、`LIBPRRTSP_2.0`。升级前同步公开头与库，移除 ICM42670/SC132 旧 `.2` 库，重新构建所有 consumer，不能建立跨 major 链接。软件 `2.0.0`、硬件 V2.2、文档修订及 SO ABI 独立；编译成功不认证当前组成的吞吐、压力或长录，见{ref}`能力与验证边界 <capability-verification-boundary>`。
+当前成套库为 ICM42670 `libicm42670.so.5.0.0`、SONAME `libicm42670.so.5`、九个导出均为 `ICM42670_X5_5.0`；SC132 `libsc132.so.3.0.0`、SONAME `libsc132.so.3`、`LIBSC132_3.0`；PRRTSP `libprrtsp.so.2.0.1`、SONAME `libprrtsp.so.2`、`LIBPRRTSP_2.0`。同步公开头文件与库，移除 ICM42670 旧 `.2/.3/.4` 及 SC132 旧 `.2` 库，成套重建所有 consumer，不建立跨 major 链接。四种启动时间戳组合使用相同二进制/IIO 采集，不构建方案专属二进制，见 [non-ROS 使用](../usage/non-ros-demo.md) 与 [ROS2 使用](../usage/ros2-demo.md)。每种 IMU 模式均要求匹配的内核 IIO V3 capture 模块，现有 V2 模块不兼容；公开 demo 构建/package verifier 不构建、安装或升级内核模块。软件 `2.0.0`、硬件 V2.2、文档修订及 SO ABI 独立。本轮文档更新不做实板测试/部署；编译成功不认证四组合运行、吞吐、压力或长录，见{ref}`能力与验证边界 <capability-verification-boundary>`。
 
 干净目标系统中 `python3`/`libstdc++` 的镜像与运行包归属仍待确认。构建、链接与 package/install verifier 不等于所有干净镜像运行依赖已经验证；部署前按实际系统确认依赖，不依靠文档版本推断。
 

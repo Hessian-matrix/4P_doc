@@ -5,7 +5,7 @@ This page explains how to cross-compile the example code in the public demo repo
 Scope:
 
 - [`RoboBaton_4p_demo`](https://github.com/Hessian-matrix/RoboBaton_4p_demo): non-ROS four-camera RTSP, IMU, UART, and SocketCAN CAN examples.
-- [`RoboBaton_4P_ROS2_demo`](https://github.com/Hessian-matrix/RoboBaton_4P_ROS2_demo): ROS2 four-camera NV12/raw+compressed images, CameraInfo, exposure observations, IMU, temperature, and optional FSYNC topic examples.
+- [`RoboBaton_4P_ROS2_demo`](https://github.com/Hessian-matrix/RoboBaton_4P_ROS2_demo): ROS2 four-camera NV12/raw+compressed images, CameraInfo, exposure observations, IMU, temperature, and IMU timing metadata topic examples.
 
 ## 1. Build Boundary
 
@@ -37,7 +37,7 @@ Each library family has one regular `libNAME.so.M.m.p` file and two exact same-d
 
 Non-ROS `runtime-provenance.json` uses v3: regular-file bytes and raw link text are bound separately; source-input links are hashed by link text. Regenerate packages with older provenance using the current script. This does not change software versions or SONAME/ABI. Both SHA-256 manifests still include resolved-byte hashes for aliases; these do not replace link-metadata verification.
 
-The current matched set is ICM42670 `libicm42670.so.3.0.0`, SONAME `libicm42670.so.3`, all exports `ICM42670_X5_3.0`; SC132 `libsc132.so.3.0.0`, SONAME `libsc132.so.3`, `LIBSC132_3.0`; PRRTSP `libprrtsp.so.2.0.1`, SONAME `libprrtsp.so.2`, `LIBPRRTSP_2.0`. Synchronize public headers and libraries before upgrading, remove old ICM42670/SC132 `.2` libraries, and rebuild every consumer, without cross-major links. Software `2.0.0`, hardware V2.2, documentation revision, and SO ABI are independent. Successful compilation does not certify current-composition throughput, pressure, or long recording; see {ref}`Capability and Verification Boundaries <capability-verification-boundary>`.
+The current matched set is ICM42670 `libicm42670.so.5.0.0`, SONAME `libicm42670.so.5`, nine exports under `ICM42670_X5_5.0`; SC132 `libsc132.so.3.0.0`, SONAME `libsc132.so.3`, `LIBSC132_3.0`; PRRTSP `libprrtsp.so.2.0.1`, SONAME `libprrtsp.so.2`, `LIBPRRTSP_2.0`. Synchronize public headers and libraries, remove old ICM42670 `.2/.3/.4` and SC132 `.2` libraries, and rebuild every consumer without cross-major links. All four startup timestamp pairs use the same binaries/IIO capture, not separate scheme-specific builds; see [non-ROS Usage](../usage/non-ros-demo.md) and [ROS2 Usage](../usage/ros2-demo.md). Every IMU mode requires the matched kernel IIO V3 capture module; the existing V2 module is incompatible. Public demo builds/package verifiers do not build, install, or upgrade that kernel module. Software `2.0.0`, hardware V2.2, documentation revision, and SO ABI are independent. No board testing/deployment is performed by this documentation update; compilation does not certify four-way operation, throughput, pressure, or long recording. See {ref}`Capability and Verification Boundaries <capability-verification-boundary>`.
 
 Clean-target-image versus runtime-package ownership of `python3`/`libstdc++` remains unresolved. Builds, links, and package/install verifiers do not establish runtime-dependency validation on every clean image. Confirm dependencies on the actual system before deployment, rather than infer them from documentation versions.
 

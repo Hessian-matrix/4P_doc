@@ -23,8 +23,8 @@ For release boundaries, versions, and compatibility, see [Product Version and Co
 | non-ROS camera fps | default `30fps`; supports `25fps`, `30fps`, `40fps`, `50fps`, and `60fps` |
 | FOV | Camera A/B: horizontal `148.4°`/`115.6°`, vertical `126.6°`/`96.8°`, diagonal `193.8°`/`157.2°`. |
 | IMU | V2 TDK ICM-42670-P, native `25/50/100/200/400/800/1600Hz`, default `800Hz`; unsupported rates are explicitly rejected. |
-| non-ROS | RTSP ports `554..557`, path `/PRR`, H.264 default with H.265 optional; IMU/UART/CAN examples, mutually exclusive bag/MP4 saving, exposure observations, and optional FSYNC |
-| ROS2 | raw/compressed images, CameraInfo, exposure observations, IMU, temperature, and optional FSYNC topics; compressed uses X5 hardware JPEG; no RTSP, TF, or calibration |
+| non-ROS | RTSP ports `554..557`, path `/PRR`, H.264 default with H.265 optional; IMU/UART/CAN examples, mutually exclusive bag/MP4 saving, exposure observations, and IMU timing metadata |
+| ROS2 | raw/compressed images, CameraInfo, exposure observations, IMU, temperature, and IMU timing metadata topics; compressed uses X5 hardware JPEG; no RTSP, TF, or calibration |
 
 CAM1..CAM4 map to software cam0..cam3 in order; camera A/B FOV specifications are listed above. See [Hardware Connection and Safety](hardware-and-safety.md#camera-interface).
 

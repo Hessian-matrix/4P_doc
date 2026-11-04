@@ -6,7 +6,7 @@
 保持 `cam-service` 运行。更新前只退出旧的 `sensor_demo`、`cam_demo` 或其他相机应用，不停止 `cam-service`。
 ```
 
-当前源码包含未发布的 realtime、FSYNC、FIFO/TMST 主导 IMU 与曝光观测更新，软件版本字符串本身不能识别工件组成；按 [版本更新记录](../changelog.md) 与 manifest 选择整套头文件、库和 consumer。相机与 IMU 均为 ABI 3.0，分别使用 `libsc132.so.3` 与 `libicm42670.so.3`；ICM 实体为 `libicm42670.so.3.0.0`，全部导出仅使用 `ICM42670_X5_3.0`。旧 consumer 必须全部重建，移除旧 `.2` 库，不能添加 `.so.2 -> .so.3` 链接或旧符号别名。ICM 字段布局不变但 host 时间改为原始 SPI FIFO burst 完成观测，INT1 仅唤醒，详见[数据合同](data-contracts.md#imu)。部署后核对实际 `--version`、sidecar/topic 和 FSYNC 配置，不能仅凭旧包版本号推断功能。本流程不升级 BSP、不修改 LPWM/kernel、IRQ/debug 或实时配额，不修复 GPIO 通知根因，也不替代目标板验证。
+当前 IMU 使用内核 IIO 采集与 ABI 5.0：实体 `libicm42670.so.5.0.0`、SONAME `libicm42670.so.5`，九个导出均为 `ICM42670_X5_5.0`；相机仍为 ABI3.0/`libsc132.so.3`。按[版本更新记录](../changelog.md) 与 manifest 匹配头文件、库和所有重建 consumer，清除旧 ICM `.2`/`.3`/`.4` 工件，不建立跨 major 链接或旧别名。相同二进制/IIO 读取/owner 支持四种启动组合 `camera_timestamp_path=observer|official` 与 `imu_timestamp_mode=host|tmst`，默认 observer/host，停止/重启后切换。保存/ROS2 将所选原生 MONOTONIC 或 RAW sample 时钟桥接到 realtime，保留原始 MONOTONIC 主机估计、RAW burst 及独立桥基点。TMST 计算 admission 不认证物理精度，不恢复 FSYNC/spidev/回退。见[数据合同](data-contracts.md)。任何部署前，目标必须已绑定匹配的 **内核 IIO V3 capture 模块**；现有 V2 模块即使 host 模式也不兼容。本应用部署流程不安装模块、不升级 BSP/内核，不改变 LPWM、IRQ/debug 或实时配额。本轮文档更新不做实板测试或部署。后续部署须核对实际 `--version`、manifest、最终健康与 timing sidecar/topic；旧组成验收不能认证新四组合组成。
 
 完整复制必须保留动态库的相对链接：`libNAME.so -> libNAME.so.M -> libNAME.so.M.m.p`，最后一个是唯一实体。使用下文不带解引用选项的 `tar`（或 `cp -a`/`rsync -a`），不要把链接展开。主机运行当前 package/install verifier，检查精确链接目标与 ELF；板端 `sha256sum -c` 仍检查别名解析后的字节，不能单独证明链接元数据正确。non-ROS 旧 provenance 包须用当前脚本重新打包为 v3。
 

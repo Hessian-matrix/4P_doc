@@ -2,9 +2,35 @@
 
 This file records user-visible updates in the RoboBaton 4P public delivery, following the shared [Documentation Version Policy](release-and-support.md#documentation-version-policy). Documentation revisions on this page do not automatically change software versions and are distinct from SO SONAME/ABI versions.
 
-## Unreleased
+## 2.0.18 - 2026-10-30
 
-The following updates are implemented in current source but have not been released as a new software version. This documentation revision does not turn them into a software release or system acceptance. Current scope and unresolved limits are centralized in {ref}`Capability and Verification Boundaries <capability-verification-boundary>`.
+- Document non-ROS `sensor_demo` manual-exposure YAML: `camera.auto_exposure` defaults to `true`, preserving the SDK tuning's auto policy; `false` uses positive integer `camera.exposure_time_us` (default `2000`, range `1..4294967295`), selecting ISP manual mode for each enabled camera with all three gains fixed to `1x`. The SDK/profile limits the usable range; configuration failure does not fall back to auto.
+- Explain startup-only `SC132_AUTO_EXPOSURE=1|0` / decimal `SC132_EXPOSURE_TIME_US`, explicit/default YAML overriding inherited environment values, stop/restart requirements, and requested values versus per-frame exposure estimates. Manual exposure is independent of the existing midpoint test; timestamp formulas, the C ABI, and SONAME are unchanged.
+- Synchronize Chinese/English READMEs, usage, and data contracts. Increment the documentation revision once from `2.0.17` to `2.0.18`, without changing software versions or release status. No board deployment or verification has been performed for this feature; no physical exposure-midpoint or synchronization-accuracy claim is made.
+
+## 2.0.17 - 2026-10-30
+
+- Document same-binary four-way startup selection: top-level non-ROS YAML `camera_timestamp_path: observer|official` and `imu_timestamp_mode: host|tmst`, CLI `--camera-timestamp-path`/`--imu-timestamp-mode`, and the same top-level read-only ROS2 parameters. Defaults remain observer/host; stop/restart to change. All pairs retain the same IIO reads/kernel owner.
+- IMU moves to ABI5.0: `libicm42670.so.5.0.0`, SONAME `.5`, nine `ICM42670_X5_5.0` exports. Config adds HOST=0/TMST=1; samples retain raw FIFO low16, separate RAW sample time/uncertainty, and the unchanged MONOTONIC host estimate. Match headers, libraries, and every rebuilt consumer without shims.
+- A matched kernel IIO V3 capture module is required for both modes; existing V2 is incompatible and application deployment does not upgrade it. TMST uses kernel-owned FIFO/UI transition evidence and userspace unwrapping/bounded affine RAW mapping; its `200µs` computational admission is not physical accuracy. No FSYNC restoration, userspace SPI/spidev, or fallback.
+- Official camera time uses same-frame RAW IRQ `timestamps − (tv − trig_tv) × 1000`, never the SIF observer, with validity0/uncertainty `UINT32_MAX` and unknown physical error. Observer keeps its `500µs` admission. Exposure observations/test mode do not establish physical synchronization.
+- Saving/ROS2 bridge the selected native mode to realtime; preserve MONOTONIC host evidence in tmst and keep RAW/MONOTONIC bridge bases separate. Timing schema is `robobaton_imu_timing_v2`; bag session config and MP4 IMU columns record selectors/native timing.
+- Synchronize Chinese/English user, API, data, build, compatibility, deployment, time, and troubleshooting guidance. No board testing or deployment occurs in this update; no four-way board/physical-accuracy acceptance is claimed. Only documentation VERSION changes, independently of software versions/release status. ABI4 revision2.0.16 remains below as history, not the current contract.
+
+## 2.0.16 - 2026-10-30
+
+- Public IMU moves to kernel IIO ABI4.0: `libicm42670.so.4.0.0`, SONAME `.4`, nine `ICM42670_X5_4.0` exports; every consumer migrates together without cross-major shims.
+- Library/standalone demos retain MONOTONIC host estimates and independent RAW burst observations; seven native ODRs, watermark1, buffer powers of two in256..8192. Remove userspace SPI, TMST/FSYNC, old read_mode/mapper/precision fields, and association options/topics/sidecars.
+- sensor_demo saving/ROS2 explicitly bridge realtime per burst. Bags/ROS2 add `/robobaton/imu/timing`; MP4 extends `imu.csv` with native times/identity/bridge columns. Bracket half-width bounds observations, not physical precision. Camera timing is unchanged.
+- STOP retains admission and drains/ACKs the complete cohort; count is a stop threshold, not truncation. Final health retains failed-stop diagnostics; transport_complete does not certify all physical tail data or absence of fatal errors.
+- START requires a non-null callback; replacement/removal is rejected through capture and STOP drain until join. Callback-side registration returns `INVALID_STATE` without deadlock. Local transport reconciliation failures retain obtained terminal kernel diagnostics without ACKing undelivered records.
+- Callback-side start/health queries also return `INVALID_STATE` during STOP drain, avoiding a lifecycle-lock/join cycle.
+- Synchronize current Chinese/English documentation. Only the documentation revision increases; software VERSION is unchanged, without implying release or target-environment acceptance.
+
+
+## Earlier Unreleased Source Changes (Historical)
+
+The entries below preserve pre-migration history and do not define the current IMU contract. Use the latest revision and current data/API pages.
 
 ### Improvements and Fixes
 

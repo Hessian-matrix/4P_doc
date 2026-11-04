@@ -23,8 +23,8 @@ RoboBaton 4P 是面向 X5 平台的四目相机产品，提供 non-ROS RTSP/IMU/
 | non-ROS相机帧率 | 默认`30fps`；支持`25fps`、`30fps`、`40fps`、`50fps`和`60fps` |
 | FOV | 相机 A/B：水平 `148.4°`/`115.6°`、垂直 `126.6°`/`96.8°`、对角 `193.8°`/`157.2°`。 |
 | IMU | V2 TDK ICM-42670-P，原生 `25/50/100/200/400/800/1600Hz`，默认 `800Hz`；不支持的速率明确拒绝。 |
-| non-ROS | RTSP 端口 `554..557`，path `/PRR`，H.264 默认、H.265 可选；IMU/UART/CAN 示例、互斥 bag/MP4 保存、曝光观测及可选 FSYNC |
-| ROS2 | raw/compressed 图像、CameraInfo、曝光观测、IMU、温度及可选 FSYNC topic；compressed 使用 X5 硬件 JPEG；ROS2 路径不提供 RTSP、TF 或标定 |
+| non-ROS | RTSP 端口 `554..557`，path `/PRR`，H.264 默认、H.265 可选；IMU/UART/CAN 示例、互斥 bag/MP4 保存、曝光观测及IMU 时钟元数据 |
+| ROS2 | raw/compressed 图像、CameraInfo、曝光观测、IMU、温度及IMU 时钟元数据 topic；compressed 使用 X5 硬件 JPEG；ROS2 路径不提供 RTSP、TF 或标定 |
 
 CAM1..CAM4 依次对应软件 cam0..cam3；相机 A/B 的 FOV 参数见上表。参见[硬件连接与安全](hardware-and-safety.md#相机接口)。
 

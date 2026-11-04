@@ -7,7 +7,7 @@ This page only covers "get it running as fast as possible". If `/root/demo` or `
 | Goal | Usage path | Suitable scenario |
 |---|---|---|
 | Four-channel RTSP, IMU, UART examples | non-ROS `/root/demo` | Not using ROS2; fastest way to confirm video streams and sensor output. |
-| ROS2 image and IMU topics | ROS2 `/root/ros2_demo/install` | Subscribe to raw/compressed images, CameraInfo, exposure observations, IMU, temperature, and optional FSYNC. |
+| ROS2 image and IMU topics | ROS2 `/root/ros2_demo/install` | Subscribe to raw/compressed images, CameraInfo, exposure observations, IMU, temperature, and IMU timing metadata. |
 
 Do not let the two paths occupy camera resources at the same time; before switching, exit the old camera application and keep `cam-service` running.
 
@@ -20,9 +20,9 @@ cd /root/demo
 ./sensor_demo
 ```
 
-`sensor_demo` runs four SC132 cameras, PRRTSP v2 H.264 RTSP streaming, and ICM-42670-P IMU acquisition (native default `800Hz`). The default image is `1280x1088@30fps`, supporting `25/30/40/50/60fps`; the output canvas supports `1280x1088`/`640x480`/`720x480`/`1280x720`. This is the implemented parameter set, not a guarantee of sustained target rate or zero loss on every saving/ROS2 path. See {ref}`Capability and Verification Boundaries <capability-verification-boundary>` for demonstrated scope and unresolved issues.
+`sensor_demo` runs four SC132 cameras, PRRTSP v2 H.264 RTSP, and IIO IMU capture. Library/standalone defaults are800Hz; the checked-in sensor_config.yaml explicitly selects1600Hz, so follow the actual configuration. Images default to1280x1088@30fps with25/30/40/50/60fps and discrete canvases. Accepted parameters do not guarantee sustained saving/ROS2 throughput; see {ref}`Capability and Verification Boundaries <capability-verification-boundary>`.
 
-Saving and FSYNC default off. See [non-ROS Demo Usage](usage/non-ros-demo.md) and [Saving Data](usage/save-data-guide.md) for bag/MP4 recording, explicit `--fsync --sample-rate-hz 1600`, and per-frame ISP exposure estimates. Cameras need read-only `/dev/mem` and realtime scheduling permission; configuration failure rejects startup. Exposure estimates do not change default trigger stamps; explicit exposure-midpoint test mode is described in [Data Contracts](development/data-contracts.md).
+Saving defaults off. See [non-ROS Demo Usage](usage/non-ros-demo.md) and [Saving Data](usage/save-data-guide.md) for bag/MP4, exposure estimates, and four-way startup YAML/CLI examples. Defaults are `camera_timestamp_path: observer` and `imu_timestamp_mode: host`; stop/restart to change to official and/or tmst, in the same binary/IIO path. Every IMU mode requires the matched kernel IIO V3 capture module; V2 is incompatible. Standalone CLI preserves MONOTONIC and tmst additionally reports RAW sample time; saving/ROS2 bridge the selected native clock to realtime. Observer requires read-only `/dev/mem` and retains `500µs` admission; official never starts it and has unknown physical error. TMST `200µs` admission is computational, not physical accuracy; no FSYNC/spidev/fallback. This update performs no board testing or deployment.
 
 Four-channel RTSP URLs:
 
@@ -77,7 +77,7 @@ ros2 topic echo /robobaton/cam0/camera_info --once
 ros2 run robobaton_4p_ros2_demo robobaton_imu_rate_monitor
 ```
 
-Expect `/robobaton/cam0..3/image_raw`, `/robobaton/cam0..3/image_raw/compressed`, `/robobaton/cam0..3/camera_info`, `/robobaton/cam0..3/exposure`, `/robobaton/imu/data`, and `/robobaton/imu/temperature`. raw/compressed images and exposure use Reliable + KeepLast(8); CameraInfo uses Reliable + Transient Local + KeepLast(1). Exposure JSON `status=1` is only an estimate. `/robobaton/fsync` defaults off; see [ROS2 Demo Usage](usage/ros2-demo.md) for enabling and checking it. ROS2 does not provide RTSP; use non-ROS `/root/demo` when RTSP is needed.
+Expect four image_raw/compressed, camera_info, and exposure topics plus `/robobaton/imu/data`, `/robobaton/imu/temperature`, and `/robobaton/imu/timing`. Images/exposure use Reliable KeepLast(8), CameraInfo Reliable Transient Local KeepLast(1), timing Reliable KeepLast(256). Exposure is estimated; timing retains host estimates/output bridges, not physical precision. See [ROS2 Demo Usage](usage/ros2-demo.md).
 
 ## 4. Stop the Program
 

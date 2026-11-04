@@ -17,7 +17,7 @@ Code repositories
 -----------------
 
 - non-ROS Demo: `RoboBaton_4p_demo <https://github.com/Hessian-matrix/RoboBaton_4p_demo>`_
-- ROS2 Demo: `RoboBaton_4P_ROS2_demo <https://github.com/Hessian-matrix/RoboBaton_4P_ROS2_demo>`_, publishing four-camera NV12/raw+compressed images, CameraInfo, IMU, and temperature topics.
+- ROS2 Demo: `RoboBaton_4P_ROS2_demo <https://github.com/Hessian-matrix/RoboBaton_4P_ROS2_demo>`_, publishing four-camera NV12/raw+compressed images, CameraInfo, IMU, temperature, and IMU timing topics.
 
 .. toctree::
    :maxdepth: 1

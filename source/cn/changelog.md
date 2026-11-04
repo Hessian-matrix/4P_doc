@@ -2,9 +2,35 @@
 
 本文件记录 RoboBaton 4P 公开交付的用户可见更新，版本定义统一遵循 [文档版本政策](release-and-support.md#文档版本政策)。本页文档修订号不自动改变软件版本，也不等于 SO 的 SONAME/ABI 版本。
 
-## 未发布
+## 2.0.18 - 2026-10-30
 
-以下记录当前源码中已实现但尚未作为新软件版本发布的更新；它们不因本文档修订自动成为软件发布或整机验收。当前适用范围与未闭环限制统一见{ref}`能力与验证边界 <capability-verification-boundary>`。
+- 补充 non-ROS `sensor_demo` 手动曝光 YAML：`camera.auto_exposure` 默认 `true`，保留 SDK tuning 自动策略；设为 `false` 时使用正整数 `camera.exposure_time_us`（默认 `2000`，范围 `1..4294967295`），每路启用相机进入 ISP 手动模式、三类增益固定 `1x`。实际范围由 SDK/profile 限制，配置失败不回退自动模式。
+- 说明启动时环境接口 `SC132_AUTO_EXPOSURE=1|0` / 十进制 `SC132_EXPOSURE_TIME_US`、YAML 显式/默认值覆盖继承环境、停止后重启，以及请求值与逐帧曝光估计的区别。手动曝光与现有中点测试独立，时间戳公式、C ABI 和 SONAME 不变。
+- 同步中英文 README、使用与数据合同；文档修订从 `2.0.17` 递增至 `2.0.18`，不改变软件版本或发布状态。本功能尚未实板部署或验证，不宣称真实曝光中点或物理同步精度。
+
+## 2.0.17 - 2026-10-30
+
+- 说明同一二进制的四组合启动选择：non-ROS 顶层 YAML `camera_timestamp_path: observer|official` 与 `imu_timestamp_mode: host|tmst`，CLI `--camera-timestamp-path`/`--imu-timestamp-mode`，ROS2 同名顶层只读参数。默认 observer/host，切换须停止/重启；四组合保持同一 IIO 读取/内核 owner。
+- IMU 切换 ABI5.0：`libicm42670.so.5.0.0`、SONAME `.5`、九个 `ICM42670_X5_5.0` 导出。config 增加 HOST=0/TMST=1；sample 保留原始 FIFO low16、独立 RAW sample/不确定度及不变的 MONOTONIC 主机估计。头文件、库及所有重建 consumer 成套匹配，不做 shim。
+- 两模式均要求匹配的内核 IIO V3 capture 模块，现有 V2 不兼容，部署应用不升级模块。TMST 使用内核拥有的 FIFO/UI 跳变证据与用户态解绕/有界仿射 RAW 映射，`200µs` 计算 admission 不是物理精度。不恢复 FSYNC、用户态 SPI/spidev 或回退。
+- official 相机时间使用同帧 RAW IRQ `timestamps − (tv − trig_tv) × 1000`，绝不使用 SIF observer，validity0/uncertainty `UINT32_MAX`，物理误差未知。observer 保留 `500µs` admission；曝光观测/测试模式不构成物理同步保证。
+- 保存/ROS2 按所选原生模式桥接 realtime；tmst 仍保留 MONOTONIC 主机证据，RAW/MONOTONIC 桥基点分开。timing schema 为 `robobaton_imu_timing_v2`；bag session config 与 MP4 IMU 列记录 selector/原生时间。
+- 同步中英文使用、API、数据、构建、兼容、部署、校时与排障说明。本轮不做实板测试或部署，不声明四组合实板/物理精度验收；仅文档 VERSION 变化，与软件版本/发布状态独立。下方 ABI4 的2.0.16保留为历史，不定义当前合同。
+
+## 2.0.16 - 2026-10-30
+
+- 公共IMU切换内核IIO ABI4.0：`libicm42670.so.4.0.0`、SONAME `.4`、九个`ICM42670_X5_4.0`导出；全部consumer成套迁移，无跨major shim。
+- 库与独立demo保留MONOTONIC主机估计及独立RAW burst观测；原生七档ODR、watermark1、buffer为256..8192的2次幂。移除用户态SPI、TMST/FSYNC、旧read_mode/mapper/精度字段及关联选项/topic/sidecar。
+- sensor_demo保存与ROS2每burst显式桥接realtime，bag/ROS2新增`/robobaton/imu/timing`，MP4扩展`imu.csv`原生时间/身份/桥列；括号半宽只约束观测，不认证物理精度。相机算法不变。
+- STOP保持接纳、排空完整cohort并ACK；count为停止阈值而非截断。最终health保留失败stop诊断，transport_complete不代表所有物理尾部或无fatal。
+- START要求非空callback；采集与STOP排空至join期间拒绝更换或清空，callback内重注册返回`INVALID_STATE`而不死锁。本地传输对账失败仍保留已取得的最终内核诊断，不ACK未交付record。
+- callback内start／health查询在STOP排空时也直接返回`INVALID_STATE`，避免与join形成锁等待环。
+- 同步中英文当前文档；仅文档修订递增，软件VERSION不变，不构成正式发布或目标环境验收。
+
+
+## 既往未发布源码变更（历史记录）
+
+以下保留迁移前的历史记录，不定义当前IMU合同；当前合同以本页最新修订及数据/API文档为准。
 
 ### 改进与修复
 

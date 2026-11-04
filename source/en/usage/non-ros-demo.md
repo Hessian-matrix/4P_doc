@@ -2,7 +2,7 @@
 
 [`RoboBaton_4p_demo`](https://github.com/Hessian-matrix/RoboBaton_4p_demo) is the public V2 non-ROS source repository, providing four-camera SC132 RTSP, four-channel mosaic RTSP, ICM-42670-P IMU, UART, and SocketCAN CAN examples.
 
-Supported parameters and actual verification scope are separate; see {ref}`Capability and Verification Boundaries <capability-verification-boundary>`. Console association success does not prove saved-image decoding or that every sample was saved. Sustained high rate on every path and long-recording acceptance for the current composition are not promised.
+Accepted parameters do not guarantee sustained throughput or zero loss for every path/load. Evaluate current contracts, terminal health, and actual payloads separately; old compositions do not certify IIO. See {ref}`Capability and Verification Boundaries <capability-verification-boundary>`.
 
 ## 1. Directory and Runtime Package
 
@@ -37,7 +37,7 @@ Deploy the full contents of `demo/`. The top-level `cam_demo`, `sensor_demo`, `m
 
 - Four SC132 cameras;
 - PRRTSP v2 H.264/H.265 RTSP streaming;
-- ICM-42670-P sensor timestamp FIFO IMU acquisition thread; INT1 (`34120000.gpio` offset `8`) only wakes acquisition, with bounded FIFO checks even without notifications.
+- ICM-42670-P kernel IIO capture with startup-selectable host or tmst timestamps; both modes preserve MONOTONIC host estimates and independent RAW burst observations, with SPI/INT1 owned by the same kernel driver.
 
 ```bash
 cd /root/demo
@@ -55,11 +55,11 @@ Common overrides:
 On exit it prints an IMU summary:
 
 ```text
-SENSOR_IMU_RESULT samples=... invalid=... timestamp_duplicates=... timestamp_regressions=... effective_hz=...
+SENSOR_IMU_RESULT samples=... invalid=... timestamp_duplicates=... timestamp_regressions=... set_odr_hz=... timestamp_hz=... acquisition_hz=... acquisition_valid=...
 ```
-In a window without system-clock corrections, check `timestamp_duplicates=0` and `timestamp_regressions=0`. Public realtime stamps may move backward with clock corrections; a regression across such a window alone is not a hardware-ordering failure. Also inspect sequences, timing drops, final health counters, and actual payloads.
+Camera realtime and saving/ROS2 bridges follow wall-clock steps; standalone IMU CLI statistics use native MONOTONIC. Do not mix these contracts. Inspect sequences, final IIO health, and actual payloads; assigned-timestamp frequency is not acquisition/integrity proof.
 
-`--imu-sample-drop-policy allow-counted` is the default: samples with provable identity but inadmissible timing are counted and dropped while acquisition continues. `strict` fails on timing/invalid-packet rejection. Unprovable identity, an invalid clock certificate, or hardware errors stop both policies. `--imu-start-order camera-first|imu-first` controls startup order, default `camera-first`, without changing timestamps or association contracts.
+`--imu-sample-drop-policy allow-counted` is the default: invalid six-axis payloads are counted and dropped while acquisition continues; `strict` fails on invalid payloads. Inconsistent identity, scan, timing evidence, or hardware errors stop both policies. Host has no physical-error bound; tmst applies a `200µs` computational mapping-admission limit, not a physical-accuracy guarantee. `--imu-start-order camera-first|imu-first` controls startup order, default `camera-first`, without changing the timestamp contract.
 
 (non-ros-yaml)=
 ## 3. YAML Configuration
@@ -69,22 +69,25 @@ In a window without system-clock corrections, check `timestamp_duplicates=0` and
 Default configuration structure:
 
 ```yaml
+camera_timestamp_path: observer
+imu_timestamp_mode: host
 camera:
   # width/height: 1280x1088 (default), 640x480, 720x480, or 1280x720, either axial orientation
   width: 1280
   height: 1088
   fps: 30
   rotate: 0
+  auto_exposure: true
+  exposure_time_us: 2000
   test_exposure_midpoint: false
 rtsp:
   bps: 4000
   codec: h264
   url: /PRR
 imu:
-  sample_rate_hz: 800
+  sample_rate_hz: 1600
   print_rate_hz: 10
   print_metrics: false
-  fsync_enabled: false
 save_data:
   save: false
   format: mp4
@@ -94,13 +97,53 @@ save_data:
 
 Boundaries:
 
+- Top-level `camera_timestamp_path` accepts `observer` (default) or `official`; top-level `imu_timestamp_mode` accepts `host` (default) or `tmst`. They are not fields under `camera`/`imu`. CLI `--camera-timestamp-path` and `--imu-timestamp-mode` override YAML. Stop and restart to change them; invalid values are rejected before hardware startup.
+
 - `camera.width` / `camera.height` support `1280x1088` (default), `640x480`, `720x480`, `1280x720`, either axial orientation; other values are rejected before the camera starts.
 - The full four-camera path is fixed to four channels; single-sensor diagnostics use `cam_demo --camera-id`.
 - The non-ROS public frame-rate set is 25/30/40/50/60fps; default `30`, other values rejected before the camera starts.
+- `camera.auto_exposure` is a boolean, default `true`: ignore the exposure duration and preserve the SDK tuning's automatic-exposure policy. Set `false` to use `camera.exposure_time_us` (default `2000`): each enabled camera enters ISP `HBN_ISP_MODE_MANUAL`, with analog, sensor digital, and ISP gains fixed to `1x` for repeatable calibration.
+- `camera.exposure_time_us` must be an integer in `1..4294967295` microseconds; zero, negatives, fractions, overflow, and trailing text are rejected. Divide by `1000000` for SDK seconds; the SDK/profile limits the usable range, and configuration failure fails startup without silently reverting to auto. Settings are startup-only: stop and restart after changes, and rebuild both the application and a supporting `libsc132.so`.
 - `camera.test_exposure_midpoint` defaults to `false`; set `true` and restart `sensor_demo` to use estimated exposure-midpoint image timestamps: trigger time plus half exposure duration. An explicit YAML value overrides `SC132_TEST_EXPOSURE_MIDPOINT`; older files omitting the field preserve the environment setting (off when unset). Rebuild both the application and a supporting `libsc132.so`. IMU stamps and bag record time are unchanged. Use the image `header.stamp` for ROS1 bag alignment; do not add half exposure again. Unavailable exposure stops acquisition; this is not a calibrated actual midpoint. See {ref}`Data Contracts <test-exposure-midpoint>`.
 - `rtsp.codec` supports `h264` and `h265`.
 - IMU native sample rates are `25/50/100/200/400/800/1600Hz`, default `800Hz`; other values are rejected, not resampled.
 - `save_data.format` defaults to `mp4` and also supports `rosbag`; the save path must be an absolute path.
+
+### Manual Exposure Example
+
+Change these two fields in the existing `camera` section, then restart `sensor_demo`. Set `auto_exposure: true` to restore automatic exposure:
+
+```yaml
+camera:
+  auto_exposure: false
+  exposure_time_us: 2000
+```
+
+The library reads `SC132_AUTO_EXPOSURE=1|0` and decimal `SC132_EXPOSURE_TIME_US` at frame-set startup. Explicit or default `sensor_demo` YAML options always override inherited environment values. Manual exposure is independent of `camera.test_exposure_midpoint`: timestamp formulas and the C ABI are unchanged, without certifying applied-frame identity or a physical exposure midpoint. No board deployment or verification has been performed for this feature. See the {ref}`Manual Exposure Contract <manual-exposure>`.
+
+### Four Timestamp Combinations
+
+The same binary and the same kernel IIO reads/owner serve all four combinations; only the timestamp axes change. Run one command at a time and exit normally before selecting another:
+
+```bash
+./sensor_demo --camera-timestamp-path observer --imu-timestamp-mode host
+./sensor_demo --camera-timestamp-path observer --imu-timestamp-mode tmst
+./sensor_demo --camera-timestamp-path official --imu-timestamp-mode host
+./sensor_demo --camera-timestamp-path official --imu-timestamp-mode tmst
+```
+
+For YAML use, choose one row and set the two top-level keys in `config/sensor_config.yaml`, then run `./sensor_demo` without selector overrides:
+
+| Combination | `camera_timestamp_path` | `imu_timestamp_mode` |
+|---|---|---|
+| Default | `observer` | `host` |
+| Observer + sensor TMST | `observer` | `tmst` |
+| Official + host | `official` | `host` |
+| Official + sensor TMST | `official` | `tmst` |
+
+Camera consumers set `SC132_TIMESTAMP_PATH` explicitly before startup; direct library use defaults to observer when the variable is unset. Observer retains the `500µs` SIF capture-window admission. Official uses the same frame's RAW IRQ `timestamps − (tv − trig_tv) × 1000`, never starts the SIF observer, and reports timing validity `0` with uncertainty `UINT32_MAX` (unknown physical bound). Host preserves MONOTONIC with unknown physical error. TMST unwraps kernel-owned FIFO/UI transition evidence into bounded affine RAW sample time with a `200µs` computational admission, not physical accuracy. No mode restores FSYNC, spidev, or automatic fallback. See [Data Contracts](../development/data-contracts.md).
+
+**Prerequisite for every pair:** a matching kernel IIO V3 capture module must already be bound. The existing V2 module is incompatible even for host; app deployment does not upgrade it. This documentation update performs no board testing or deployment and does not claim four-way target-board acceptance.
 
 (non-ros-save)=
 
@@ -124,7 +167,7 @@ cd /root/demo
 
 MP4 mode requires `rtsp.codec: h264`, the full four-channel camera mask `0x0f`, and must not enable `--record-bag` or `record-frame-skip` at the same time. The configured final output directory must not end with `.partial`; if the target directory or a same-named `.partial` already exists, the program automatically writes to the sibling `<dirname>-YYYYMMDDTHHMMSSZ[-NNNN]`, and the exit summary `SENSOR_MP4_RESULT path=` gives the real directory.
 
-Current MP4 sessions contain `camera0.mp4` through `camera3.mp4`, four `cameraN_timestamps.csv` files, `imu.csv`, `exposure.jsonl`, `fsync.jsonl`, `camera_params.yaml`, `session_status.json`, and `publication_receipt.json`. `fsync.jsonl` is always created but receives association records only with FSYNC enabled. MP4 uses nominal H.264 frame timing; timestamp CSV stores microsecond-quantized realtime group-trigger times expressed in ns. Original per-camera values are in the input exposure sidecar and, with FSYNC enabled, association records. Exposure `status=1` is an estimate, not certified applied exposure; the input sidecar may outnumber encoded frames. See [Data Contracts](../development/data-contracts.md) for joins. `.partial` is recovery-only, not a complete data source.
+Current MP4 sessions contain `camera0.mp4` through `camera3.mp4`, four `cameraN_timestamps.csv`, extended `imu.csv`, `exposure.jsonl`, `camera_params.yaml`, `session_status.json`, and `publication_receipt.json`, without an FSYNC sidecar. Image CSV uses microsecond-quantized realtime group times; exposure sidecars retain per-camera input observations. IMU CSV `sample_realtime_ns` comes from the output bridge and retains MONOTONIC, RAW, burst/sequence/generation, origin, and bridge bases/half-width. See [Data Contracts](../development/data-contracts.md). `.partial` is recovery only.
 
 To convert to a JPEG dataset offline, use the scripts in the public demo repository on the host:
 
@@ -154,6 +197,7 @@ Common parameters:
 --bps <kbps>
 --url <path>
 --trigger-mode vin_lpwm
+--camera-timestamp-path <observer|official>
 --diagnostics
 --max-skew-ns <ns>
 --frame-timeout-ms <ms>
@@ -236,6 +280,7 @@ Like `cam_demo`/`sensor_demo`, `mosaic_rtsp_demo` exclusively holds the four-cam
 cd /root/demo
 ./imu_reader_demo
 ./imu_reader_demo --sample-rate-hz 1600 --count 10000
+./imu_reader_demo --imu-timestamp-mode tmst --print-metrics
 ```
 
 It prints sampled records at `10Hz` by default; the program still consumes all IMU samples. To view metrics use:
@@ -246,18 +291,20 @@ It prints sampled records at `10Hz` by default; the program still consumes all I
 
 Key fields:
 
-- `ts_ns`: IMU sample time in `CLOCK_REALTIME` `ns`, from measured FIFO TMST-to-RAW-to-realtime mapping. `host_ts_ns` is the RAW observation at that packet's successful SPI FIFO burst completion, converted to realtime using the bridge measured for that observation; packets in one burst may share it, and FSYNC deferral retains the converted value. It is not an IRQ edge, sample time, or exposure time. Both follow clock steps; use `sample_seq` for order. `TIME_BASE domain=realtime realtime_start_ns=...` declares only a startup reference, not a frozen offset.
+- `sample_monotonic_ns`: kernel-assigned MONOTONIC host estimate, retained without Unix conversion by standalone CLI; `sample_seq` is the sequence. `TIME_BASE domain=monotonic` declares the native clock.
+- `timestamp_mode`, `fifo_tmst`, `sample_raw_ns`, `timestamp_uncertainty_ns`: mode and raw FIFO low16; host leaves RAW sample zero and uncertainty `UINT32_MAX`, tmst adds mapped RAW sample and computational uncertainty without replacing MONOTONIC. Standalone output never converts either mode to Unix time.
 - `accel_mps2`: acceleration in `m/s^2`.
 - `gyro_rps`: angular velocity in `rad/s`.
-- `uncertainty_us`, `gpio_gap_count`, `fifo_overflow_count`, `mapper_failure_count`: timestamp mapping and acquisition-link diagnostics.
+- `--print-metrics` adds generation, evidence, source, packet/burst flags, MONOTONIC observation, independent RAW burst completion, estimated period, and same-domain MONOTONIC differences. Never directly subtract RAW and MONOTONIC.
 
 V2 `accel_mps2` outputs `[X, Y, Z]`; PCB orientation and signs still need six-face/rotation board verification. Axis signs and transforms relative to the main board or cameras are not currently declared.
 
-IMU INT1 uses `34120000.gpio` offset `8`, with per-sample FIFO TMST timing. Cameras use LPWM and the VIN-propagated trigger capture, not frame arrival time. Camera and IMU FSYNC share one physical IO; this does not automatically associate FIFO samples one-to-one with exposures.
+The library/standalone default is800Hz; checked-in YAML explicitly selects1600Hz. CLI overrides YAML, while a generated default config uses800Hz. Distinguish supported rates, library defaults, and active settings.
 
-Use `sensor_demo --fsync --sample-rate-hz 1600` or YAML `imu.fsync_enabled: true` for explicit association (default off, only `800/1600Hz`). Without saving, stdout emits `robobaton_fsync_v1` JSON; saving stores bag `/robobaton/fsync` or MP4 `fsync.jsonl`. Only `status=1` is a unique match. Check timing drops, sequence gaps, and `SENSOR_FSYNC_RESULT`; sample correspondence is not exposure synchronization. See [Data Contracts](../development/data-contracts.md).
+The kernel IIO V3 driver owns IMU SPI/INT1; the older V2 module is incompatible. Discover the unique `icm42670-capture` instance and validate its control node without fixed device numbers. Buffer defaults to4096, API accepts powers of two in256..8192; watermark1 and seven native ODRs. Both modes use this same capture path, without userspace SPI/spidev, FSYNC, or automatic fallback.
 
-Realtime scheduling permission is required: camera capture uses `SCHED_FIFO/60`, IMU owner `SCHED_FIFO/20`, and the combined application's IMU consumer `SCHED_RR/3`. The camera observer inherits the allowed CPU mask and sleeps `50µs` per iteration. IMU no longer uses an independent INT1 clock observer; INT1 is wake-only, and notification sequence gaps are diagnostic, not independently fatal. Scheduling failure rejects startup. Applications do not automatically change IRQ/debug or realtime quotas; this redesign does not fix the GPIO/kernel root cause, and high load can still cause counted drops or failure. Inspect `IMU_RUNTIME_HEALTH final=yes health_valid=yes` after successful stop and actual payloads, not merely continued terminal output.
+
+Realtime scheduling requires camera `observer` `SCHED_FIFO/60` (not started in `official`), IMU owner `SCHED_FIFO/20`, and consumers `SCHED_RR/3`. Failure rejects startup without automatic IRQ/debug/realtime-quota changes. The observer window remains `500µs`; official has unknown physical error. Neither IMU mode guarantees physical accuracy or zero loss.
 
 ## 8. Serial Demo
 

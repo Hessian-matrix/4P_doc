@@ -24,9 +24,9 @@
 4. 执行 NTP/PTP 配置前，应先退出 demo、ROS2 节点和其他时间戳敏感任务；保持 `cam-service` 运行。
 5. V2 独立 PPS IO 无需切换 UART7 引脚；接线前确认正式 5pin 线序、电平和共地，断电操作。
 6. 系统时间同步不等于采样同步。相机、IMU、PPS、PTP 和 ROS `header.stamp` 属于不同层次，字段语义见[数据合同](../development/data-contracts.md)。
-7. 相机、IMU 和 bag record time 均输出 `CLOCK_REALTIME` 系统时间；硬件触发/采样时间经内部 RAW 映射并持续刷新 realtime 桥接，不冻结启动 offset。系统校时会改变后续时间戳，允许回拨；内部超时仍使用单调时钟。先校时再采集，避免编码/容器遇到不支持的时间回退。统一时间域不代表 FSYNC 样本或曝光已同步；系统时间未校准时也不代表准确 UTC。
-8. IMU `host_timestamp_ns`（producer CLI `fifo_observation_ns`）保留成功 SPI FIFO burst 完成时 RAW 观测按当次桥接转换的 realtime；同 burst 可共享，FSYNC 延迟发布不重新桥接旧 RAW。它不是 IRQ、样本或曝光时间；包序和身份不由 realtime 递增定义。
-9. 上述字段语义不证明持久 RTC、断电/重启后自动校时或绝对 UTC 精度，也不关闭当前 LPWM/FSYNC 的负载与长尾限制；见{ref}`能力与验证边界 <capability-verification-boundary>`。
+7. 启动相机 `observer|official` 与 IMU `host|tmst` selector 独立，默认 observer/host；四组合共用相同二进制及 IIO 采集/owner，只改变时间戳轴，切换须停止/重启。observer 保留 `500µs` SIF admission；official 使用同帧 RAW IRQ `timestamps − (tv − trig_tv) × 1000`（AON `tv`/`trig_tv` 单位 µs），不启动 observer，validity0/uncertainty `UINT32_MAX`（物理上界未知）。见 [non-ROS 使用](../usage/non-ros-demo.md) 与 [ROS2 使用](../usage/ros2-demo.md)。
+8. 两种 IMU 模式均保留 `sample_monotonic_ns` 与 `observation_monotonic_ns` 的内核 MONOTONIC 主机证据；`burst_complete_raw_ns` 为独立 RAW，不能跨域直接作差。host 的 RAW sample 为零、不确定度未知。TMST 对内核拥有的 FIFO/UI 跳变证据解绕并作有界仿射 RAW `sample_raw_ns` 映射，`200µs` 计算 admission 不是物理精度。保存/ROS2 每 burst 桥接 host MONOTONIC→REALTIME 或 tmst RAW→REALTIME，分开保留 `bridge_monotonic_ns`/`bridge_raw_ns` 和桥括号半宽。bag record time 独立读取 realtime，照实保留墙钟回拨，不冻结 offset、不合成递增；采集前先校时。均不恢复 FSYNC、spidev 或回退；两模式要求匹配内核 IIO V3（V2 不兼容）。
+9. 这些语义不证明持久 RTC、重启后自动校时、绝对 UTC 或物理同步；能力边界见{ref}`能力与验证边界 <capability-verification-boundary>`。
 
 ## 三种同步方式
 

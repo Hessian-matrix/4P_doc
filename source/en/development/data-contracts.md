@@ -39,13 +39,16 @@ Only full four-camera operation or single-sensor diagnostics is supported, not 2
 
 | Mode | Current status | Public contract |
 |---|---|---|
-| `vin_lpwm` | The only supported trigger for all camera applications and the library | Camera and IMU FSYNC share the LPWM IO; the camera time base is the frame-propagated `trig_tv` hardware capture. Missing capture stops acquisition rather than falling back to frame arrival time. |
+| `vin_lpwm` | Only supported camera trigger | Uses frame-propagated `trig_tv` capture; missing capture stops acquisition without arrival-time fallback. |
 
-All public sensor timestamps use `CLOCK_REALTIME` system time (Unix epoch, in ns). By default camera stamps represent the LPWM hardware trigger edge, not frame arrival, IRQ, or exposure midpoint; see the opt-in {ref}`Exposure-Midpoint Test Switch <test-exposure-midpoint>`. The library brackets a SIF VSYNC capture-register transition with RAW reads, subtracts `VSYNC − trigger` in the shared 24 MHz counter, and exactly matches the frame's `trig_tv` against capture history. The background thread inherits the process's allowed CPU mask, uses `SCHED_FIFO/60`, and sleeps `50µs` between scans. An in-scan transition uses that scan's bracket, rereads TRIG, and verifies stable VSYNC. Failure to enable realtime scheduling rejects startup. A register window exceeding `500µs`, missing capture, or failed match stops acquisition without an arrival-time fallback. This implementation requires the fixed X5 register map, read-only `/dev/mem` access, and realtime scheduling permission; the rejection window is not demonstrated synchronization accuracy.
+Camera timestamps use `CLOCK_REALTIME` system time (Unix epoch, in ns). With exposure-midpoint testing disabled, they represent the selected LPWM trigger-time estimate, not frame arrival or exposure midpoint. The startup-only `camera_timestamp_path` selects `observer` (default) or `official`; direct library users set `SC132_TIMESTAMP_PATH` before startup. Stop and restart to change it; invalid values fail startup and neither path falls back to the other.
 
-Frame-set mode first discards 30 warmup frames per camera by default. Until all enabled cameras finish warmup, buffers are returned immediately, without exposure queries, image transforms, or capture-map admission for these unpublished frames. Every delivered frame after warmup still requires a valid exact capture match with the unchanged `500µs` window limit; disabling warmup does not exempt the first frame.
+- `observer`: bracket a SIF VSYNC capture-register transition with RAW reads, subtract `VSYNC − trigger` in the shared 24 MHz counter, and exactly match the frame's `trig_tv` against capture history. The background thread inherits the allowed CPU mask, uses `SCHED_FIFO/60`, and sleeps `50µs` between scans. An in-scan transition uses that scan's bracket, rereads TRIG, and verifies stable VSYNC. Missing realtime scheduling permission rejects startup. A register window exceeding the unchanged `500µs` admission limit, missing capture, or failed match stops acquisition. This path requires the fixed X5 register map and read-only `/dev/mem`; the window is not demonstrated physical synchronization accuracy.
+- `official`: use the same frame's `out_img.info.timestamps` (IRQ time in `CLOCK_MONOTONIC_RAW`) minus `(tv − trig_tv) × 1000`, where `tv` and `trig_tv` are AON microseconds, not RAW/realtime epochs. It never starts or uses the SIF MMIO observer. Invalid metadata, arithmetic overflow, or underflow stops acquisition. This is an IRQ-derived trigger estimate with an unknown physical-error bound: `reserved[SC132_GROUP_TIMING_VALID]=0` and `reserved[SC132_GROUP_UNCERTAINTY_NS]=UINT32_MAX`, never the observer's bounded validity marker.
 
-Grouping remains in internal trigger RAW time, followed by one freshly sampled RAW-to-realtime bridge for the entire group. Group time is the minimum delivered channel timestamp; `max_skew_ns` always measures trigger-capture differences, not exposure or camera/IMU alignment accuracy. Non-ROS diagnostics, RTSP input times, saved images, and ROS2 image stamps use the delivered timestamp: realtime trigger time by default, estimated exposure midpoint in test mode. Bridges follow runtime clock corrections, including backward steps, without a frozen offset or monotonic clamp. Internal timeouts remain monotonic; the FSYNC trigger-to-sample association below is explicitly opt-in.
+Frame-set mode first discards 30 warmup frames per camera by default. Until all enabled cameras finish warmup, buffers are returned immediately, without exposure queries, image transforms, or timestamp admission for these unpublished frames. Every delivered frame must satisfy the selected path: an exact capture match within the `500µs` window for observer, or valid same-frame metadata/arithmetic for official. Disabling warmup does not exempt the first frame.
+
+Grouping uses the selected trigger RAW estimate, followed by one freshly sampled RAW-to-realtime bridge for the entire group. Group time is the minimum delivered channel timestamp; `max_skew_ns` measures differences between selected trigger estimates, not exposure or camera/IMU alignment accuracy. Non-ROS diagnostics, RTSP input times, saved images, and ROS2 image stamps use the delivered timestamp: realtime trigger estimate by default, estimated exposure midpoint in test mode. Bridges follow runtime clock corrections, including backward steps, without a frozen offset or monotonic clamp. Internal timeouts remain monotonic. IMU selectors and clocks are independent of the camera path.
 
 ### Per-frame Exposure Observations
 
@@ -61,6 +64,15 @@ After acquiring each frame and before output transforms, query the latest ISP st
 Public `timestamp_ns` is the trigger edge by default. The test switch can select trigger time plus half the duration, but this is not a certified exposure midpoint: trigger-to-integration-start has not been calibrated. Bag `/cameraN/frame_metadata` and tee `camN/frames.jsonl` preserve `exposure`. MP4 `exposure.jsonl` records input-camera identity, raw/normalized frame IDs, group ID, group/per-camera delivered times, and exposure. It can contain input frames not saved by the encoder: join the camera's timestamp CSV using `group_timestamp_ns // 1000 * 1000`, not source frame ID as a file index. ROS2 `/robobaton/camN/exposure` (`std_msgs/msg/String`, Reliable KeepLast(8)) publishes `robobaton_exposure_v1` JSON with `camera_id/sequence/frame_id/raw_frame_id/timestamp_ns/exposure`; join by camera and Image `header.stamp`. Clock steps may repeat stamps: preserve sequence and acquisition boundaries, rather than assume stamps alone are globally unique. Parse integer JSON losslessly.
 
 MP4 sidecar top-level keys are `camera_id/raw_frame_id/frame_id/group_id/group_timestamp_ns/camera_timestamp_ns/exposure`. Its per-camera delivered-time field is named `camera_timestamp_ns`, unlike `timestamp_ns` in ROS2 JSON. Check `exposure.status` before using `duration_ns`; do not use `source_timestamp` to align Unix time.
+
+(manual-exposure)=
+### Startup-only Manual Exposure Configuration
+
+Non-ROS `sensor_demo` accepts boolean `camera.auto_exposure`, default `true`, and integer microseconds `camera.exposure_time_us`, default `2000`, with valid input `1..4294967295`. Zero, negatives, fractions, overflow, trailing text, and invalid booleans are rejected before startup. Auto mode ignores the duration without rewriting the SDK tuning's automatic-exposure policy. Manual mode selects ISP `HBN_ISP_MODE_MANUAL` for each enabled camera, sets SDK seconds to `exposure_time_us / 1000000`, and fixes analog, sensor digital, and ISP gains to `1x` for repeatable calibration. The SDK/profile limits the usable range: SDK rejection fails startup without silent fallback to auto.
+
+The library reads `SC132_AUTO_EXPOSURE=1|0` and decimal `SC132_EXPOSURE_TIME_US` once at each `sc132_start_frame_set()` startup, defaulting to `1` / `2000` when unset. `sensor_demo` always writes explicit or default YAML options into the environment, overriding inherited values; omitting YAML keys does not preserve environment control. Settings are startup-only: stop and restart after changes, and rebuild both the application and a supporting library. See the {ref}`non-ROS YAML Configuration <non-ros-yaml>` for examples.
+
+Manual parameters are set after camera flow starts successfully and before the worker is ready. Each camera discards `3` transition frames even when normal warmup is disabled. This does not certify applied-parameter identity for subsequent frames; per-frame `exposure` retains the estimate contract above. Bag `/robobaton/session_config` fields `auto_exposure` / `exposure_time_us` record requested values, not measured exposure. The feature is independent of `camera.test_exposure_midpoint`, changes neither timestamp formulas, the C ABI, nor SONAME, and makes no physical exposure-midpoint claim. No board deployment or verification has been performed.
 
 (test-exposure-midpoint)=
 ### Exposure-Midpoint Timestamp Test Switch
@@ -78,89 +90,85 @@ The non-ROS combined entry `sensor_demo` also accepts `camera.test_exposure_midp
 
 When enabled, each `timestamp_ns = realtime trigger time + floor(exposure.duration_ns / 2)`, using that frame's frozen latest ISP observation. It ignores trigger-to-integration-start delay, not replacing time with host now, arrival time, or opaque source time. Frame info and frame-set items agree; group time is the minimum adjusted channel timestamp. Non-ROS saving/RTSP, ROS2 Image/CameraInfo, and exposure messages use these values; consumers must not add half exposure a second time. Unavailable exposure, zero duration, or addition overflow stops acquisition rather than silently reverting to trigger time.
 
-Group admission and `max_skew_ns` still use original trigger RAW; reserved RAW/generation/uncertainty and FSYNC correspondence are not shifted. Thus test-mode group time and RAW audit time intentionally describe different events. This is only an exposure-midpoint estimate without delay compensation, not a guarantee of applied exposure, error bounds, or hardware synchronization accuracy.
+Group admission and `max_skew_ns` still use original trigger RAW; reserved RAW/generation/uncertainty are not shifted. Thus test-mode group time and RAW audit time intentionally describe different events. This is only an exposure-midpoint estimate without delay compensation, not a guarantee of applied exposure, error bounds, or hardware synchronization accuracy.
 
 
 ## IMU
 
+The public library requires the matching **kernel IIO V3 capture module** already bound to the device. An existing V2 capture module is incompatible, including in host mode; rebuilding/deploying applications alone does not upgrade it. Enumerate the unique instance named `icm42670-capture`, validate its scan layout, and BIND its matching control node. Never assume an `iio:deviceN` number. Both timestamp modes use the same IIO reads and kernel SPI/INT1 owner, in the same binary. The library neither loads modules nor changes the device tree, and has no userspace SPI/spidev or automatic fallback backend.
+
 | Item | Contract |
 |---|---|
-| Device path | `/dev/spidev2.0` |
-| SPI mode/speed | mode `0`, `10 MHz` |
-| INT1 DRDY | `34120000.gpio` offset `8`; not old GPIO395 |
-| Read mode | sensor timestamp FIFO |
-| FIFO watermark | `1` |
-| Native ODR | `25/50/100/200/400/800/1600Hz`, default `800Hz`; other values are rejected, not resampled |
-| FSYNC | V2 input shares the camera trigger net; opt-in rising-edge capture links a trigger to its first subsequent tagged IMU sample without changing continuous sampling phase. |
+| ABI | `5.0`; real file `libicm42670.so.5.0.0`, SONAME `libicm42670.so.5`, all nine exports versioned `ICM42670_X5_5.0`; rebuild every consumer with matching headers/libraries |
+| Native ODR | `25/50/100/200/400/800/1600Hz`, default `800Hz`; reject other values without resampling |
+| FIFO watermark | Fixed at `1` |
+| Buffer capacity | Default `buffer_capacity=4096`; power of two in `256..8192` only |
+| Invalid six-axis payload policy | Default `allow-counted` counts and continues; `strict` fails on invalid payloads. Not a timestamp-precision policy |
+| Timestamp mode | Startup-only `timestamp_mode`: `ICM42670_TIMESTAMP_MODE_HOST=0` (default) or `ICM42670_TIMESTAMP_MODE_TMST=1`; app `imu_timestamp_mode` accepts `host` or `tmst` |
 
-Field semantics:
-
-| Field | Unit / semantics |
+| Field | Units and semantics |
 |---|---|
-| `sample_sequence` / demo `sample_seq` | IMU sequence defined by FIFO order, not INT1 notifications or increasing realtime. |
-| `temperature_c` / demo `temp_c` | Degrees Celsius. |
-| `accel_mps2` | `m/s^2`. |
-| `gyro_rps` | `rad/s`. |
-| `host_timestamp_ns` / CLI `fifo_observation_ns` | RAW observation at the packet's successful SPI FIFO burst completion, converted to `CLOCK_REALTIME` ns using the bridge measured for that observation. Packets in one burst may share it; FSYNC deferral retains the converted value, possibly earlier than publication, without rebridging old RAW. Follows wall steps; not IRQ-edge, sample, or exposure time. |
-| `sample_timestamp_ns` | Per-sample FIFO TMST-to-RAW-to-`CLOCK_REALTIME` timestamp; each publication refreshes the bridge and follows backward system-clock steps. |
-| demo `ts_ns` | Producer realtime sample time retained unchanged, in ns; `host_ts_ns` is also realtime, with no further consumer offset. |
-| `reserved0` | Count of observed FIFO timestamp low-16-bit rollovers in this session. |
-| `timestamp_uncertainty_us` | Per-sample time-mapping uncertainty, in microseconds. |
-| `gpio_event_gap_count` / `fifo_overflow_count` / `mapper_failure_count` | Session counts of detectable missing GPIO notification sequence values, FIFO overflows, and mapping failures. GPIO gaps are diagnostic, not proof of physical-edge/sample loss or independently fatal. |
+| `session_generation` / `sample_sequence` | Session identity and FIFO packet sequence; use sequence for order and never mix sessions |
+| `sample_monotonic_ns` | Kernel-assigned `CLOCK_MONOTONIC` host estimate, retained unchanged in both modes; not Unix time or a measured physical sampling edge |
+| `observation_monotonic_ns` | Host observation in the same MONOTONIC domain; its difference from sample time is not certified physical sampling latency |
+| `estimated_period_ns` | Host-estimated period, not a measured chip timestamp |
+| `evidence_id` / `burst_flags` | In-session burst identity; bit `1` denotes an ordinary successful burst, bit `2` a STOP tail |
+| `burst_complete_raw_ns` | Separate `CLOCK_MONOTONIC_RAW` burst-completion observation; shared within a burst. Never subtract it directly from MONOTONIC fields |
+| `timestamp_source` | `1=IRQ`, `2=SERVICE`; SERVICE identifies a service-time estimate without IRQ, not a hardware sampling edge |
+| `packet_flags` | Low three bits are accel/gyro/temperature valid (`1/2/4`) |
+| `temperature_c` / `accel_mps2[3]` / `gyro_rps[3]` | Celsius, `m/s^2`, `rad/s`; `raw` retains original six-axis/temperature values |
+| `timestamp_mode` | Numeric mode `0=HOST`, `1=TMST` in the C sample; output JSON/CSV uses `host`/`tmst` |
+| `fifo_tmst` | Raw FIFO TMST low 16 bits, zero-extended into the public u32 field; not an unwrapped timestamp or Unix time |
+| `sample_raw_ns` | `0` in host mode; in tmst mode, userspace-unwrapped FIFO TMST mapped to `CLOCK_MONOTONIC_RAW` using kernel-owned FIFO/UI transition evidence |
+| `timestamp_uncertainty_ns` | `UINT32_MAX` (unknown) in host mode; tmst computational mapping-admission bound in ns, not a physical sampling-accuracy certificate |
 
-The IMU samples continuously and independently. FIFO order and measured chip TMST define sequence and time; INT1 only wakes FIFO draining, without per-packet pairing. FSYNC uses chip tags/deltas and measured endpoints to identify the first tagged sample after a trigger, not exposure simultaneity. Exposure midpoint, TF extrinsics, and calibration remain unavailable. Neither host observations nor FSYNC deltas are sample time. Both realtime stamps follow clock corrections; unique host values and increasing wall time are not acquisition-order requirements.
+Host mode preserves the kernel MONOTONIC estimate without a physical-error bound. TMST mode uses kernel-owned FIFO TMST and bounded UI transition observations; userspace unwraps the counter and performs bounded affine mapping to RAW. Missing, contradictory, stale, ambiguous, or out-of-budget timing evidence fails rather than falling back to host or nominal-ODR time. The `200µs` sample-mapping admission is computational, not measured physical accuracy. It does not restore FSYNC, trigger-to-sample association, or userspace SPI.
 
-### FSYNC Trigger-to-Sample Association
+The public library and standalone `icm42670_reader`/`imu_reader_demo` never convert to Unix time. Both modes preserve native MONOTONIC; tmst additionally supplies RAW sample time and uncertainty. `IMU_TIMING_SUMMARY` separates `timestamp_hz` (host-assigned MONOTONIC span, even in tmst mode) from `acquisition_hz` (independent RAW endpoints of ordinary non-STOP bursts and each endpoint's last packet sequence). The latter requires `acquisition_valid=yes` and at least two ordinary bursts. Neither rate alone proves physical sampling accuracy or completeness.
 
-Disabled by default. Non-ROS uses `sensor_demo --fsync --sample-rate-hz 1600` or YAML `imu.fsync_enabled: true`; ROS2 sets `imu.fsync_enabled:=true` and `imu.sample_rate_hz:=1600`. Only `800/1600Hz` are supported; the rate is not changed automatically. The tighter `800Hz` budget can cause more timing drops; `1600Hz` also does not guarantee an admissible sample for every trigger.
+### Output Realtime Bridge and Timing Metadata
 
-The hardware FSYNC FIFO tag replaces the packet's absolute TMST with trigger-to-sample delay. The implementation waits for adjacent absolute TMSTs, bounds missing time with legal tick-step intervals, and includes interval half-width in midpoint uncertainty; it never synthesizes timestamps from nominal ODR. Measured clock slope converts delay to ns before subtraction from sample RAW time. Missing endpoints, ambiguous wrap, or uncertainty exceeding the `200µs` policy do not produce fabricated associations.
+The `sensor_demo` saving and ROS2 output adapters select native sample time by mode: host uses `sample_monotonic_ns` with MONOTONIC→REALTIME; tmst uses `sample_raw_ns` with RAW→REALTIME. One bridge is observed for each new `(session_generation,evidence_id,timestamp_mode)` and reused within that burst; original MONOTONIC host fields and RAW burst observations are never rewritten. The bridge tries at most three times, rejecting an observation whose selected native-clock bracket exceeds `200000ns`; failure of all attempts fails output. `bridge_uncertainty_ns` is the bracket half-width rounded up, separate from the tmst sample-mapping admission and not physical sampling precision or a camera/IMU synchronization bound. Backward wall-clock steps remain visible in subsequent bursts without a monotonic clamp.
 
-Retain a leading FSYNC-tagged packet and its original burst-completion observation until a later absolute TMST permits reconstruction, without waiting for or consuming a corresponding GPIO identity. The measured pre-enable Arm transition is not a preceding FIFO sample: check shared-transition and one-full-legal-ODR-later hypotheses separately, narrowed by later measured endpoints. Accept only a unique feasible hypothesis, never fractional phases. Both FIFO-enable writes must complete before the shortest legal ODR interval measured from the start of the Arm observation bracket, converted using the measured clock-slope lower bound. Exceeding this deadline rejects startup to prevent whole-TMST-wrap aliasing. Unique wrap, measured clocks, and `200µs` admission remain required. Unprovable clocks/epochs fail; over-budget samples retain strict/allow-counted policies and health counters.
+Bag `/imu/data` and ROS2 IMU/Temperature `Header.stamp` use the explicitly converted realtime. Bag `/robobaton/imu/timing` (`std_msgs/String`) and the same ROS2 topic (`std_msgs/msg/String`, Reliable KeepLast(256)) retain per-sample `robobaton_imu_timing_v2` JSON:
 
-Camera groups and FSYNC edges match only with a unique candidate in both directions within combined RAW uncertainty intervals, never by nearest neighbor or equal realtime timestamps. History is bounded (128 groups, 256 events); restarted generations cannot mix. JSON schema is `robobaton_fsync_v1`:
+- Clock declarations: `sample_clock` and `bridge_clock` are `CLOCK_MONOTONIC` for host, `CLOCK_MONOTONIC_RAW` for tmst; `output_clock=CLOCK_REALTIME`, `burst_complete_clock=CLOCK_MONOTONIC_RAW`;
+- Identity: `generation`, `sample_sequence`, `evidence_id`, `burst_flags`;
+- Times and origin: `sample_monotonic_ns`, `sample_realtime_ns`, `burst_complete_raw_ns`, `observation_monotonic_ns`, `estimated_period_ns`, `timestamp_source`, `packet_flags`, plus `timestamp_mode` (`host`/`tmst`), `fifo_tmst`, `sample_raw_ns`, and `timestamp_uncertainty_ns`;
+- Bridge observations: `bridge_monotonic_ns` (host only; zero for tmst), `bridge_raw_ns` (tmst only; zero for host), `bridge_realtime_ns`, `bridge_uncertainty_ns`. Never relabel a RAW bridge base as MONOTONIC or subtract across clocks.
 
-| Field | Meaning |
-|---|---|
-| `status` | `1` unique match; `2` missing event or group; `3` ambiguous. Only `1` is valid. |
-| `camera_generation` / `group_id` / `frame_ids` / `camera_mask` | Camera session, group number, cam0..3 frame IDs, and active-camera bitmap. |
-| `imu_generation` / `fsync_sequence` / `sample_sequence` | IMU session, hardware trigger sequence, and published sample sequence; gaps are possible. |
-| `group_timestamp_ns` / `sample_timestamp_ns` / `fsync_timestamp_ns` | Realtime delivered group, IMU sample, and FSYNC-edge times, in ns; group time defaults to trigger time and becomes the minimum estimated camera exposure midpoint in test mode. |
-| `camera_timestamps_ns` | Original realtime stamp for each cam0..3 frame; use `camera_mask` to select valid entries and join each ROS2 Image/CameraInfo `header.stamp` exactly. Group time is the minimum, not a replacement for every camera stamp. |
-| `group_raw_ns` / `sample_raw_ns` / `fsync_raw_ns` | Internal RAW values for association auditing only, not UTC; group RAW always means earliest trigger and is not shifted by exposure-midpoint test mode. |
-| `fsync_to_sample_ns` | Measured delay from the FSYNC edge to its subsequent hardware-tagged sample. |
-| `group_uncertainty_ns` / `uncertainty_ns` | Camera-group and IMU-event mapping uncertainties, not exposure-sync accuracy claims. |
+MP4 `imu.csv` uses output realtime in `sample_realtime_ns`, retaining native times, identity, burst, origin, bridge bases/half-width, temperature, and raw six-axis columns (generation is named `session_generation`). Its additional selector fields are `timestamp_mode,fifo_tmst,sample_raw_ns,timestamp_uncertainty_ns,bridge_clock,bridge_raw_ns`. Host retains RAW sample zero and unknown sample uncertainty; tmst retains the original MONOTONIC estimate separately. There are no FSYNC topics, sidecars, callbacks, or enable options, trigger-to-sample association, or `200µs` physical precision guarantees. Exposure observations and the exposure-midpoint test switch remain available with either camera path; official uncertainty remains unknown. A common Unix epoch does not establish physical synchronization.
 
-Without saving, JSON goes to stdout; ROS1 bags store `/robobaton/fsync` (`std_msgs/String`); MP4 sessions store `fsync.jsonl`; ROS2 publishes `/robobaton/fsync` (`std_msgs/msg/String`, Reliable KeepLast(256)). Missing-side fields are zero: check `status` and generation first. Storage completeness differs from association completeness: inspect statuses, sequence gaps, and captured/dropped in `SENSOR_FSYNC_RESULT`; exit code or container completeness alone cannot prove every trigger matched.
+Parse JSON timestamps and sequences losslessly as integers. Epoch nanoseconds exceed IEEE-754's safe integer range; ordinary JavaScript `JSON.parse` rounds them, so use a lossless integer parser.
 
-Read integer timestamps and sequences with a lossless integer JSON parser (for example, Python `json.loads` uses `int`). Epoch nanoseconds exceed the IEEE-754 safe-integer range; ordinary JavaScript `JSON.parse` rounds them, so use a BigInt-aware lossless parser. Association describes source-frame/source-sample identity, not successful storage selection, queue admission, or DDS delivery; cross-check per-camera stamps, frame metadata, and IMU sequences against actual data. With `SENSOR_FSYNC_RESULT health_valid=no`, captured/dropped are `unknown`, not zero; `stdout_dropped` reports stdout write losses.
+### STOP, ACK, and Final Health
 
-Load boundary: the acquisition owner uses `SCHED_FIFO/20`; non-ROS IMU consumers and ROS2 IMU publication use `SCHED_RR/3`. Cross-priority queue locks use priority inheritance. SPI is `10MHz`; INT1 retains its `100µs` asynchronous-reset wake pulse. Realtime scheduling failure never silently downgrades. Applications do not automatically change IRQs, SPI dynamic-debug, realtime quotas, LPWM, or the kernel. SPI/scheduling and subscriber load still matter. Measured TMST, unique bidirectional FSYNC matching, and `200µs` admission remain unchanged, without a zero-loss guarantee under arbitrary load.
+The serial acquisition worker invokes callbacks with a sample borrowed until return. Callbacks must not throw or call stop/destroy; `user_data` must remain alive until stop returns. STOP keeps callback admission open, drains the complete stop cohort, then joins. Asynchronous consumers must drain concurrently, not close admission first. `--count N` is a STOP-request threshold: final counts may exceed N and do not truncate the cohort. A record is ACKed only after all covered samples reach callbacks; repeated stop retains terminal diagnostics.
 
-INT1 is notification, not a sample clock or per-packet identity source; GPIO software IRQ timestamps are not physical-edge hardware latches and acquisition does not consume them. Detectable notification sequence gaps only increment `gpio_event_gap_count`; continuous sequences cannot rule out loss/merging before event generation. FIFO/TMST-led acquisition removes per-edge pairing but **does not fix or establish the underlying GPIO/kernel cause**. Diagnosing that cause still requires matching-BSP IRQ capture or synchronized physical waveforms. Bounded timeouts still check FIFO liveness without IRQs. Do not infer sample loss from notification gaps; inspect FIFO/sample sequences, final health, and actual payloads.
+`icm42670_get_runtime_health` can return obtained terminal diagnostics even after stop reports failure; never replace failed-stop fields with zero and call them healthy. Final health includes `session_generation`, `published_samples`, `consumed_scans`, `records_consumed`, `records_acked`, `last_packet_sequence`, `irq_wakeup_count`, `timer_service_count`, plus `fatal_reason/fatal_errno`, `fifo_overflow_count`, `invalid_payload_count`, `scan_push_failure_count`, `evidence_full_count`, `timestamp_service_burst_count`, `tail_packet_count`, `unknown_hardware_tail`, `quiesce_errno`, and `transport_complete`.
 
-The sensor TMST-to-RAW fit requires one affine line satisfying valid read intervals, not exact midpoint observations. Contradictory narrow observations invalidate old certificates; overwide SPI observations do not advance unwrapping. Slope, extrapolation, and FSYNC reconstruction count toward admission uncertainty. FIFO overflow, bad packets, wrap/clock ambiguity, and invalid epochs still fail. Long SPI stalls can still reject samples or stop acquisition; wider gates, nominal-ODR timestamps, and cached old samples do not conceal failures.
+Evaluate stop/health statuses, nonzero generation, terminal errors, counts, sequences, and producer/consumer/actual-payload totals together. `transport_complete=1` certifies only consumption and ACK of the stop cohort, not absence of fatal errors. `unknown_hardware_tail` identifies physical tail data outside the STOP fence, not certified delivery of all physical samples. `allow-counted` is not zero loss; strict is not physical precision. CLI final records use best-effort nonblocking output: a missing summary is not a health pass.
 
-Acceptance must use the final `IMU_RUNTIME_HEALTH final=yes health_valid=yes` after a successful stop: require a nonzero generation and check `published_samples`, `invalid_packet_drop_count`, GPIO gaps, and FIFO overflows. The final record also reports `mapper_failure_count`, `uncertainty_over_200_drop_count`, `max_consecutive_timing_drop_count`, `fsync_captured`, and `fsync_dropped`, including losses after the final successful sample. Invalid packets are counted even when timing admission also rejects them. The last published sample is insufficient because a trailing error may have no later sample to carry its counters. Timing drops and FSYNC dropped tags remain explicitly counted, not complete associations. Storage or DDS acceptance must also read actual IMU/four-camera payloads and verify association coverage using the timestamp rules above, rather than rely only on health summaries, topic existence, or container completeness.
-
-`accel_mps2` outputs `[X, Y, Z]`. The V2 PCB mounting direction and acceleration signs still require on-board six-face/rotation verification. Axis signs and transforms relative to the main board or cameras are not currently declared.
+`accel_mps2` is `[X,Y,Z]`. PCB orientation/signs remain unpublished; no main-board/camera transform, TF, or extrinsics is declared. Acquisition uses `SCHED_FIFO/20`, non-ROS consumers/ROS2 IMU publication `SCHED_RR/3`. Scheduling failure rejects startup without automatic system IRQ/debug/realtime-quota changes.
 
 ## non-ROS Save Output
 
 | Output | Contract |
 |---|---|
 | ROS bag | `sensor_demo --record-bag <absolute .bag>` saves four-channel JPEG images, camera parameters, and IMU data; incomplete stress/abnormal runs use an explicit `.partial.bag` recovery file. |
-| MP4 session | `sensor_demo --record-mp4-dir <absolute directory>` saves four H.264 MP4s, four timestamp CSVs, `imu.csv`, input-frame `exposure.jsonl`, `fsync.jsonl`, `camera_params.yaml`, `session_status.json`, and `publication_receipt.json`. The FSYNC file is always created; association records require FSYNC enabled. |
+| MP4 session | Four H.264 MP4s, four timestamp CSVs, extended `imu.csv`, input `exposure.jsonl`, `camera_params.yaml`, `session_status.json`, `publication_receipt.json`; no FSYNC file. |
 | MP4 path conflict | When the configured final directory or a same-named `.partial` already exists, the actual output automatically switches to the sibling `<name>-YYYYMMDDTHHMMSSZ[-NNNN]`; follow `SENSOR_MP4_RESULT path=`. |
 | `.partial` | Keeps the recovery namespace; a `.partial` MP4 session can be extracted for inspection but is not declared complete. |
 
-MP4 mode only supports H.264 and the full four-channel camera mask `0x0f`, and cannot be enabled together with bag saving or frame-skip. MP4 file timing is nominal container timing. The same session's `cameraN_timestamps.csv` aligns encoded frames by `frame_index` and stores realtime group-trigger times quantized to encoder microsecond precision, expressed in ns, not each camera's original nanosecond stamp. With FSYNC enabled, `fsync.jsonl` preserves original per-camera values in `camera_timestamps_ns`; compare CSV against `group_timestamp_ns // 1000 * 1000`. After storage drops, producer `frame_ids` must not be treated directly as file `frame_index`. A `published_complete` source must carry a matching `publication_receipt.json` and a complete four-channel MP4/index inventory.
+MP4 requires H.264, full mask0x0f, and no simultaneous bag/frame-skip. Image CSV joins `frame_index` to microsecond-quantized realtime group times. Match exposure input observations by camera/group time, not source-frame identity as encoded index. A complete source also requires matching publication receipt and four MP4/CSV pairs.
 
 Bag payload stamps are separate from record time: image and first-frame CameraInfo `header.stamp` preserve realtime camera captures; IMU payloads retain realtime sample stamps. Bag record time independently reads `CLOCK_REALTIME` at writing, not sampling. Backward clock steps are preserved rather than clamped. Physical write order remains unchanged; each connection's chunk index is time-sorted for ROS bag readers. Session config declares `camera_timestamp_domain`, `imu_timestamp_domain`, and `record_timestamp_domain` all as `"realtime"`.
 
+Bag `/robobaton/session_config` also records startup `camera_timestamp_path` and `imu_timestamp_mode`. Four combinations use one binary and one IIO capture/owner; only the two timestamp axes change. Select them before acquisition as shown in [non-ROS Usage](../usage/non-ros-demo.md) and [ROS2 Usage](../usage/ros2-demo.md).
+
 MP4 CSV indexes use the realtime system timeline, subject to the precision and per-camera distinction above; container playback remains relative/nominal, not Unix epoch. A backward step unsupported by the encoder/container produces an error and incomplete artifacts rather than fabricated increasing times. Complete system-clock synchronization before continuous recording.
 
-Storage completeness is recorder-specific. Bag complete checks the session and recorder queue/write errors, not independently zero producer timing drops. MP4 complete additionally requires valid successful-stop final health, published=observed=admitted=written>0, continuous sequences, zero FIFO/timing/invalid-packet drops, and maximum uncertainty ≤`200µs`. GPIO notification gaps are diagnostic and do not independently make storage incomplete. Default `allow-counted` may continue after timing rejection with provable clock identity, so bag complete does not prove zero sample loss. Exposure/FSYNC completeness needs separate checks; see [Saving Data](../usage/save-data-guide.md).
+Storage completeness is recorder-specific. Bag complete does not independently certify zero producer invalid payloads. MP4 additionally checks valid final health, published=observed=admitted=written>0, scan=published, records=ACK, continuous sequences, and zero fatal/overflow/invalid/push/evidence/quiesce errors. Old mapper/precision fields are removed. Stop-cohort completeness is not all-physical-sample completeness; check exposure coverage separately. See [Saving Data](../usage/save-data-guide.md).
 
 Bag overload retains/drops complete four-camera groups together. The default minimum interval `10` uses contiguous `source_group_order`, not producer `group_id`. Candidates must be fully encoded, complete, and unclaimed; writer-claimed groups stay protected. Without a legal old or incoming group to drop, stop and drain to a readable partial bag with nonzero exit. Every group drop means `data_complete=false`; policy compliance is not sustained-pressure or all-sensor acceptance. Intentional alternate saving explicitly requires minimum interval `2`; see [Saving Queue Diagnostics](../usage/save-data-guide.md).
 
@@ -176,7 +184,7 @@ Native bag JPEG removes only the length-`4` JPU APP9 immediately after SOI conta
 | `/robobaton/cam0..3/exposure` | `std_msgs/msg/String` | `robobaton_exposure_v1` frozen per-frame ISP observations; `status=1` is an estimate, not certified applied-frame identity. |
 | `/robobaton/imu/data` | `sensor_msgs/msg/Imu` | ICM-42670-P gyro/accel; orientation unavailable. |
 | `/robobaton/imu/temperature` | `sensor_msgs/msg/Temperature` | ICM-42670-P temperature, reusing the IMU sample stamp. |
-| `/robobaton/fsync` | `std_msgs/msg/String` | Opt-in FSYNC association JSON. |
+| `/robobaton/imu/timing` | `std_msgs/msg/String` | Per-sample `robobaton_imu_timing_v2` native clocks and bridge observations. |
 
 ROS2 QoS:
 
@@ -186,15 +194,15 @@ ROS2 QoS:
 | compressed Image | Follows the raw publisher, also Reliable + KeepLast(8) |
 | CameraInfo | Reliable + Transient Local + KeepLast(1) |
 | Exposure | Reliable + KeepLast(8) |
-| FSYNC | Reliable + KeepLast(256), disabled by default |
+| IMU timing | Reliable + KeepLast(256), active with IMU |
 | IMU | `SensorDataQoS`, keep last 100 |
 | Temperature | `SensorDataQoS`, keep last 10 |
 
 ROS2 raw `Image.step` uses the underlying DMA buffer's stride; `data.size()` uses the underlying Y/UV buffer size, which may be larger than the compact `width * height * 3 / 2`. Subscribers must not index the UV plane directly under the compact-NV12 assumption.
 
-ROS2 `header.stamp` is not publication time: cameras use realtime trigger-edge times by default or the estimated exposure midpoint in opt-in test mode. IMU/Temperature use realtime `sample_timestamp_ns`, not `host_timestamp_ns`. ROS2 only splits nanoseconds into `sec`/`nanosec`, without another offset. Stamps can be compared on the same calibrated system timeline, but a common domain does not guarantee hardware sample/exposure alignment; cross-device accuracy still depends on clock synchronization. `use_sim_time` does not change sensor stamps to simulation `/clock`. Subsequent stamps follow NTP/PTP system-clock corrections; these services do not establish FSYNC sample associations.
+ROS2 Headers are not publication time. Cameras use the selected realtime trigger estimate (or opt-in exposure-midpoint estimate); IMU/Temperature use the selected per-burst MONOTONIC→REALTIME or RAW→REALTIME bridge. Timing JSON retains native MONOTONIC, independent RAW, mode, identity, and correctly labeled bridge observations. Backward wall-clock steps remain visible; no simulation `/clock` conversion. A common epoch is not physical synchronization.
 
-ROS2 does not publish RTSP, TF extrinsics, or calibration. FSYNC provides trigger-to-sample correspondence only, without changing sample phase or guaranteeing exposure synchronization. For general visualization, prefer `/image_raw/compressed`; ordinary RGB/BGR tools may not display raw NV12.
+ROS2 provides no RTSP, TF extrinsics, calibration, or trigger-to-sample association. Prefer compressed for general visualization; RGB/BGR tools may not display NV12 directly.
 
 ## UART
 
