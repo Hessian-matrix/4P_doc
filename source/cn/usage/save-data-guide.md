@@ -5,7 +5,7 @@
 本文说明如何使用 non-ROS `sensor_demo` 保存以下两类数据：
 
 1. ROS1 bag v2.0：四路同步图像、相机信息、帧元数据和独立 IMU；
-2. H.264 MP4 session：四路 MP4、编码帧时间戳索引、相机参数、独立 IMU、曝光与 FSYNC sidecar、session status 和 publication receipt。
+2. H.264 MP4 session：四路 MP4、编码帧时间戳索引、相机参数、含原生时钟/桥列的 IMU CSV、曝光 sidecar、session status 和 publication receipt。
 
 本文适用于 `sensor_demo --help` 同时包含以下参数的运行包：
 
@@ -30,7 +30,7 @@ ROS1 bag 与 MP4 是两种互斥的保存模式，当前不能在同一个进程
 
 推荐优先使用 H.264 MP4 保存：四路 `cameraN.mp4` 可直接播放，并复用 RTSP 编码结果；ROS1 bag 保存 JPEG 消息，适合 ROS1 消息工具或后续解包分析。支持的帧率是参数范围，不是零丢失保证，负载边界见第 9 节。两种模式的启动与验收分别见第 5/7 节。
 
-高压 bag 在严格丢组策略耗尽时合法结束本次会话，不是持续压力通过；当前新组成 `8h` MP4 + FSYNC 长录尚未启动。应用退出的正常收尾保持 IMU 输入直到 producer 停止、consumer 排空后再关闭 writer；动态停录以本次 callback window 为边界，不停止 producer。历史 DDS 发布/接收差额仍未精确归因，不能仅凭保存序列连续证明所有路径头尾无损；统一结论见{ref}`能力与验证边界 <capability-verification-boundary>`。
+高压 bag 在严格丢组策略耗尽时合法结束为 partial，不是持续压力通过。应用退出的正常收尾保持 IMU 输入直到 producer STOP 排空、consumer 排空后再关闭 writer；动态停录以本次 callback window 为边界，不停止 producer。历史 DDS 发布/接收差额仍未精确归因，不能仅凭保存序列连续证明所有路径头尾无损。旧组成的 FSYNC/长录结果不认证当前 IIO V3/ABI5 集成组成；本轮仅新增 non-ROS HO 保存短窗验证，不认证长录，见{ref}`能力与验证边界 <capability-verification-boundary>`。
 
 | 模式 | 入口 | 主要输出 | 完整保存判据 |
 |---|---|---|---|
@@ -39,11 +39,11 @@ ROS1 bag 与 MP4 是两种互斥的保存模式，当前不能在同一个进程
 
 启动命令行录制在进程退出时，还须检查退出码为 0 且对应 `SENSOR_*_RESULT` 明确完整。网页动态会话按上面的会话最终结果判断；`.partial`、`data_complete=no` 或相关错误只能作为恢复或诊断数据。
 
-这里的 complete 首先是各 recorder 的发布结果，不是所有硬件样本、曝光或 FSYNC 关联都完整的统一证明。默认 `--imu-sample-drop-policy allow-counted` 允许可证明身份的 timing 拒绝计数后继续；bag 的 complete 判定检查会话和 recorder 队列/写入错误，不单独强制 producer timing drop 为零。MP4 还要求最终 producer 健康有效、published=observed=admitted=written>0、序号连续、FIFO/timing/invalid-packet drop 为零，最大样本不确定度不超过 `200µs`。`gpio_event_gap_count` 是缺失唤醒通知序号诊断，不证明物理沿或样本丢失，也不单独使 bag/MP4 失败。若要求零丢失数据集，两种模式都要核对最终健康与实际保存载荷；`strict` 可使 timing/无效包拒绝立即失败，但不保证任意负载成功。重复 host 与系统校时回拨合法，不能代替样本序号判断顺序。
+complete 首先是 recorder 发布结果，不证明所有物理样本或曝光观测均已保存。默认 `allow-counted` 只对无效六轴 payload 计数，strict 遇此失败。bag 检查会话/队列/写入错误；动态 MP4 按 `imu_health_scope=callback_window` 核对窗口内样本、序号、计数差值与队列写入，不等待 producer STOP 或认证窗口外完整性。仍活跃的启动自动会话使用 `imu_health_scope=producer_session`，应用退出后另要求有效最终 health、published=observed=admitted=written>0、scan=published、record=ACK、序号连续及零 fatal/overflow/invalid/push/evidence/quiesce 异常。旧 mapper-health 字段已移除；tmst 仍独立执行 `200µs` 计算 admission，不是物理精度。`transport_complete` 仅认证 STOP 集合，不覆盖 fence 外物理尾部；两种保存模式均须按实际健康范围与载荷核对。
 
-图像、frame metadata 及 IMU CSV/bag payload 保留 producer 的 `CLOCK_REALTIME` 捕获/采样时间（Unix epoch ns）。MP4 timestamp CSV 保存同域组触发时间，经编码器微秒量化后以 ns 表示，不是逐路原始纳秒 stamp；开启 FSYNC 时逐路原始值在 `fsync.jsonl`。bag record time 独立读取写入时系统时间，不等于采样时间；系统回拨如实保留，bag index 按时间排序。MP4 容器仍使用相对/名义播放时间。采集前应先校时；同域不证明相机/IMU 的样本或曝光已对齐，详见[数据合同](../development/data-contracts.md)。
+相机图像/metadata 使用所选 observer/official realtime 触发估计或显式曝光中点估计。保存按启动 `imu_timestamp_mode` 每 burst 桥接 host MONOTONIC→REALTIME 或 tmst RAW→REALTIME；tmst 下也不覆盖原始 MONOTONIC 主机估计。bag `/imu/data` Header 与 MP4 `imu.csv` 的 `sample_realtime_ns` 是输出值。bag `/robobaton/imu/timing` JSON 和 CSV 保留模式、原始 FIFO low16 `fifo_tmst`、`sample_raw_ns`、`timestamp_uncertainty_ns`、原生 host/burst 证据、身份/来源，以及正确标注且独立的 MONOTONIC/RAW 桥基点与半宽。host 的 RAW sample 为零、样本不确定度 `UINT32_MAX`；桥不确定度与 tmst `200µs` 计算 admission 均不是物理精度。图像 CSV 仍为微秒量化组时间，exposure sidecar 保留逐路输入值。bag record time 独立读取 realtime 并保留回拨；MP4 播放仍相对/名义。共同 epoch 不代表物理同步，录制前先校时。
 
-需要触发—样本关联时增加 `--fsync --sample-rate-hz 1600`（默认关闭，支持 `800/1600Hz`）。bag 增加 `/robobaton/fsync` 的 `std_msgs/String` JSON，MP4 session 增加 `fsync.jsonl`；以 `sample_sequence`、`group_id`、`frame_ids` 对照实际保存数据。仅 `status=1` 有效；容器完整不代表关联完整，须检查缺失/歧义记录、序号缺口及最终 captured/dropped。字段及不确定度边界见[数据合同](../development/data-contracts.md)。
+bag timing schema `robobaton_imu_timing_v2` 与 ROS2 `/robobaton/imu/timing` 一致；bag `/robobaton/session_config` 记录 `camera_timestamp_path`、`imu_timestamp_mode`。通过 [non-ROS YAML/CLI](non-ros-demo.md) 选择任一四组合，停止/重启后切换，均使用相同二进制与 IIO 采集/owner。每种组合均要求匹配的内核 IIO V3 capture 模块，现有 V2 模块不兼容，应用部署不升级模块。无 FSYNC 选项/topic/sidecar、spidev 或回退。official 绝不使用 SIF observer 时间，validity0/uncertainty `UINT32_MAX`。当前 non-ROS HO 短窗证据及未验收范围见{ref}`能力与验证边界 <capability-verification-boundary>`。不声明四组合保存验收；见[数据合同](../development/data-contracts.md#imu)。
 
 bag `/cameraN/frame_metadata`、tee `camN/frames.jsonl` 和 MP4 `exposure.jsonl` 保存逐帧冻结的 `exposure`。`status=1` 是最新 ISP 观测估计，不是已证实的该帧实际曝光；`0` 是不可用，不沿用上一帧。MP4 sidecar 描述输入帧，可能多于实际编码帧，按相机及微秒量化的组触发时间对照 timestamp CSV。字段、关联键与误差边界见[逐帧曝光观测](../development/data-contracts.md#逐帧曝光观测)。
 
@@ -249,7 +249,7 @@ success=yes
 - `encoded_frames_dropped=0`；
 - `imu_samples_admitted == imu_samples_written > 0`；
 - producer final-health snapshot 有效，published samples 与 consumer observed samples 相同；
-- IMU final FIFO/mapper/uncertainty-drop/invalid-packet 为零，样本序号连续；GPIO 通知缺口单独诊断，不作为 complete 否决条件；
+- 最终 `transport_complete=1`、record/ACK 相等，fatal/overflow/invalid/push/evidence/quiesce 为零，且样本序号连续；
 - session 中存在匹配的 `publication_receipt.json`；
 - session 目录中不存在 `.publication_incomplete` marker。
 
@@ -261,15 +261,14 @@ run_30fps_mp4/
 ├── camera0_timestamps.csv ... camera3_timestamps.csv
 ├── imu.csv
 ├── exposure.jsonl
-├── fsync.jsonl
 ├── camera_params.yaml
 ├── session_status.json
 └── publication_receipt.json
 ```
 
-MP4 的播放时间轴使用名义帧率；`cameraN_timestamps.csv` 按 `frame_index` 对齐编码帧，提供微秒量化、以 ns 表示的 realtime 组触发时间，不是各路原始纳秒 stamp。开启 FSYNC 时，用 `fsync.jsonl` 的组时间核对 CSV，以 `camera_timestamps_ns` 读取各路原始值，详见[数据合同](../development/data-contracts.md)。
+MP4 使用名义播放帧率，`cameraN_timestamps.csv` 按 `frame_index` 关联编码帧和微秒量化 realtime 组时间，不是各路原始纳秒 stamp。按相机与组时间对照 `exposure.jsonl` 输入观测，不能把源 frame_id 直接当文件索引。
 
-`exposure.jsonl` 始终保存输入帧的观测（包括 `status=0`）；`fsync.jsonl` 始终创建，只有启用 FSYNC 才写入关联。曝光估计不可用不会单独使图像停止或 complete 变成 partial；如果业务要求每帧有估计值，应另查 `exposure.status` 及输入到编码帧的对应，不用容器 complete 代替。
+`exposure.jsonl` 始终保存输入观测（包括 status=0），可能多于保存编码帧；没有 FSYNC sidecar。曝光不可用不单独令默认模式停止或 partial；业务需每帧曝光估计时另查状态与输入/编码对应。
 
 退出码 2、`published_partial`、`.partial` 目录、marker 或 receipt 不匹配都不是完整 session。
 
@@ -391,8 +390,8 @@ success=yes
 并检查：
 
 - `image_frames_by_camera=cam0:N,cam1:N,cam2:N,cam3:N` 四路相等且 `N > 0`；
-- 成功 stop 后的 `IMU_RUNTIME_HEALTH final=yes health_valid=yes` 有非零 generation，核对 published 与 consumer observed、recorder admitted/written 及 bag 实际 IMU 消息数；
-- 零丢失要求额外检查 sequence gap/duplicate/regression、无效包、FIFO overflow 和 timing drop 为零，并回读实际样本；GPIO 通知缺口不等于样本丢失。未校时窗口应无 sample timestamp duplicate/regression；同 burst 的 host timestamp 可重复，系统校时可使两类 realtime 回拨，不能据此伪造递增时间或忽略其他健康错误；
+- stop后保留最终 `IMU_RUNTIME_HEALTH`（包括失败诊断），检查状态/非零generation，核对published、consumer observed、recorder admitted/written及实际消息数；
+- 核对sequence、无效payload、overflow、fatal/push/evidence/quiesce、STOP transport及record/ACK，再比对producer/consumer/保存实际载荷；MONOTONIC与RAW不可直接相减，realtime桥允许校时回拨，不合成递增值。
 - 最终路径来自 `SENSOR_BAG_RESULT path=`，不要只依赖配置路径猜测。
 
 非零退出、`published_partial`、`.partial.bag` 或 quarantine 都不是正式完整数据，但应保留用于诊断，不要自动覆盖或删除。
@@ -451,11 +450,11 @@ python3 scripts/rosbag_extract.py \
 
 两种模式的参数集合均支持 `25/30/40/50/60fps`，但不能只按帧率承诺完整保存：
 
-- H.264 MP4 复用 RTSP 编码 access unit，完整性同时受编码、存储和 IMU 最终健康约束；高负载或 timing drop 可以得到 `published_partial`，即使四路 MP4 均可播放。
+- H.264 MP4 复用 RTSP 编码 access unit，完整性同时受编码、存储和 IMU 最终健康约束；高负载或源端错误 可以得到 `published_partial`，即使四路 MP4 均可播放。
 - ROS1 bag 使用独立 JPEG 编码和队列，CPU、编码吞吐、存储及 RTSP 预览负载均影响丢帧；不能承诺某个帧率以下必定 complete，或高帧率只有少量丢失。
-- 更换 fps、IMU ODR、FSYNC、尺寸、保存介质或系统调度后，应在目标环境核对四路速率、最终健康及实际载荷。曝光 `status=1` 覆盖率、FSYNC 唯一匹配率和完整保存分别检查，不相互代替。
+- 改变 fps、IMU ODR、尺寸、介质或调度后，须分别核对持续四路速率、最终健康、IMU timing/桥证据及实际载荷；曝光覆盖率与容器完整性分别判断。
 
-non-ROS `60fps` + `1600Hz` FSYNC 的短时 CPU/BPU 控制台关联不等于已保存图像解码通过；原生 bag JPEG 只去除私有 JPU APP9，不改变 ROS2 JPEG 插件，也不关闭 H.264 RTSP 高帧率 missing-reference/slice 告警问题。不要用一种编码/保存路径的结果代替另一条路径。
+参数可配置或旧组成运行不认证新 IIO 组成的解码、DDS 或持续保存。原生 bag JPEG 去除私有 JPU APP9，不改变 ROS2 JPEG 插件；一种编码/保存路径不认证另一条路径。
 
 ## 10. 常见问题
 

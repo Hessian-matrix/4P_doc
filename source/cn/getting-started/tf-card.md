@@ -161,4 +161,4 @@ ROS1 bag 可将最后的 `--record-mp4-dir ...` 替换为 `--record-bag "$TF_MOU
 | 文件到约 4GiB 失败 | 检查是否为 FAT32；备份后考虑目标 BSP 支持的 ext4/exFAT。 |
 | 重启后目录仍在，但卡未挂载 | 手动挂载不持久；按第 2～4 节重查。目录存在或 `df` 有剩余空间不证明 TF backing，须核对精确挂载点及设备号。 |
 
-命令选项与 ext4 只读日志行为参考 [Linux mount(8)](https://man7.org/linux/man-pages/man8/mount.8.html)。
+命令选项与 ext4 只读日志行为参考 [Linux mount(8)](https://man7.org/linux/man-pages/man8/mount.8.html)。TF 热插拔修复是用户确认，不是本页新增实板复测；不推导新的硬件版本或所有卡型号、容量、自动挂载与长时间录制均已验收。仍以实际系统识别和功能为准，见{ref}`能力与验证边界 <capability-verification-boundary>`。

@@ -44,7 +44,7 @@ RoboBaton 4P V2 是面向 X5 平台的四目相机产品，提供 non-ROS RTSP/I
 | 图像输出 | NV12；原生 `1280x1088`，支持 VSE 缩放至 `640x480` / `720x480` / `1280x720`；旋转 `90/270` 对外宽高交换 |
 | 相机帧率 | 默认 `30fps`；支持 `25fps`、`30fps`、`40fps`、`50fps` 和 `60fps` |
 | FOV | 相机 A：193.8°(D)，126.6°(H)，148.4°(V) ，相机B:157.2°(D)，96.8°(H)，115.6°(V) |
-| IMU | TDK ICM-42670-P；原生 `25/50/100/200/400/800/16000Hz`；默认 `800Hz` |
+| IMU | TDK ICM-42670-P；原生 `25/50/100/200/400/800/1600Hz`，默认 `800Hz`；不支持的速率明确拒绝 |
 | USB | USB-C 3.0 |
 | 网口 | 千兆以太网，GH1.25 8P 接口 |
 | CAN | SH1.0 2P 接口，支持 CAN FD |
@@ -52,8 +52,8 @@ RoboBaton 4P V2 是面向 X5 平台的四目相机产品，提供 non-ROS RTSP/I
 | 其他接口 | 用户 UART × 2、PPS 输入 × 1、DEBUG UART × 1 |
 | 尺寸 | 55 × 40 × 23 mm |
 | 主体重量 | 65 g |
-| non-ROS | RTSP 端口 `554..557`，path `/PRR`，H.264 默认、H.265 可选；IMU / UART / CAN 示例、互斥 bag / MP4 保存、曝光观测 |
-| ROS2 | raw / compressed 图像、CameraInfo、曝光观测、IMU、温度；compressed 使用 X5 硬件 JPEG；ROS2 路径不提供 RTSP、TF 或标定 |
+| non-ROS | 默认四路 H.264 网页预览、RTSP 关闭；显式开启 RTSP 后端口 `554..557`、path `/PRR`，H.265 可选；IMU / UART / CAN 示例、互斥 bag / MP4 保存、曝光及 IMU 时钟元数据 |
+| ROS2 | raw / compressed 图像、CameraInfo、曝光观测、IMU、温度及 IMU 时钟元数据；compressed 使用 X5 硬件 JPEG；ROS2 路径不提供 RTSP、TF 或标定 |
 ````
 
 `CAM1`～`CAM4` 依次对应软件 `cam0`～`cam3`；相机 A / B 的 FOV 参数见上表。参见 [硬件连接与安全](hardware-and-safety.md#相机接口)。

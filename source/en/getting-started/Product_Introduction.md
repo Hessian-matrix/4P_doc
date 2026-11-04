@@ -39,19 +39,21 @@ The supplied Ethernet cable is for testing and temporary connections, not reliab
 | Platform | D-Robotics X5, 8-core ARM Cortex-A55 @ 1.5 GHz |
 | Memory | 4 GB (1 GB fixed for system and hardware) |
 | Storage | 32 GB |
+| Power input | 12–27 V |
 | Cameras | 4 RGB cameras: CAM1, CAM2, CAM3, CAM4 |
 | Standard image output | NV12; native `1280x1088`, with VSE scaling to `640x480` / `720x480` / `1280x720`; rotation `90/270` swaps external width/height |
 | Camera frame rate | Default `30fps`; supports `25fps`, `30fps`, `40fps`, `50fps`, and `60fps` |
-| FOV | Camera A / B: horizontal 148.4° / 115.6°, vertical 126.6° / 96.8°, diagonal 193.8° / 157.2° |
-| IMU | V2 TDK ICM-42670-P; native `25/50/100/200/400/800/1600Hz`; default YAML: `1600Hz` for non-ROS, `800Hz` for ROS2 |
+| FOV | Camera A / B: horizontal 126.6° / 96.8°, vertical 148.4° / 115.6°, diagonal 193.8° / 157.2° |
+| IMU | TDK ICM-42670-P; native `25/50/100/200/400/800/1600Hz`, default `800Hz`; unsupported rates are explicitly rejected |
 | USB | USB-C 3.0 |
 | Ethernet | Gigabit Ethernet, GH1.25 8P connector |
 | CAN | SH1.0 2P connector, CAN FD supported |
 | TF card slot | Supports up to 512 GB |
 | Other interfaces | User UART × 2, PPS input × 1, DEBUG UART × 1 |
 | Dimensions | 55 × 40 × 23 mm |
-| non-ROS | RTSP ports `554..557`, path `/PRR`, H.264 default with H.265 optional; IMU / UART / CAN examples, mutually exclusive bag / MP4 saving, exposure observations |
-| ROS2 | raw / compressed images, CameraInfo, exposure observations, IMU, temperature; compressed uses X5 hardware JPEG; no RTSP, TF, or calibration |
+| Main-unit weight | 65 g |
+| non-ROS | Four H.264 browser previews by default, RTSP off; explicitly enabled RTSP uses ports `554..557`, path `/PRR`, with optional H.265; IMU / UART / CAN examples, mutually exclusive bag / MP4 saving, exposure and IMU timing metadata |
+| ROS2 | raw / compressed images, CameraInfo, exposure observations, IMU, temperature, and IMU timing metadata; compressed uses X5 hardware JPEG; no RTSP, TF, or calibration |
 ````
 
 `CAM1`–`CAM4` map to software `cam0`–`cam3` in order; camera A / B FOV specifications are listed above. See [Hardware Connection and Safety](hardware-and-safety.md#camera-interface).

@@ -53,7 +53,7 @@
 |---|---|
 | 现象 | `error while loading shared libraries` 或运行到 `bin/` 程序时报 `.so` 缺失。 |
 | 检查 | `ls -l /root/demo/lib`；从 `/root/demo` 顶层启动脚本运行；直接运行 `bin/` 前执行 `. ./env.sh`。 |
-| 正常结果 | `libsc132.so*`、`libicm42670.so*`、`libprrtsp.so*` 存在，且优先从 `/root/demo/lib` 加载；ICM SONAME 为 `libicm42670.so.3`，实体为 `libicm42670.so.3.0.0`，没有旧 `.2` 库或跨 major 链接。 |
+| 正常结果 | `libsc132.so*`、`libicm42670.so*`、`libprrtsp.so*` 优先从 `/root/demo/lib` 加载；ICM 为 SONAME `libicm42670.so.5`、实体 `libicm42670.so.5.0.0`、九个 `ICM42670_X5_5.0` 导出及成套重建 consumer，无旧 `.2/.3/.4` 库或跨 major 链接。 |
 | 常见原因 | 只复制单个 ELF、漏复制 `lib/`、未加载 `env.sh`、混用了其他工程的同名 `.so`。 |
 | 恢复/需收集信息 | 重新整包部署并提供 `ls -l /root/demo /root/demo/lib` 和完整错误文本。 |
 
@@ -165,7 +165,7 @@
 | 现象 | MP4/rosbag 保存后没有预期 final 输出，或离线提取脚本拒绝输入。 |
 | 检查 | 查看 `SENSOR_MP4_RESULT` 或 `SENSOR_BAG_RESULT`；确认 `outcome`、`data_complete`、`path` 和 `configured_path`。MP4 complete 还需要 `session_status.json`、`publication_receipt.json`、四路 MP4 和四路 timestamp CSV。 |
 | 正常结果 | complete 运行退出码为 `0`，`data_complete=yes`，且 `path` 是真实输出。若配置目录已存在，MP4 会自动写入同级时间戳目录。 |
-| 常见原因 | 路径冲突切到时间戳目录；`.partial` recovery 数据；编码/队列/存储丢帧或最终 IMU timing/无效包丢弃；MP4 使用 H.265、非四路或 frame-skip；Host 缺少完整 `ffmpeg`/`ffprobe`。四路 MP4 能播放不代表 final health 满足 complete；详见[数据保存](usage/save-data-guide.md)。 |
+| 常见原因 | 路径冲突切到时间戳目录；`.partial` recovery 数据；编码/队列/存储丢帧、最终 IMU 无效 payload 丢弃或 IIO 证据／停止错误；MP4 使用 H.265、非四路或 frame-skip；Host 缺少完整 `ffmpeg`/`ffprobe`。四路 MP4 能播放不代表 final health 满足 complete；详见[数据保存](usage/save-data-guide.md)。 |
 | 恢复/需收集信息 | 使用 `SENSOR_MP4_RESULT path=` 指向的真实目录重新提取；`.partial` 只作为 recovery 数据；收集退出摘要、session 目录文件列表和提取脚本错误文本。 |
 
 ## H.265 客户端卡顿
@@ -182,27 +182,26 @@
 
 `missing bounded LPWM clock mapping; fail closed` 表示正式交付帧未取得有效触发时间，不使用到帧时间或最近邻代替。`reason=exact_record_rejected` 表示精确触发已记录但未通过有界重建；保留 `record_vsync_ticks`、`record_trigger_ticks`、`lower_raw_ns`、`upper_raw_ns`，检查计数器关系及 `500000ns` 采样窗口上限。`reason=not_retained` 只说明查找时历史中没有该触发，不能仅凭历史已满断言覆盖；请求等于 `last_overwritten_trigger_ns` 才证明最近一次覆盖了该身份。收集整行日志、启动配置和系统调度状态，不放宽窗口或把此诊断当作稳定性修复。
 
+上述有界映射诊断适用于 `camera_timestamp_path=observer`，`500µs` admission 不变。`official` 绝不启动 SIF observer；`invalid official same-frame timestamp` 表示同帧 IRQ RAW/AON 元数据或算术非法。保留所选模式与完整 reason 行，不用到帧时间替代，也不自动换模式恢复。official 即使算术成功仍为 timing validity0、uncertainty `UINT32_MAX`，不是物理有界结果。
+
+selector 非法或只读参数错误时，使用准确的顶层 `camera_timestamp_path: observer|official` 与 `imu_timestamp_mode: host|tmst`（默认 observer/host）、CLI `--camera-timestamp-path`/`--imu-timestamp-mode`，或 ROS2 同名顶层参数。切换须停止/重启，ROS2 不能用 `ros2 param set` 热切换。四组合均为同一二进制/IIO owner，不是另一套 SPI 后端。见 [non-ROS 使用](usage/non-ros-demo.md) 与 [ROS2 使用](usage/ros2-demo.md)。
+
 ## IMU 无数据或异常
 
 | 项目 | 内容 |
 |---|---|
-| 现象 | `imu_reader_demo` 无输出、启动失败或 timestamp duplicate/regression 非零。 |
-| 检查 | `ls -l /dev/spidev2.0`；`./imu_reader_demo --sample-rate-hz 800 --print-metrics`；INT1 为 `34120000.gpio` offset `8`，不是旧 GPIO395。 |
-| 正常结果 | 能持续输出样本；无系统校时的窗口应 `timestamp_duplicates=0`、`timestamp_regressions=0`，校时允许 realtime 回拨。最终健康有效，计数与实际载荷符合业务要求。 |
-| 常见原因 | SPI 设备、供电/焊接/设备树或采样率错误；实时调度权限不足；IRQ/SPI 长延迟触发 timing 拒绝，或身份/时钟证书失效。默认 counted drop 不等于零丢失。 |
-| 恢复/需收集信息 | 保留完整启动/退出日志、校时状态、`SENSOR_IMU_RESULT` 和成功 stop 后 `IMU_RUNTIME_HEALTH final=yes health_valid=yes`、`/dev/spidev2.0` 状态。不要扩大不确定度门限或把旧样本填回。 |
+| 检查 | 运行 `./imu_reader_demo --sample-rate-hz 800 --count 800 --print-metrics --imu-timestamp-mode host`（停止后也可选 `tmst`）；核对 ABI5 头文件/库、匹配内核 IIO V3 capture 模块，以及唯一 `icm42670-capture` sysfs/控制身份。现有 V2 模块两模式均不兼容，不硬编码编号。 |
+| 正常合同 | 两模式均分开保留 MONOTONIC 主机估计和 RAW burst 观测。host 的 `sample_raw_ns=0`、uncertainty `UINT32_MAX`；tmst 增加 RAW sample 映射，不替代 MONOTONIC。count 为 STOP 阈值，最终数量可更大；独立 CLI 不转 Unix 时间。 |
+| 常见原因 | V3 模块/设备树缺失或不匹配、身份歧义、scan 布局不符、其他 owner 占用、调度权限、内核 I/O/overflow/push/evidence/quiesce 错误，或 TMST FIFO/UI 时间证据非法。库不加载模块、不抢资源、不使用 spidev、不回退到 host；部署应用不升级模块。 |
+| 需保留信息 | 完整启动/退出日志、stop返回值、`IMU_TIMING_SUMMARY`、最终`IMU_RUNTIME_HEALTH`和实际序号/载荷；stop失败仍读取终态诊断。检查record/ACK与transport_complete，不把物理尾部排除解释为所有物理采样已交付。 |
 
-INT1 仅用于唤醒排空 FIFO，不再逐项认证包/沿身份。`gpio_event_gap_count` 只统计可检测的缺失通知序号值：不证明物理沿或样本丢失，也不单独导致失败；缺少通知时仍通过有界等待检查 FIFO。FIFO overflow、坏包、时钟歧义和无效 epoch 仍失败，应保留完整日志、样本序号、TMST/RAW 与最终健康证据。host 时间是原始 burst 完成观测，允许重复和系统回拨；不能要求唯一 host、用 host 或递增 realtime 判定样本顺序。该架构不修复 GPIO/IRQ/kernel 根因；仍需匹配 BSP 的 IRQ/SPI 延迟证据，不放宽 `200µs` 或合成样本时间。重复启动通过不代表持续采集通过。
+`timestamp_hz`是主机赋时统计，`acquisition_hz`来自普通burst的独立RAW端点且需`acquisition_valid=yes`；二者不证明物理精度。不要跨MONOTONIC/RAW作差。保存/ROS2输出桥失败会令输出失败，不能扩大括号或合成递增值掩盖错误。参考[IMU数据合同](development/data-contracts.md#imu)。
 
-排查 IRQ/SPI 延迟时，同时检查 BSP 的 spidev 逐传输 dynamic-debug 是否开启，以及内核日志速率。高频同步调试输出会改变采集运行条件；与普通应用 stdout 日志不同，减少应用打印不会关闭它。先保留原 flags 和失败日志，仅在获准的独立对照实验中关闭对应打印点，结束后恢复并核对。应用与 SO 不自动修改全局 debug、IRQ 或系统实时配额；关闭调试后通过不等于原环境通过，也不豁免身份与不确定度检查。
+TMST 证据缺失、矛盾、过期、歧义或超预算均失败，`200µs` 计算 admission 不是物理精度，不得扩大门限掩盖失败。保存/ROS2 使用 host MONOTONIC→REALTIME 或 tmst RAW→REALTIME；核对 `bridge_clock`、独立 `bridge_monotonic_ns`/`bridge_raw_ns` 和 schema `robobaton_imu_timing_v2`。不恢复 FSYNC 关联。当前 non-ROS HO 短窗证据及未验收范围见{ref}`能力与验证边界 <capability-verification-boundary>`。
 
-## 曝光观测不可用或 FSYNC 不完整
+## 曝光观测不可用
 
-| 项目 | 内容 |
-|---|---|
-| 检查 | 曝光读取 bag frame metadata、MP4 `exposure.jsonl` 或 ROS2 `/robobaton/camN/exposure`；FSYNC 检查 `--fsync`/`imu.fsync_enabled`、`800/1600Hz` 及 `/robobaton/fsync`/`fsync.jsonl`。 |
-| 解释 | 曝光 `status=0` 时其余曝光字段为零且图像继续；`1` 仅为最新 ISP 估计，不证明实际生效帧。FSYNC `status=1` 才是唯一对应；缺失/歧义、timing drop 或 FSYNC dropped 可显式存在。 |
-| 恢复/需收集信息 | 按[数据合同](development/data-contracts.md)核对相机/组/样本序号、原始 stamp、generation 和最终 captured/dropped；保留实际图像/IMU 载荷。不用最近邻、沿用上帧曝光或容器 complete 掩盖缺失，不据此宣称曝光同步。 |
+从bag frame metadata、MP4 `exposure.jsonl`或ROS2 `/robobaton/camN/exposure`读取。`status=0`时其余字段为零；默认图像继续，曝光中点测试模式会停止。`status=1`仅为最新ISP估计，不证明实际生效帧或真实曝光中心。按相机/组时间核对输入和编码帧，不按sidecar行号或源帧号作为MP4索引。当前软件没有FSYNC关联选项、topic或sidecar。
 
 ## UART 无数据
 

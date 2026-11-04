@@ -5,7 +5,7 @@
 This document explains how to use the non-ROS `sensor_demo` to save the following two kinds of data:
 
 1. ROS1 bag v2.0: four-channel synchronized images, camera info, frame metadata, and independent IMU;
-2. H.264 MP4 session: four MP4s, encoded-frame timestamp indexes, camera parameters, independent IMU, exposure and FSYNC sidecars, session status, and publication receipt.
+2. H.264 MP4 session: four MP4s, encoded-frame indexes, camera parameters, IMU CSV with native clocks/bridge columns, exposure sidecar, session status, and publication receipt.
 
 This document applies to runtime packages whose `sensor_demo --help` includes both of the following parameters:
 
@@ -30,7 +30,7 @@ Dynamic MP4 uses `imu_health_scope=callback_window` to check native samples, seq
 
 H.264 MP4 saving is recommended first: the four `cameraN.mp4` files play directly and reuse RTSP encoding. ROS1 bag stores JPEG messages for ROS1 tooling or later extraction. Supported frame rates are a parameter range, not a zero-loss guarantee; see section 9 for load boundaries. Startup and acceptance are in sections 5/7 respectively.
 
-Pressure bags may legally end their session at strict drop-policy exhaustion; that is not a sustained-pressure pass. The current composition's `8h` MP4 + FSYNC recording has not started. Normal application-exit finalization retains IMU input until producer shutdown and consumer drain, then closes the writer. Dynamic stop instead ends its callback window without stopping the producer. The historical DDS publication/reception difference still cannot be exactly attributed. Continuous saved sequences do not prove every path retains all head/tail data; see {ref}`Capability and Verification Boundaries <capability-verification-boundary>`.
+Pressure bags may legally end as partial when strict drop policy is exhausted; this is not a sustained-pressure pass. Normal application-exit finalization retains IMU input through producer STOP/drain and consumer drain before closing the writer. Dynamic stop ends its callback window without stopping the producer. The historical DDS publication/reception difference remains unattributed; continuous saved sequences do not prove losslessness at every path's head/tail. Historical FSYNC/long-recording results do not certify the integrated IIO V3/ABI5 composition, and this update adds only a non-ROS HO saving smoke, not long-recording acceptance. See {ref}`Capability and Verification Boundaries <capability-verification-boundary>`.
 
 | Mode | Entry | Main output | Complete-save criterion |
 |---|---|---|---|
@@ -39,11 +39,11 @@ Pressure bags may legally end their session at strict drop-policy exhaustion; th
 
 For startup command-line recording, also check process exit code 0 and an explicitly complete corresponding `SENSOR_*_RESULT`. Dynamic Web sessions use the session final result described above. Partial, `data_complete=no`, or relevant errors are recovery/diagnostic data only.
 
-Here, complete is first the individual recorder's publication result, not universal proof that every hardware sample, exposure observation, or FSYNC association is complete. Default `--imu-sample-drop-policy allow-counted` continues after counted timing rejection when identity remains provable. Bag completeness checks the session and recorder queue/write errors; it does not independently require zero producer timing drops. MP4 additionally requires valid final producer health, published=observed=admitted=written>0, continuous sequences, zero FIFO/timing/invalid-packet drops, and maximum sample uncertainty at most `200µs`. `gpio_event_gap_count` diagnoses missing wake-notification sequence values, not physical-edge/sample loss, and does not independently fail bag/MP4 completeness. For a zero-loss dataset, check final health and actual saved payloads in both modes. `strict` fails on timing/invalid-packet rejection but does not guarantee success under arbitrary load. Repeated host observations and wall-clock rollback are valid; sample sequence defines order.
+Complete is first the recorder publication result, not proof of saving every physical sample or exposure observation. Default `allow-counted` counts only invalid six-axis payloads; strict fails on them. Bag checks session/queue/write errors. Dynamic MP4 uses `imu_health_scope=callback_window` to check window-local samples, sequences, counter differences, and queue writes, without awaiting producer STOP or certifying outside-window completeness. A still-active startup-auto session uses `imu_health_scope=producer_session`; after application exit it additionally requires valid final health, published=observed=admitted=written>0, scan=published, records=ACK, continuous sequences, and zero fatal/overflow/invalid/push/evidence/quiesce errors. Old mapper-health fields are absent; tmst still applies separate `200µs` computational admission, not physical accuracy. `transport_complete` certifies only the STOP cohort, excluding its physical tail. Check each mode against its actual health scope and payloads.
 
-Images, frame metadata, and IMU CSV/bag payloads preserve producer `CLOCK_REALTIME` capture/sample times (Unix epoch ns). MP4 timestamp CSV stores group-trigger times on the same timeline, quantized by the encoder to microseconds and expressed in ns, not original per-camera nanosecond stamps; with FSYNC enabled, original values are in `fsync.jsonl`. Bag record time independently reads system time at writing, not sampling; backward steps are preserved and bag indexes are time-sorted. MP4 container playback remains relative/nominal. Synchronize the system clock before acquisition. A common domain does not prove camera/IMU sample or exposure alignment; see [Data Contracts](../development/data-contracts.md).
+Camera images/metadata use the selected observer/official realtime trigger estimate or opt-in exposure-midpoint estimate. Saving bridges IMU host MONOTONIC→REALTIME or tmst RAW→REALTIME per burst, according to startup `imu_timestamp_mode`; it never overwrites the original MONOTONIC host estimate in tmst mode. Bag `/imu/data` Header and MP4 `imu.csv` `sample_realtime_ns` are output values. Bag `/robobaton/imu/timing` JSON and CSV retain mode, raw FIFO low16 `fifo_tmst`, `sample_raw_ns`, `timestamp_uncertainty_ns`, native host/burst evidence, identity/origin, and correctly labeled separate MONOTONIC/RAW bridge bases/half-width. Host RAW sample is zero and sample uncertainty is `UINT32_MAX`; bridge uncertainty and tmst `200µs` computational admission are not physical precision. Image CSV remains microsecond-quantized group time; exposure sidecars retain per-camera input times. Bag record time reads realtime independently and preserves backward steps; MP4 playback remains relative/nominal. A common epoch is not physical synchronization; synchronize before recording.
 
-Add `--fsync --sample-rate-hz 1600` for trigger-to-sample association (default off, `800/1600Hz` supported). Bags add `/robobaton/fsync` as `std_msgs/String` JSON; MP4 sessions add `fsync.jsonl`. Cross-check `sample_sequence`, `group_id`, and `frame_ids` against saved data. Only `status=1` is valid. Container completeness does not prove association completeness: inspect missing/ambiguous records, sequence gaps, and final captured/dropped counts. See [Data Contracts](../development/data-contracts.md) for fields and uncertainty boundaries.
+Bag timing schema `robobaton_imu_timing_v2` matches ROS2 `/robobaton/imu/timing`; bag `/robobaton/session_config` records `camera_timestamp_path` and `imu_timestamp_mode`. Choose any of the four startup pairs through [non-ROS YAML/CLI](non-ros-demo.md), then stop/restart to change; all use the same binary and IIO capture/owner. Every pair requires the matched kernel IIO V3 capture module; the existing V2 module is incompatible and app deployment does not upgrade it. No FSYNC option/topic/sidecar, spidev, or fallback exists. Official never uses SIF observer timing and has validity0/uncertainty `UINT32_MAX`. See {ref}`Capability and Verification Boundaries <capability-verification-boundary>` for the current non-ROS HO short smoke and unverified scope. See [Data Contracts](../development/data-contracts.md#imu).
 
 Bag `/cameraN/frame_metadata`, tee `camN/frames.jsonl`, and MP4 `exposure.jsonl` save frozen per-frame `exposure`. `status=1` is a latest-ISP observation estimate, not certified applied exposure; `0` is unavailable, without carrying earlier values forward. The MP4 sidecar describes input frames and may outnumber encoded frames; join by camera and microsecond-quantized group-trigger time against timestamp CSV. See [Exposure Observations](../development/data-contracts.md#per-frame-exposure-observations) for fields, join keys, and limits.
 
@@ -247,7 +247,7 @@ Also check:
 - `encoded_frames_dropped=0`;
 - `imu_samples_admitted == imu_samples_written > 0`;
 - The producer final-health snapshot is valid, and published samples equal consumer-observed samples;
-- IMU final FIFO/mapper/uncertainty-drop/invalid-packet counters are zero and sample sequences are continuous; GPIO notification gaps remain diagnostic, not a completeness veto;
+- Final `transport_complete=1`, records=ACK, zero fatal/overflow/invalid/push/evidence/quiesce errors, and continuous sample sequences;
 - A matching `publication_receipt.json` exists in the session;
 - No `.publication_incomplete` marker exists in the session directory.
 
@@ -259,15 +259,14 @@ run_30fps_mp4/
 ├── camera0_timestamps.csv ... camera3_timestamps.csv
 ├── imu.csv
 ├── exposure.jsonl
-├── fsync.jsonl
 ├── camera_params.yaml
 ├── session_status.json
 └── publication_receipt.json
 ```
 
-The MP4 playback timeline uses the nominal frame rate; `cameraN_timestamps.csv` aligns encoded frames by `frame_index`, providing realtime group-trigger times quantized to microseconds and expressed in ns, not original per-camera nanosecond stamps. With FSYNC enabled, cross-check CSV using group time in `fsync.jsonl` and read original per-camera values from `camera_timestamps_ns`; see [Data Contracts](../development/data-contracts.md).
+MP4 uses nominal playback timing; `cameraN_timestamps.csv` joins encoded `frame_index` to microsecond-quantized realtime group time, not original per-camera nanosecond stamps. Match input observations in `exposure.jsonl` by camera/group time; do not use source frame_id directly as file index.
 
-`exposure.jsonl` always stores input-frame observations, including `status=0`. `fsync.jsonl` is always created, with association records written only when FSYNC is enabled. An unavailable exposure estimate alone neither stops images nor changes complete to partial. If every saved frame must have an estimate, separately check `exposure.status` and input-to-encoded-frame joins rather than infer it from container completeness.
+`exposure.jsonl` always saves input observations including status=0 and may outnumber saved encoded frames. There is no FSYNC sidecar. Unavailable exposure alone does not stop default-mode images or make output partial; check status and input/encoded joins separately if every frame needs an estimate.
 
 Exit code 2, `published_partial`, a `.partial` directory, a marker, or a receipt mismatch is not a complete session.
 
@@ -389,8 +388,8 @@ success=yes
 And check:
 
 - `image_frames_by_camera=cam0:N,cam1:N,cam2:N,cam3:N` all equal and `N > 0`;
-- Successful stop yields `IMU_RUNTIME_HEALTH final=yes health_valid=yes` with nonzero generation; compare published, consumer-observed, recorder-admitted/written counts, and actual bag IMU messages;
-- A zero-loss requirement additionally needs zero sequence gaps/duplicates/regressions, invalid packets, FIFO overflows, and timing drops, plus actual sample readback. GPIO notification gaps are not sample-loss counts. Windows without corrections should have no sample timestamp duplicates/regressions; host timestamps may repeat within a burst, and corrections may move both realtime stamps backward. Do not fabricate increasing stamps or ignore other health errors;
+- Retain final `IMU_RUNTIME_HEALTH` after stop, including failed-stop diagnostics; inspect status and nonzero generation, then compare published, consumer-observed, recorder-admitted/written counts, and actual bag IMU messages;
+- Check sequences, invalid payloads, overflow, fatal/push/evidence/quiesce, STOP transport, and records/ACK, then compare producer/consumer/saved payloads. Never directly subtract MONOTONIC and RAW; realtime bridges preserve wall-clock steps without fabricated monotonic values.
 - The final path comes from `SENSOR_BAG_RESULT path=`, not from guessing the configured path.
 
 A nonzero exit, `published_partial`, `.partial.bag`, or quarantine is not formally complete data, but should be kept for diagnostics — do not auto-overwrite or delete it.
@@ -449,11 +448,11 @@ The output directory must not exist. The current tool supports uncompressed, ful
 
 Both modes accept `25/30/40/50/60fps`, but frame rate alone cannot guarantee complete saving:
 
-- H.264 MP4 reuses RTSP-encoded access units. Completeness depends on encoding, storage, and final IMU health; high load or timing drops can produce `published_partial` even when all four MP4s play.
+- H.264 MP4 reuses RTSP-encoded access units. Completeness depends on encoding, storage, and final IMU health; high load or source errors can produce `published_partial` even when all four MP4s play.
 - ROS1 bag uses separate JPEG encoding and queues. CPU, encoder throughput, storage, and RTSP preview load affect losses; no frame-rate threshold guarantees complete saving or only a small loss at higher rates.
-- After changing fps, IMU ODR, FSYNC, dimensions, storage, or system scheduling, check sustained four-channel rates, final health, and actual payloads on the target. Exposure `status=1` coverage, unique FSYNC matching, and storage completeness are separate checks.
+- After changing fps, IMU ODR, dimensions, media, or scheduling, separately check sustained four-channel rates, final health, IMU timing/bridge metadata, and actual payloads. Exposure coverage and container completeness are separate.
 
-Short non-ROS `60fps` + `1600Hz` FSYNC CPU/BPU console association does not establish saved-image decoding. Native bag JPEG removes only private JPU APP9, without changing the ROS2 JPEG plugin or closing high-rate H.264 RTSP missing-reference/slice warnings. One encoding/saving path's result does not certify another path.
+Accepted settings or older compositions do not certify decoding, DDS, or sustained saving of current IIO operation. Native bag JPEG removes private JPU APP9 without changing the ROS2 JPEG plugin; one encoding/saving path does not certify another.
 
 ## 10. Common Issues
 

@@ -19,7 +19,7 @@
 ## 代码仓库
 
 - [RoboBaton_4p_demo](https://github.com/Hessian-matrix/RoboBaton_4p_demo)：non-ROS 用户交付仓和 `/root/demo` 运行包。
-- [RoboBaton_4P_ROS2_demo](https://github.com/Hessian-matrix/RoboBaton_4P_ROS2_demo)：ROS2 四目 NV12/raw+compressed 图像、CameraInfo、曝光观测、IMU、温度与可选 FSYNC topic demo，部署目录为 `/root/ros2_demo`。
+- [RoboBaton_4P_ROS2_demo](https://github.com/Hessian-matrix/RoboBaton_4P_ROS2_demo)：ROS2 四目 NV12/raw+compressed 图像、CameraInfo、曝光观测、IMU、温度与 timing JSON topic demo，部署目录为 `/root/ros2_demo`。
 - [4P_doc](https://github.com/Hessian-matrix/4P_doc)：本公开在线文档仓。
 
 公开 shell 示例使用合法变量和示例值，并在相邻注释中说明需要按现场环境修改。官方出厂默认地址为 `192.168.1.12`，默认账号为 `root`。
@@ -30,7 +30,7 @@
 
 完整公开政策见 [中文发布说明](source/cn/release-and-support.md#文档版本政策) 和 [English release policy](source/en/release-and-support.md#documentation-version-policy)。主仓门禁命令为 `python3 -B tests/version_reporting_contract_test.py`；中英文仍须分别通过严格 HTML 构建和 linkcheck。
 
-当前文档修订为 `2.0.57`，软件仍为 `2.0.0`；硬件标识与 SO ABI 独立识别。首次上电页说明随板预烧录系统开机自启 `sensor_demo`、网页查看传感器和录包；出厂预烧录不表示已有公开镜像下载。USB 页面按匹配系统说明 USB3 RNDIS 默认配置、网络和切换边界，不再声称已集成五模式菜单。NTP 页面仅说明板端自动授时、服务器配置、自建局域网源和手动恢复，正常使用不需要逐板安装脚本。当前源码 Web 预览与本文档修订不代表新软件发布或真实双机/GPU验收。当前参数支持范围与实际完成的验证范围分别维护在[中文能力与验证边界](source/cn/release-and-support.md#capability-verification-boundary)和[English capability and verification boundaries](source/en/release-and-support.md#capability-verification-boundary)：不承诺所有路径持续 `60fps`、任意负载零丢失或当前新组成已完成 `8h` 长录。
+当前文档修订为 `2.0.59`，软件仍为 `2.0.0`；硬件标识与 SO ABI 独立识别。当前 IMU 为内核 IIO V3／公共 ABI5，最终默认 HO（相机 observer + IMU host），其余启动组合保留比较。non-ROS 默认 Web 开、RTSP 关、IMU `800Hz`；手动曝光为显式配置，不更改默认自动曝光。首次上电页保留随板预烧录、自启 `sensor_demo`、网页预览与录包说明，出厂预烧录不等于公开镜像下载。USB 页保留匹配镜像的 Host/Device、RNDIS/ECM/UVC/ADB/MSD 功能与安全切换边界；NTP 页描述板端自动授时、服务器配置、局域网源和手动恢复。当前整合包已完成 non-ROS HO／四路30fps网页预览与姿态／bag与MP4回读／正常停止短窗验证；不认证 ROS2 板端、其余三组合、物理精度、双机/GPU、压力、`8h` 或重启，也不构成新软件发布。见[中文能力与验证边界](source/cn/release-and-support.md#capability-verification-boundary)和[English capability and verification boundaries](source/en/release-and-support.md#capability-verification-boundary)。
 
 ## 当前在线文档目录
 

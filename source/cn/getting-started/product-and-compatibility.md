@@ -8,7 +8,7 @@
 
 硬件标识、软件 `2.0.0`、文档和 SO ABI 独立识别。参数受支持不等于所有模式/负载/时长已通过；当前高帧率、压力、长录及外设限制见{ref}`能力与验证边界 <capability-verification-boundary>`。
 
-V2 IMU 为 ICM-42670-P，API `icm42670_*`，ABI 3.0，real SO `libicm42670.so.3.0.0`、SONAME `libicm42670.so.3`；全部导出仅使用 `ICM42670_X5_3.0`，无旧别名。字段布局不变但 host 时间改为 SPI FIFO burst 完成观测，INT1 仅唤醒；FIFO 顺序与实测 TMST 定义样本。必须同步头文件、库、consumer 与配置并重建全部 consumer，移除旧 `.2` 库，不建立跨 major 链接；软件 VERSION 不变。原生 ODR `25/50/100/200/400/800/1600Hz`，默认 `800Hz`；不支持的速率明确拒绝，不静默重采样。
+当前 IMU 使用内核 IIO 公共 ABI 5.0：实体 `libicm42670.so.5.0.0`、SONAME `libicm42670.so.5`，九个导出均为 `ICM42670_X5_5.0`。设备必须已绑定匹配的内核 IIO V3 capture 模块；现有 V2 模块即使 host 模式也不兼容。全部 consumer 与匹配头文件/库成套重建并清除旧 major 工件，不建立跨 major 链接。启动 `camera_timestamp_path=observer|official`（默认 observer）与 `imu_timestamp_mode=host|tmst`（默认 host）提供四种组合，共用同一二进制和同一 IIO 读取/owner，停止/重启后切换。host 保留 MONOTONIC，物理误差未知；tmst 依据内核 FIFO/UI 跳变证据增加有界仿射 RAW sample 映射，同时保留 MONOTONIC，`200µs` 计算 admission 不是物理精度。official 相机时间是物理上界未知的同帧 IRQ 派生估计，绝不是 SIF observer 结果。保存/ROS2 将所选原生模式桥接到 realtime 并保留原生证据。无用户态 SPI/spidev、FSYNC 恢复或回退。见 [non-ROS 使用](../usage/non-ros-demo.md)、[ROS2 使用](../usage/ros2-demo.md) 与[数据合同](../development/data-contracts.md)。当前 non-ROS HO 短窗证据及未验收范围见{ref}`能力与验证边界 <capability-verification-boundary>`。不声明四组合实板验收；软件、文档、ABI 与发布状态独立。
 
 | 交付物 | 用户入口 |
 |---|---|
@@ -21,8 +21,8 @@ V2 IMU 为 ICM-42670-P，API `icm42670_*`，ABI 3.0，real SO `libicm42670.so.3.
 
 | 路径 | 主要能力 | 运行目录 | 备注 |
 |---|---|---|---|
-| non-ROS | 四路 RTSP、IMU、UART、互斥 bag/MP4 保存、可选 FSYNC 与曝光观测 | `/root/demo` | RTSP `554..557/PRR`，H.264 默认、H.265 可选；四路拼接示例为 `558/PRR`。 |
-| ROS2 | raw/compressed 图像、CameraInfo、逐帧曝光观测、IMU、温度与可选 FSYNC | `/root/ros2_demo/install` | ROS2 Humble；compressed 使用 X5 `MEDIA_CODEC_ID_JPEG` 硬件编码；不提供 RTSP。 |
+| non-ROS | 四路 RTSP、IMU、UART、互斥 bag/MP4 保存、IMU 时钟元数据 与曝光观测 | `/root/demo` | RTSP `554..557/PRR`，H.264 默认、H.265 可选；四路拼接示例为 `558/PRR`。 |
+| ROS2 | raw/compressed 图像、CameraInfo、逐帧曝光观测、IMU、温度与IMU 时钟元数据 | `/root/ros2_demo/install` | ROS2 Humble；compressed 使用 X5 `MEDIA_CODEC_ID_JPEG` 硬件编码；不提供 RTSP。 |
 
 两条路径不要混用目录、头文件或 `.so`，同一时间只运行一个占用 camera/VIO/编码资源的应用。
 
@@ -35,13 +35,13 @@ V2 IMU 为 ICM-42670-P，API `icm42670_*`，ABI 3.0，real SO `libicm42670.so.3.
 | 交叉编译 | 只在开发机使用 X5 交叉编译包；不建议在 X5 板端原生编译。 |
 | non-ROS相机配置 | 默认`1280x1088@30fps`；支持`25/30/40/50/60fps`；输出画布 `1280x1088`/`640x480`/`720x480`/`1280x720`。 |
 | Trigger | 所有相机入口仅支持 `vin_lpwm`（VIN LPWM 硬件触发）；不提供 free-run 或软件 GPIO 触发。 |
-| 权限与调度 | 相机需要只读 `/dev/mem`，捕获和 IMU 实时线程需要调度权限，失败拒绝启动；详见[数据合同](../development/data-contracts.md)。 |
+| 权限与调度 | 仅相机 `observer` 需要只读 `/dev/mem` 与 `SCHED_FIFO/60`；`official` 不启动该 observer。IMU owner/consumer 实时线程需要调度权限，失败拒绝启动；详见[数据合同](../development/data-contracts.md)。 |
 
 相机仅完整四路或单颗诊断，不支持 2/3 路；旋转 `180` 仅支持 `30fps`。单颗诊断已由用户确认，不扩展为所有模式或压力负载验收。
 
 ROS2 路径不提供 RTSP；需要 RTSP 时使用 non-ROS 路径。当前不提供TF、外参、相机内参或畸变标定；CameraInfo 只有宽高，IMU orientation 不可用。
 
-当前相机 ABI 3.0 新增逐帧冻结的 ISP `exposure` 观测，保留 frame-info 前缀尺寸读取，但 SONAME 已切到 `libsc132.so.3`，旧二进制必须重建；估计值不证明该帧实际生效曝光。FSYNC 默认关闭，仅 `800/1600Hz` 可开启，提供触发—样本唯一关联而非曝光同步。软件版本相同不证明包内功能相同：按 [changelog](../changelog.md) 区分未发布更新，并核对 manifest、头文件和实际库。
+当前相机 ABI 3.0 提供逐帧冻结的 ISP `exposure` 观测及 frame-info 前缀尺寸读取；估计不证明该帧实际生效曝光。相机时间算法未改变。软件版本相同不证明包组成相同，须核对 [changelog](../changelog.md)、manifest、头文件与实际库。
 
 ## 出厂系统镜像与目标板兼容性
 

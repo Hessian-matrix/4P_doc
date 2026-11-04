@@ -53,7 +53,7 @@ For full image integration, interactive configuration, and log paths see [Wi-Fi 
 |---|---|
 | Symptom | `error while loading shared libraries`, or `.so` missing when running a `bin/` program. |
 | Check | `ls -l /root/demo/lib`; run from the `/root/demo` top-level launcher script; run `. ./env.sh` before directly running `bin/`. |
-| Normal result | `libsc132.so*`, `libicm42670.so*`, and `libprrtsp.so*` exist and load preferentially from `/root/demo/lib`; ICM uses SONAME `libicm42670.so.3` and real file `libicm42670.so.3.0.0`, without old `.2` libraries or cross-major links. |
+| Normal result | `libsc132.so*`, `libicm42670.so*`, and `libprrtsp.so*` load preferentially from `/root/demo/lib`; ICM uses SONAME `libicm42670.so.5`, real file `libicm42670.so.5.0.0`, nine `ICM42670_X5_5.0` exports, and matching rebuilt consumers. No old `.2/.3/.4` libraries or cross-major links. |
 | Common causes | Only a single ELF copied, `lib/` omitted, `env.sh` not loaded, or same-named `.so` mixed from other projects. |
 | Recovery / info to collect | Re-deploy the full package and provide `ls -l /root/demo /root/demo/lib` and the full error text. |
 
@@ -165,7 +165,7 @@ For full image integration, interactive configuration, and log paths see [Wi-Fi 
 | Symptom | After MP4/rosbag saving, there is no expected final output, or the offline extraction script rejects the input. |
 | Check | View `SENSOR_MP4_RESULT` or `SENSOR_BAG_RESULT`; confirm `outcome`, `data_complete`, `path`, and `configured_path`. MP4 complete also requires `session_status.json`, `publication_receipt.json`, four MP4s, and four timestamp CSVs. |
 | Normal result | A complete run exits `0`, `data_complete=yes`, and `path` is the real output. If the configured directory already exists, MP4 automatically writes to a sibling timestamped directory. |
-| Common causes | Path conflicts selected a timestamped sibling; `.partial` recovery input; encoder/queue/storage losses or final IMU timing/invalid-packet drops; MP4 used H.265, non-four-channel, or frame-skip; the Host lacks full `ffmpeg`/`ffprobe`. Four playable MP4s do not prove complete final health; see [Saving Data](usage/save-data-guide.md). |
+| Common causes | Path conflicts selected a timestamped sibling; `.partial` recovery input; encoder/queue/storage losses, final IMU invalid-payload drops, or IIO evidence/stop errors; MP4 used H.265, non-four-channel, or frame-skip; the Host lacks full `ffmpeg`/`ffprobe`. Four playable MP4s do not prove complete final health; see [Saving Data](usage/save-data-guide.md). |
 | Recovery / info to collect | Re-extract using the real directory from `SENSOR_MP4_RESULT path=`; `.partial` is recovery-only; collect the exit summary, session directory listing, and extraction-script error text. |
 
 ## H.265 Client Stuttering
@@ -182,27 +182,26 @@ For full image integration, interactive configuration, and log paths see [Wi-Fi 
 
 `missing bounded LPWM clock mapping; fail closed` means a delivered frame has no valid trigger time; arrival time and nearest-neighbor matches are not substitutes. `reason=exact_record_rejected` means the exact trigger was recorded but bounded reconstruction rejected it. Retain `record_vsync_ticks`, `record_trigger_ticks`, `lower_raw_ns`, and `upper_raw_ns` to check counter relationships and the `500000ns` observation-window limit. `reason=not_retained` only means the trigger was absent at lookup; full history alone does not prove eviction. Only equality with `last_overwritten_trigger_ns` proves that the most recent overwrite removed that identity. Collect the complete log line, startup configuration, and scheduling state; do not widen the window or treat these diagnostics as a stability fix.
 
+That bounded-map diagnostic applies to `camera_timestamp_path=observer`; its `500µs` admission is unchanged. With `official`, the SIF observer is never started: `invalid official same-frame timestamp` means invalid same-frame IRQ RAW/AON metadata or arithmetic. Preserve the selected mode and complete reason line; do not substitute arrival time or switch modes as automatic recovery. Official successful arithmetic still has timing validity0 and uncertainty `UINT32_MAX`, not a bounded physical result.
+
+For rejected selector values or read-only parameter errors, use exactly top-level `camera_timestamp_path: observer|official` and `imu_timestamp_mode: host|tmst` (defaults observer/host), CLI `--camera-timestamp-path`/`--imu-timestamp-mode`, or the same top-level ROS2 parameters. Stop/restart to change; ROS2 `ros2 param set` cannot hot-switch them. All pairs use the same binary/IIO owner, not alternative SPI backends. See [non-ROS Usage](usage/non-ros-demo.md) and [ROS2 Usage](usage/ros2-demo.md).
+
 ## IMU Has No Data or Is Abnormal
 
 | Item | Content |
 |---|---|
-| Symptom | `imu_reader_demo` has no output, fails to start, or reports nonzero timestamp duplicate/regression. |
-| Check | `ls -l /dev/spidev2.0`; `./imu_reader_demo --sample-rate-hz 800 --print-metrics`; INT1 is `34120000.gpio` offset `8`, not old GPIO395. |
-| Normal result | Samples continue; windows without clock corrections should have `timestamp_duplicates=0` and `timestamp_regressions=0`, while realtime may step backward during correction. Final health is valid and counters agree with actual payloads and application requirements. |
-| Common causes | SPI, power/soldering/device-tree, or sample-rate errors; missing realtime scheduling permission; long IRQ/SPI delays causing timing rejection, or invalid identity/clock certificates. Default counted drops are not zero loss. |
-| Recovery / info to collect | Keep full startup/exit logs, clock-correction state, `SENSOR_IMU_RESULT`, `IMU_RUNTIME_HEALTH final=yes health_valid=yes` after successful stop, and `/dev/spidev2.0` state. Do not widen uncertainty gates or fill gaps with old samples. |
+| Check | Run `./imu_reader_demo --sample-rate-hz 800 --count 800 --print-metrics --imu-timestamp-mode host` (or select `tmst` after stopping); check ABI5 headers/libraries, the matched kernel IIO V3 capture module, and unique `icm42670-capture` sysfs/control identity. The existing V2 module is incompatible in both modes. Never hard-code the device number. |
+| Normal contract | MONOTONIC host estimates and RAW burst observations remain separate in both modes. Host has `sample_raw_ns=0` and uncertainty `UINT32_MAX`; tmst adds mapped RAW sample time without replacing MONOTONIC. Count is a STOP threshold and final totals may exceed it; standalone CLI does not convert to Unix time. |
+| Common causes | Missing/mismatched V3 module or device-tree binding, ambiguous identity, invalid scan layout, another owner, scheduling permission, kernel I/O/overflow/push/evidence/quiesce errors, or invalid TMST FIFO/UI timing evidence. The library never loads modules, steals resources, uses spidev, or falls back to host. App deployment does not upgrade the module. |
+| Retain | Full startup/exit logs, stop status, `IMU_TIMING_SUMMARY`, final `IMU_RUNTIME_HEALTH`, actual sequences/payloads. Read terminal diagnostics even after failed stop. Check record/ACK and transport_complete; exclusion of physical tail data is not delivery of every physical sample. |
 
-INT1 only wakes FIFO draining; packets and edges are no longer individually identity-certified. `gpio_event_gap_count` counts detectable missing notification sequence values: it is not proof of physical-edge/sample loss or independently fatal. Bounded waits still check FIFO without notifications. FIFO overflow, bad packets, ambiguous clocks, and invalid epochs still fail; preserve full logs, sample sequences, TMST/RAW observations, and final health. Host time is the original burst-completion observation, so duplicates and wall-clock steps are valid; do not require unique host stamps or infer sample order from host or increasing realtime. This architecture does not fix the GPIO/IRQ/kernel root cause. Matching-BSP IRQ/SPI latency evidence remains necessary; never widen `200µs` or synthesize sample times. Passing repeated starts does not establish sustained acquisition.
+`timestamp_hz` describes host-assigned times; `acquisition_hz` uses ordinary-burst independent RAW endpoints and requires `acquisition_valid=yes`. Neither proves physical precision. Do not subtract MONOTONIC from RAW. Saving/ROS2 bridge failures fail output; never widen brackets or synthesize increasing values to conceal errors. See [IMU Data Contracts](development/data-contracts.md#imu).
 
-When investigating IRQ/SPI latency, also check whether the BSP enables per-transfer spidev dynamic-debug and measure the kernel-log rate. High-frequency synchronous debug output changes acquisition conditions; reducing application stdout does not disable it. Preserve the original flags and failure log first. Disable only the relevant print site in a separately authorized comparison, then restore and verify it afterward. Applications and SOs do not automatically change global debug, IRQ settings, or system realtime quotas. Passing with debug disabled does not establish a pass in the original environment or waive identity and uncertainty checks.
+TMST missing/contradictory/stale/ambiguous/out-of-budget evidence fails acquisition; its `200µs` computational admission is not physical accuracy and must not be widened to hide failures. Saving/ROS2 use host MONOTONIC→REALTIME or tmst RAW→REALTIME; verify `bridge_clock`, separate `bridge_monotonic_ns`/`bridge_raw_ns`, and schema `robobaton_imu_timing_v2`. No FSYNC association is restored. See {ref}`Capability and Verification Boundaries <capability-verification-boundary>` for the current non-ROS HO short smoke and unverified scope.
 
-## Unavailable Exposure Observations or Incomplete FSYNC
+## Unavailable Exposure Observations
 
-| Item | Content |
-|---|---|
-| Check | Read exposure from bag frame metadata, MP4 `exposure.jsonl`, or ROS2 `/robobaton/camN/exposure`. Check FSYNC enablement (`--fsync`/`imu.fsync_enabled`), `800/1600Hz`, and `/robobaton/fsync`/`fsync.jsonl`. |
-| Interpretation | Exposure `status=0` zeros other exposure fields while images continue; `1` is only the latest ISP estimate, not certified applied-frame exposure. Only FSYNC `status=1` is a unique correspondence; missing/ambiguous records, timing drops, and dropped FSYNC tags can be explicit. |
-| Recovery / info to collect | Use [Data Contracts](development/data-contracts.md) to compare camera/group/sample sequences, original stamps, generation, and final captured/dropped counts; retain actual image/IMU payloads. Do not hide missing data with nearest-neighbor matching, previous exposure values, or container completeness, or claim exposure synchronization. |
+Read bag frame metadata, MP4 `exposure.jsonl`, or ROS2 `/robobaton/camN/exposure`. `status=0` zeros other fields; default images continue, while exposure-midpoint test mode stops. `status=1` is only the latest ISP estimate, not certified applied-frame exposure or true exposure midpoint. Join input/encoded frames by camera/group time, not sidecar row or source frame ID as MP4 index. Current software has no FSYNC association option, topic, or sidecar.
 
 ## UART Has No Data
 

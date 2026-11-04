@@ -136,7 +136,7 @@ PHC2SYS_ARGS="-c eth0 -s CLOCK_REALTIME -w -S 1.0"
 - `-w`：等待 `ptp4l` 就绪，并从其 `currentUtcOffset` 自动维护系统 UTC 与 PHC PTP/TAI 的偏移和方向；不能使用 `-O 0` 把两个时间尺度混为一谈。
 - `-S 1.0`：偏差超过 1 秒时允许 step，目标是 PHC，不是系统时钟。
 
-硬件 timestamp 模式下，PHC 应为系统 UTC 加当前 TAI−UTC（当前 `37 s`），与 `pmc` 的 `currentUtcOffset` 一致。`utc_offset` 不是永久常数，闰秒政策变化时须同步更新。`phc_ctl eth0 cmp` 在此工具版本输出的是 REALTIME−PHC，正确情况下约为 `-37000000000 ns`；不要把负号误解为 PHC 落后。master 与报文通过不能证明 UTC 已校准：先校准系统时间，再启动此链路。相机库独立把 SIF 触发捕获映射为 realtime；PTP 不执行该映射，也不建立 FSYNC 样本或曝光同步。
+硬件 timestamp 模式下，PHC 应为系统 UTC 加当前 TAI−UTC（当前 `37 s`），与 `pmc` 的 `currentUtcOffset` 一致。`utc_offset` 不是永久常数，闰秒政策变化时须同步更新。`phc_ctl eth0 cmp` 在此工具版本输出的是 REALTIME−PHC，正确情况下约为 `-37000000000 ns`；不要把负号误解为 PHC 落后。master 与报文通过不能证明 UTC 已校准：先校准系统时间，再启动此链路。相机库独立把启动时所选触发估计映射为 realtime：`observer` 使用有界 SIF 捕获历史，`official` 使用同帧 RAW IRQ/AON 元数据且绝不启动 SIF observer，物理误差未知（validity0/uncertainty `UINT32_MAX`）。IMU 保存/ROS2 则独立将 host MONOTONIC 或 tmst RAW sample 桥接到 realtime。PTP 不执行这些映射，也不建立 IMU 物理采样或曝光同步；见[时间同步](system-time-sync.md)。
 
 ### 5.4 ifupdown 地址钩子
 
