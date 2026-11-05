@@ -4,8 +4,10 @@ This page explains how to cross-compile the example code in the public demo repo
 
 Scope:
 
-- [`RoboBaton_4p_demo`](https://github.com/Hessian-matrix/RoboBaton_4p_demo): non-ROS four-camera RTSP, IMU, UART, and SocketCAN CAN examples.
-- [`RoboBaton_4P_ROS2_demo`](https://github.com/Hessian-matrix/RoboBaton_4P_ROS2_demo): ROS2 four-camera NV12/raw+compressed images, CameraInfo, exposure observations, IMU, temperature, and IMU timing metadata topic examples.
+- [`RoboBaton_4p_demo`](https://github.com/Hessian-matrix/RoboBaton_4p_demo/tree/V2_main): non-ROS four-camera RTSP, IMU, UART, and SocketCAN CAN examples.
+- [`RoboBaton_4P_ROS2_demo`](https://github.com/Hessian-matrix/RoboBaton_4P_ROS2_demo/tree/V2_main): ROS2 four-camera NV12/raw+compressed images, CameraInfo, exposure observations, IMU, temperature, and IMU timing metadata topic examples.
+
+V2 source and documentation use the `V2_main` main branch. The clone commands below select it explicitly; switch existing checkouts to `V2_main` before building too.
 
 ## 1. Build Boundary
 
@@ -28,10 +30,12 @@ RoboBaton_4P_ROS2_demo
 
 The public demo repositories already carry the public headers and matching precompiled runtime libraries required for building:
 
-- non-ROS: `include/`, `lib/libicm42670.so*`, `lib/libsc132.so*`, `lib/libprrtsp.so*`.
+- non-ROS: `include/`, `lib/libicm42670.so*`, `lib/libsc132.so*`, `lib/libprrtsp.so*`; also requires matching X5 SDK media headers such as `hbn_api.h`, `libhbmem.so`, and `libmultimedia.so` from the cross-compilation package, not built by this consumer repository.
 - ROS2: `include/robobaton_4p_ros2_demo/`, `lib/libicm42670.so*`, `lib/libsc132.so*`; building also requires the target-side ROS2, `hb_media_codec.h`, `libmultimedia.so.1`, `libhbmem.so.1`, and `libalog.so.1` provided by the X5 cross-compilation package.
 
 These repositories do not compile the underlying ICM42670, SC132, or PRRTSP producer source. Without the X5 cross-compilation toolchain, you cannot recompile the source and can only use the `demo/` in the repository or a pre-generated install package for deployment.
+
+The system USB camera program `x5-uvc-mosaic` is not a root CMake target listed above. Its complete backend, standalone build, and offline installer are under [`scripts/env_setup/x5_usb/`](https://github.com/Hessian-matrix/RoboBaton_4p_demo/tree/V2_main/scripts/env_setup/x5_usb) in public `RoboBaton_4p_demo`. This build needs no Go, but requires the matching X5 SDK and SC132 ABI3 library. Editing other non-ROS mosaic or JPEG examples does not update the system USB camera. See {ref}`USB Development Entry Points <usb-uvc-development>` for source/function links, standalone commands, offline `--package` installation, and safe updates on an existing board.
 
 Each library family has one regular `libNAME.so.M.m.p` file and two exact same-directory relative links: `libNAME.so.M -> libNAME.so.M.m.p`, `libNAME.so -> libNAME.so.M`. Non-ROS uses ICM42670, SC132, and PRRTSP; ROS2 uses only the first two. Synchronization, packaging, and install preserve links; verifiers reject flattened aliases and wrong, absolute, or broken links. Copy complete trees with `tar`, `cp -a`, or `rsync -a`, without dereferencing links.
 
@@ -39,7 +43,7 @@ Non-ROS `runtime-provenance.json` uses v3: regular-file bytes and raw link text 
 
 The current matched set is ICM42670 `libicm42670.so.5.0.0`, SONAME `libicm42670.so.5`, nine exports under `ICM42670_X5_5.0`; SC132 `libsc132.so.3.0.0`, SONAME `libsc132.so.3`, `LIBSC132_3.0`; PRRTSP `libprrtsp.so.2.0.1`, SONAME `libprrtsp.so.2`, `LIBPRRTSP_2.0`. Synchronize public headers and libraries, remove old ICM42670 `.2/.3/.4` and SC132 `.2` libraries, and rebuild every consumer without cross-major links. All four startup timestamp pairs use the same binaries/IIO capture, not separate scheme-specific builds; see [non-ROS Usage](../usage/non-ros-demo.md) and [ROS2 Usage](../usage/ros2-demo.md). Every IMU mode requires the matched kernel IIO V3 capture module; the existing V2 module is incompatible. Public demo builds/package verifiers do not build, install, or upgrade that kernel module. Software `2.0.0`, hardware V2.2, documentation revision, and SO ABI are independent. See {ref}`Capability and Verification Boundaries <capability-verification-boundary>` for the current non-ROS HO short smoke and unverified scope. compilation does not certify four-way operation, throughput, pressure, or long recording. See {ref}`Capability and Verification Boundaries <capability-verification-boundary>`.
 
-Clean-target-image versus runtime-package ownership of `python3`/`libstdc++` remains unresolved. Builds, links, and package/install verifiers do not establish runtime-dependency validation on every clean image. Confirm dependencies on the actual system before deployment, rather than infer them from documentation versions.
+The current matching Buildroot image supplies `/usr/bin/python3`, C++/SDK runtime libraries, and `/opt/ros/humble`. Application packages supply their programs, configuration, matched producers, and tools. The ROS2 install also carries selected transitive dependencies and NumPy's BLAS/LAPACK/Fortran libraries, not just the two producers; it does not replace the system interpreter or BSP. Checks on a flashed device cover Python `3.10.12`, actual non-ROS loading, and ROS2 version/package queries in the package environment. Builds and package/install verifiers do not validate every runtime path. See [Current Image Contents](../ops/system-flashing.md).
 
 ## 2. Prepare the Cross-Compilation Environment
 
@@ -94,7 +98,7 @@ file -L "$TARGET_ROS_PREFIX/lib/librclcpp.so"
 Get the source:
 
 ```bash
-git clone https://github.com/Hessian-matrix/RoboBaton_4p_demo.git
+git clone --branch V2_main https://github.com/Hessian-matrix/RoboBaton_4p_demo.git
 cd RoboBaton_4p_demo
 ```
 
@@ -189,7 +193,7 @@ When deploying to the X5, do not delete `/root/demo` directly, and do not copy t
 Get the source:
 
 ```bash
-git clone https://github.com/Hessian-matrix/RoboBaton_4P_ROS2_demo.git
+git clone --branch V2_main https://github.com/Hessian-matrix/RoboBaton_4P_ROS2_demo.git
 cd RoboBaton_4P_ROS2_demo
 ```
 

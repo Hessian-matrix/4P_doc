@@ -41,19 +41,21 @@
 
 ROS2 路径不提供 RTSP；需要 RTSP 时使用 non-ROS 路径。当前不提供TF、外参、相机内参或畸变标定；CameraInfo 只有宽高，IMU orientation 不可用。
 
-当前相机 ABI 3.0 提供逐帧冻结的 ISP `exposure` 观测及 frame-info 前缀尺寸读取；估计不证明该帧实际生效曝光。相机时间算法未改变。软件版本相同不证明包组成相同，须核对 [changelog](../changelog.md)、manifest、头文件与实际库。
+当前相机 ABI 3.0 提供逐帧冻结的 ISP `exposure` 观测及 frame-info 前缀尺寸读取；估计不证明该帧实际生效曝光。时间戳由启动 selector 选择 observer 或 official，默认仍为触发时间估计；详见[数据合同](../development/data-contracts.md)。软件版本相同不证明包组成相同，须核对 [changelog](../changelog.md)、manifest、头文件与实际库。
 
 ## 出厂系统镜像与目标板兼容性
 
-V2 匹配 BSP/系统镜像和恢复通道的公开资料待确认，当前没有公开镜像下载或已确认的烧录步骤；见[系统烧录](../ops/system-flashing.md)。不要将未确认适用于当前硬件的镜像写入设备。
+V2 系统镜像已完成制作并已有烧录启动的设备；当前匹配镜像预装 non-ROS、ROS2 Humble、IIO capture 模块和系统依赖，仅 non-ROS 默认自启。当前固件支持按住 SW1 上电或复位，再通过 USB3 Fastboot 使用 XBurn 烧录，无需连接调试串口，具体操作见[系统烧录](../ops/system-flashing.md)。镜像下载：[4P_V2.0.0_image.tar.gz](https://www.hessian-matrix.com/wp-content/uploads/2026/automaticupdates/4P_V2.0.0_image.tar.gz)；发布包 SHA-256 与适用硬件须在烧录前向产品支持核对。镜像完成不等于全部接口验收；烧录前须确认镜像适用于当前硬件并备份数据，不要将未确认兼容的镜像写入设备。
 
 ## 版本查询与整包匹配
 
 ```bash
 /root/demo/cam_demo --version
 /root/demo/sensor_demo --version
-/root/ros2_demo/install/lib/robobaton_4p_ros2_demo/robobaton_sensors_node --version
-/root/ros2_demo/install/lib/robobaton_4p_ros2_demo/robobaton_imu_rate_monitor --version
+/root/ros2_demo/install/robobaton_ros2_env.bash \
+  /root/ros2_demo/install/lib/robobaton_4p_ros2_demo/robobaton_sensors_node --version
+/root/ros2_demo/install/robobaton_ros2_env.bash \
+  /root/ros2_demo/install/lib/robobaton_4p_ros2_demo/robobaton_imu_rate_monitor --version
 ```
 
 部署时按整包更新和校验：non-ROS使用`manifest.sha256`，ROS2 install使用archive checksum和runtime `abi_manifest.sha256`。不要只替换单个可执行文件或单个`.so`；运行包中的程序、头文件和运行库应来自同一经验证的软件包，不能根据文档修订号判断软件或 ABI 是否匹配。

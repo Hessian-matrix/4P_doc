@@ -16,8 +16,10 @@ troubleshooting steps.
 Code repositories
 -----------------
 
-- non-ROS Demo: `RoboBaton_4p_demo <https://github.com/Hessian-matrix/RoboBaton_4p_demo>`_
-- ROS2 Demo: `RoboBaton_4P_ROS2_demo <https://github.com/Hessian-matrix/RoboBaton_4P_ROS2_demo>`_, publishing four-camera NV12/raw+compressed images, CameraInfo, IMU, temperature, and IMU timing topics.
+- non-ROS Demo: `RoboBaton_4p_demo <https://github.com/Hessian-matrix/RoboBaton_4p_demo/tree/V2_main>`_
+- ROS2 Demo: `RoboBaton_4P_ROS2_demo <https://github.com/Hessian-matrix/RoboBaton_4P_ROS2_demo/tree/V2_main>`_, publishing four-camera NV12/raw+compressed images, CameraInfo, IMU, temperature, and IMU timing topics.
+
+V2 source and this documentation use the ``V2_main`` main branch. Select it explicitly when cloning rather than relying on the repository default branch.
 
 .. toctree::
    :maxdepth: 1

@@ -1,34 +1,141 @@
 # Saving Data
 
-## 1. Scope
+## 1. Record and Save from Web (Recommended)
 
-This document explains how to use the non-ROS `sensor_demo` to save the following two kinds of data:
+For everyday recording, use the Web workflow: **open the device homepage → select format and storage → start → stop and wait for finalization → check results and path → copy the data**. The preflashed system starts `sensor_demo` automatically at boot; there is no need to log in over SSH or start another instance. See [non-ROS Demo Usage](non-ros-demo.md) for Web access and manual startup.
 
-1. ROS1 bag v2.0: four-channel synchronized images, camera info, frame metadata, and independent IMU;
-2. H.264 MP4 session: four MP4s, encoded-frame indexes, camera parameters, IMU CSV with native clocks/bridge columns, exposure sidecar, session status, and publication receipt.
+Recording saves the device's four cameras and the same IMU. It is **not a screen recording and does not automatically download to your computer**. Only one ROS1 bag or H.264 MP4 session can run at a time.
 
-This document applies to runtime packages whose `sensor_demo --help` includes both of the following parameters:
+### 1.1 Open the Recording Card
 
-```text
---record-bag <absolute-path>
---record-mp4-dir <absolute-directory>
+1. Connect the device as described in [First Boot](../getting-started/first-boot.md), then open `http://<device-ip>/` in your computer's browser.
+2. Find the **Recording and Saving** card on the homepage. On wide screens it is beside the cameras, attitude, and telemetry; on narrow screens, scroll down without switching pages.
+3. Wait for fresh device status. Before your first session it should be idle. If recording is already active, identify its purpose before stopping someone else's session.
+
+```{figure} ../_static/images/recording-card.png
+:alt: Web Recording and Saving card with format, storage, start/stop/query controls, duration, written size, and a collapsed details section
+:width: 325px
+:align: center
+
+Recording card detail. Set format and storage first; after stopping, expand Recording details and guidance to check the outcome and device path.
 ```
 
-ROS1 bag and MP4 are two mutually exclusive save modes and currently cannot be enabled simultaneously in the same process.
+Use only a trusted isolated LAN. This page has no authentication: anyone reaching the device can start or stop recording. Do not expose it to the Internet or an untrusted network. Before recording, confirm system time using [System Time Synchronization](../time-sync/system-time-sync.md); a common time axis does not establish physical synchronization.
 
-### Dynamic Web Sessions
+### 1.2 Select Format and Storage
 
-With a complete runtime supporting Web recording, open `http://<device-ip>/` and use the always-present “录制与保存” (Recording and Saving) card on the homepage. Its single form shows format, fixed storage, start/stop/query, device state, duration, and bytes written by default. Frame skipping and minimum drop interval are in the initially closed Advanced Options section; free space, drop counts, session, path, final integrity, and other details are in the initially closed Recording Details and Usage section. Actual errors, uncertain commands, and stopping/finalization messages remain outside the folds. Existing fresh-state/capability checks and command locks remain; controls do not act on missing/stale status or an uncertain command outcome. Cameras, IMU, and preview keep running after recording stops; mutually exclusive sessions can be repeated. CLI/YAML startup recording remains and can be stopped from Web. See [Web Recording Control](non-ros-demo.md#web-recording-control) for operation and access boundaries.
+Choose **Format** according to your intended use:
 
-Expanding or collapsing advanced options or recording details does not send stop, reset options or bias, or recreate WebRTC, SSE, or the attitude Worker. Invalid hidden advanced values automatically open the section before browser validation feedback. `Esc` only exits single-camera expansion and is not a recording control. Refresh still resets browser-local options to defaults and clears preview bias without changing device recording state.
+| Format | Saved content | Intended use |
+|---|---|---|
+| ROS bag | One ROS1 bag v2.0 file with four JPEG image streams, camera info, frame metadata, and native IMU | ROS1 message tools or later extraction/analysis; recording itself does not require ROS installation |
+| MP4 · Four-channel H.264 | One session directory with four `cameraN.mp4` files, timestamp indexes, camera parameters, native IMU CSV, and exposure/status/publication sidecars | Direct video playback with companion sensor data; requires four-channel H.264 encoding |
 
-Web allows only fixed runtime storage (standard package `/root/demo/bin/recordings`) or `/mnt/sdcard/recordings` on mounted TF. The device allocates session names, with no custom paths or eMMC fallback for absent TF. Start requires at least 64 MiB free, not a guarantee of sufficient space throughout recording. Recording/storage failures report failed/partial and clean up that session rather than masquerading as success; source failures still stop acquisition.
+Prefer MP4 for directly playable video. If unavailable, check the page's capability message; working preview alone does not establish MP4 readiness. MP4 does not support frame skipping.
 
-Stop only requests finalization. Wait for device `published_complete`, `data_complete=true`, and `cleanup_complete=true`, then cross-check actual payloads. Web results and `SENSOR_RECORDING_RESULT` are session results and do not require acquisition-process exit. `partial`, `failed`, `aborted`, or incomplete cleanup is not complete data. Collapsing details, closing the browser, and network loss do not stop recording. Query actual state after a timeout; do not blindly retry. Incomplete cleanup blocks a new session.
+Choose device-side storage under **Storage location**:
 
-Dynamic MP4 uses `imu_health_scope=callback_window` to check native samples, sequence continuity, counter differences, and queue writes for that window. It waits for the first valid IDR and boundedly waits for a common encoded group at stop. This does not establish losslessness outside the window or for the whole producer. Final producer health after process shutdown applies only to a still-active startup-auto session. Preview filtering, attitude bias, and telemetry decimation do not alter saved values. There is no authentication: anyone reaching the device can start/stop disk writes. Use only a trusted isolated LAN.
+| Option | Fixed save root | Notes |
+|---|---|---|
+| Runtime directory / eMMC | `/root/demo/save_data` | Fixed absolute path, independent of the executable location; not your computer's download directory |
+| TF card | `/mnt/sdcard/recordings` | Confirm the actual mount using [TF Card Usage](../getting-started/tf-card.md); absent/unmounted TF fails without falling back to eMMC |
 
-H.264 MP4 saving is recommended first: the four `cameraN.mp4` files play directly and reuse RTSP encoding. ROS1 bag stores JPEG messages for ROS1 tooling or later extraction. Supported frame rates are a parameter range, not a zero-loss guarantee; see section 9 for load boundaries. Startup and acceptance are in sections 5/7 respectively.
+With Runtime / eMMC selected, the device allocates a bag file at `/root/demo/save_data/session-<id>.bag` or an MP4 session directory at `/root/demo/save_data/session-<id>`. The device generates `<id>`; use the actual output path in the details. Existing data remains in its original directory, without automatic moves or deletion. Fixed directories retain the existing symlink security checks; symlinks cannot bypass path constraints.
+
+At start, the device checks that the target storage has at least `64 MiB` free; this does not guarantee enough space for the whole session. Free space in the details belongs to an assigned session path. Before the first recording it may remain at the initial `0 B`, and changing the storage selector does not immediately query that disk. See {ref}`Recording Details Explained <web-recording-details>`. Web does not accept custom paths, and YAML `save_data.save_path` does not change its fixed paths. CLI/YAML save-path semantics and the default `/root/demo/save_mp4/` are unchanged; use the advanced CLI/YAML startup instructions below for custom paths.
+
+### 1.3 Start and Observe Recording
+
+1. Leave Advanced options at their defaults for ordinary recording. Click **Start Recording** once and wait for device confirmation.
+2. Confirm the device reports recording, then observe **Duration (device clock)** and **Written**. Command acceptance, advancing duration, or increasing bytes does not establish final data completeness.
+3. Expand the details for actual session, format/storage, output path, and drop counts. Avoid storage stress, large copies/downloads, archive extraction, or data conversion during recording; keep this as the only high-throughput disk-writing task where possible.
+
+Written size uses decimal MB, switches to GB at `1 GB`, and keeps two decimal places (`1 MB = 1,000,000 B`, `1 GB = 1,000,000,000 B`). This is display conversion only; device byte counters are unchanged.
+
+Controls are disabled when status is missing/stale, a command is pending or uncertain, or the device cannot start. Use **Query Status** to inspect actual state. A timeout does not mean the command was not executed; do not blindly resend. Recording/storage faults report failed/partial results; source faults can still stop acquisition.
+
+### 1.4 Stop, Wait for Finalization, and Check Results
+
+1. Click **Stop Recording** once. The device must drain queues, close files, and finalize MP4 when selected. **Do not cut power, remove TF, or delete output files during finalization.**
+2. Wait for the stopping/finalization message to finish, then expand **Recording details and guidance**.
+3. Check **Final outcome** is `published_complete` and **Completeness / cleanup** shows both **Data complete: Yes · Cleanup complete: Yes** (`data_complete=true`, `cleanup_complete=true` in the API). Then cross-check actual payloads using the format-specific acceptance instructions below.
+4. Note the **Session ID** and **Output path (on device)** for this session. The device allocates paths; use the final displayed value rather than guessing a session name. Complete MP4 output is a directory; bag output is one `.bag` file.
+
+An accepted stop request, a stopped timer, playable MP4, or readable bag alone does not prove completeness. `partial`, `failed`, `aborted`, `.partial`, or incomplete cleanup is not complete data. Keep outputs and errors for recovery/diagnosis; incomplete cleanup blocks a new session.
+
+Web-created dynamic sessions provide their final result without exiting the acquisition process and also log `SENSOR_RECORDING_RESULT`. Cameras, IMU, and Web preview continue after recording stops, so another session can be started. **Collapsing details, closing or refreshing the page, and network loss do not stop recording.** Reopen the page and query actual device state. Refresh resets browser-local options and clears preview gyro bias without changing device recording state. `Esc` only exits single-camera expansion; it does not stop recording.
+
+(web-recording-details)=
+### 1.5 Recording Details Explained
+
+Click **Recording details and guidance** at the bottom of the recording card to expand it; click again to collapse. This only changes visibility and does not start or stop recording. The following is the real device's idle Web interface with only its session ID redacted. No recording was started for this screenshot; it is not an example of a successful recording.
+
+```{figure} ../_static/images/recording-details.png
+:alt: Expanded recording details on the real device, with eight status fields and four guidance notes; session ID redacted
+:width: 574px
+:align: center
+
+Real idle state with details expanded. Interpret `0 B`, empty format/outcome, the unassigned path, and Data complete: No in context; they do not establish a failed recording or a full disk.
+```
+
+#### Status Fields
+
+| Field | Meaning and interpretation | Limits |
+|---|---|---|
+| Free space | Available bytes reported by the device, in `B`, queried on the filesystem containing the current/last session path | May remain at the initial `0 B` before a path is assigned. This is neither your computer's free space nor a preflight check of the currently selected storage. After selecting TF, do not use the previous eMMC session's value to judge TF capacity |
+| Dropped groups | Recorder image-group drop count for a bag session, counting groups rather than individual camera frames | Not browser preview drops or IMU sample loss. `0` does not prove end-to-end losslessness; check final outcomes and payloads |
+| Dropped encoded frames | For an MP4 session, this replaces the previous label and counts dropped H.264 encoded frames across all four cameras | Not common four-camera groups or IMU samples; do not compare directly with bag groups. The idle screenshot has no MP4 session yet, so it shows Dropped groups |
+| Final outcome | Publication result returned after stop/finalization; `—` when idle without a result, or No final result yet for an unfinished active session | Complete publication requires `published_complete`. `published_partial`, `aborted`, `cleanup_incomplete`, or bag's `published_durability_unproven` is not complete success. Also check completeness/cleanup below and actual payloads |
+| Session ID | Device recording-control identifier used to distinguish sessions and correlate status with `SENSOR_RECORDING_RESULT` | The controller already has an ID at initialization; a number alone does not mean recording was created. It is neither a timestamp nor the bag's internal session UUID. Record the actual value; do not copy the screenshot or guess paths |
+| Format / storage | Device-reported format and storage for the current/last session; format is `rosbag` or `mp4`, or may be `—` before a session | Not the selectors preparing the next recording; changing selectors does not move existing files. Runtime directory / eMMC in the initial idle state does not mean output has been created |
+| Output path (on device) | Device-assigned bag file or MP4 session directory; The device has not assigned a path yet means none is available | Not a computer path or download link. Note the final value after stopping. Abnormal outputs are for recovery/diagnosis; an existing path does not prove completeness. Do not delete during recording or finalization |
+| Completeness / cleanup | Data complete is the recorder's completeness result; Cleanup complete describes internal finalization/resource cleanup | Cleanup complete: Yes does not mean files were deleted or data is complete. Initial idle No / Yes means there is no complete recording result yet; do not declare failure from this field during recording either. Both must be Yes at completion; incomplete cleanup blocks new sessions |
+| Health scope | `callback_window` describes health checks scoped to a dynamic recording callback window, not a health-pass indicator | Does not establish losslessness outside the window, for the whole producer, or physical synchronization. The current Web/API always displays this value and cannot identify the actual scope of an adopted startup-auto MP4. For that case, check sidecar `imu_health_scope` and final outcomes under {ref}`Startup-Auto MP4 Limits <startup-mp4-web-stop>` |
+
+#### The Four Guidance Notes
+
+1. **Trusted LAN and permissions:** there is no login authentication; anyone reaching the device can control recording. Use a trusted isolated LAN only, without Internet port forwarding or exposure to untrusted networks.
+2. **Device-allocated fixed paths:** Runtime / eMMC uses the fixed absolute directory `/root/demo/save_data`, not a path derived from the executable location; TF still uses `/mnt/sdcard/recordings`. Web accepts no custom path and has no download button. Unavailable TF does not fall back to eMMC. Existing data is not automatically moved or deleted, and symlink security constraints are unchanged.
+3. **One session and native data:** only one bag or MP4 can record at a time. Native IMU and the corresponding camera data are saved; Web preview decimation, filtering, and attitude gyro-bias calibration affect preview only, not saved data. MP4 saves four H.264 files, not a Web screen capture.
+4. **Network loss does not stop recording; stop still needs finalization:** closing the page or losing the network sends no stop command. After a command timeout, use Query Status instead of blindly resending. After stopping, wait for the device's final outcome without cutting power or removing TF. Then copy the data as described next.
+
+### 1.6 Copy Saved Data to Your Computer
+
+Wait until recording has stopped and finalization has completed, then copy data from the device using SSH/SCP file transfer. **The current Web page has no file-download button.** Connect a file-transfer tool to the device, open the final output path you noted, and copy the bag file or the entire MP4 session directory. Do not copy only the four MP4s and omit timestamps, IMU, camera parameters, or other sidecars.
+
+Alternatively, run the following in a **terminal on your computer**. Set `DEVICE_IP` to the device address and `REMOTE_PATH` to the actual final path shown on the page. `session-123` is only an example, not a fixed session name:
+
+```bash
+DEVICE_IP='<device-ip>'
+mkdir -p ./recordings
+
+# ROS bag: copy one file
+REMOTE_PATH='/root/demo/save_data/session-123.bag'
+scp "root@${DEVICE_IP}:${REMOTE_PATH}" ./recordings/
+
+# MP4: copy the entire session directory (choose the matching format)
+REMOTE_PATH='/root/demo/save_data/session-123'
+scp -r "root@${DEVICE_IP}:${REMOTE_PATH}" ./recordings/
+```
+
+For TF, use the actual `/mnt/sdcard/recordings/...` path from the details. Clean up only identified historical sessions after copying and checking the data. Never delete staging, markers, or output paths during recording. See section 6 for offline MP4-to-JPEG conversion and section 8 for bag inspection/extraction.
+
+### 1.7 Advanced Options and Completeness Boundaries
+
+Advanced options is initially collapsed; ordinary recording does not require changes. For bag, frame skip defaults to `0` (save every group) and minimum drop interval to `10`. Explicit frame skip `1` (alternate groups) requires interval `2`. MP4 does not support frame skipping. The interval constrains drop policy, not sustained losslessness. Invalid hidden values automatically open the section for validation feedback.
+
+Expanding or collapsing advanced options/details does not stop recording, reset current options or gyro bias, or recreate WebRTC, SSE, or the attitude Worker. Saved data uses native IMU; Web preview decimation, filtering, and attitude calibration do not change saved values.
+
+Sections 2–5 and 7 below are **advanced deployment checks, custom parameters/paths, and CLI/YAML startup recording**, not prerequisites for everyday Web recording. They apply to complete packages whose `sensor_demo --help` includes both `--record-bag <absolute-path>` and `--record-mp4-dir <absolute-directory>`. Do not start a duplicate `sensor_demo` while the boot-started instance is active. Before manual operation, stop this package's instance normally using {ref}`Stop, Restart, and Boot Autostart <non-ros-autostart>`, keeping `cam-service` running.
+
+(startup-mp4-web-stop)=
+```{warning} Early Web Stop of Startup-Auto MP4
+[INFERENCE] In the current implementation, an MP4 session created by CLI `--record-mp4-dir` or YAML `save_data.save: true` is adopted by Web control. An early Web stop uses neither a valid dynamic callback window nor producer final health, which is supplied at application shutdown. Even successful remux therefore cannot satisfy the complete criterion and publishes partial. This has not been reproduced on the newly flashed device or fixed in this update.
+
+Create dynamic MP4 from Web for independently started/stopped complete sessions. For startup-auto MP4 with a custom path, keep the session active until normal application shutdown, then check final health, outcomes, and payloads. The current fixed Web/API `health_scope=callback_window` label does not identify an adopted session's actual health scope; use the MP4 sidecar's `imu_health_scope` and final outcome. Normal shutdown does not guarantee completeness; other errors still produce failed/partial results.
+```
+
+Dynamic MP4 uses `imu_health_scope=callback_window` to check native samples, sequence continuity, counter differences, and queue writes for that window. It waits for the first valid IDR and boundedly waits for a common encoded group at stop. This does not establish losslessness outside the window or for the whole producer. Final producer health after process shutdown applies only to a still-active startup-auto session. Supported frame rates are a parameter range, not a zero-loss guarantee; see section 9 for load boundaries.
 
 Pressure bags may legally end as partial when strict drop policy is exhausted; this is not a sustained-pressure pass. Normal application-exit finalization retains IMU input through producer STOP/drain and consumer drain before closing the writer. Dynamic stop ends its callback window without stopping the producer. The historical DDS publication/reception difference remains unattributed; continuous saved sequences do not prove losslessness at every path's head/tail. Historical FSYNC/long-recording results do not certify the integrated IIO V3/ABI5 composition, and this update adds only a non-ROS HO saving smoke, not long-recording acceptance. See {ref}`Capability and Verification Boundaries <capability-verification-boundary>`.
 
@@ -47,7 +154,7 @@ Bag timing schema `robobaton_imu_timing_v2` matches ROS2 `/robobaton/imu/timing`
 
 Bag `/cameraN/frame_metadata`, tee `camN/frames.jsonl`, and MP4 `exposure.jsonl` save frozen per-frame `exposure`. `status=1` is a latest-ISP observation estimate, not certified applied exposure; `0` is unavailable, without carrying earlier values forward. The MP4 sidecar describes input frames and may outnumber encoded frames; join by camera and microsecond-quantized group-trigger time against timestamp CSV. See [Exposure Observations](../development/data-contracts.md#per-frame-exposure-observations) for fields, join keys, and limits.
 
-## 2. Version and Runtime Package Consistency
+## 2. Advanced: Version and Runtime Package Consistency
 
 Every deployment must copy the complete `demo/` runtime package, not just replace `sensor_demo` or a single `.so`.
 
@@ -135,7 +242,7 @@ ffmpeg -version | sed -n '1p'
 
 If any check fails, do not start formal MP4 recording.
 
-The device also needs usable `python3` and matching `libstdc++`. Clean-system-image versus runtime-package ownership of these dependencies is not fully resolved. Available tools or passing manifests do not establish runtime-dependency acceptance for every image.
+The device also needs usable `python3` and matching `libstdc++`. The current matching Buildroot image supplies Python `3.10.12` and C++/SDK runtime libraries; application packages do not replace system dependencies. Available tools or passing manifests do not validate every saving path; see [Current Image Contents](../ops/system-flashing.md).
 
 ## 4. Parameters and YAML Precedence
 
@@ -177,7 +284,7 @@ save_data:
 
 This avoids accidental data from forgetting that YAML already enabled saving.
 
-## 5. Save an H.264 MP4 Session (Recommended)
+## 5. Advanced: CLI/YAML H.264 MP4 Recording
 
 ### 5.1 Foreground Start
 
@@ -200,7 +307,7 @@ If the configured final directory or its corresponding `.partial` already exists
 SENSOR_MP4_RESULT path=<actual path> configured_path=<configured path>
 ```
 
-### 5.2 YAML Start (More Recommended)
+### 5.2 Start with YAML Configuration
 
 Configure the parameters in the YAML file, then run `sensor_demo` directly.
 
@@ -299,7 +406,7 @@ The default requires all four channels `0,1,2,3`. Do not use `--expected-cameras
 
 The output directory must not exist. Final publication uses atomic no-replace and does not overwrite concurrently created directories.
 
-## 7. Save a ROS1 Bag
+## 7. Advanced: CLI/YAML ROS1 Bag Recording
 
 ### 7.1 Foreground Start
 
@@ -327,7 +434,7 @@ If the business explicitly allows saving once every other complete synchronized 
 
 `record-frame-skip=1` saves one group and skips one group using consecutive complete frame-set arrival ordinals at the recorder, with all four cameras sharing the decision; it does not change RTSP frame rate. Intentional alternate saving must explicitly use `--record-drop-min-interval 2`; the default interval of 10 conflicts with alternate saving and is rejected at startup.
 
-### 7.2 YAML Start (More Recommended)
+### 7.2 Start with YAML Configuration
 
 Configure the parameters in the YAML file, then start directly.
 
@@ -409,7 +516,7 @@ Drops must apply the same decision to the complete four-camera group and report 
 
 ## 8. View and Unpack a ROS1 Bag
 
-The runtime package includes `bin/rosbag_info.py` (a Python standard-library implementation requiring usable `/usr/bin/python3` on-device; clean-image dependency ownership remains unresolved). After saving, view the bag status directly on-device:
+The runtime package includes `bin/rosbag_info.py`, a Python standard-library implementation requiring usable `/usr/bin/python3` on-device. The current matching image provides Python `3.10.12`. After saving, view the bag status directly on-device:
 
 ```bash
 DEMO_DIR=/root/demo  # change to the actual full runtime package directory

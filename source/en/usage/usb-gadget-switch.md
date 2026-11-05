@@ -1,94 +1,230 @@
 # USB Interface Functions and Switching Limits
 
-The updated matching V2 Buildroot image provides `switch_usb_gadget` to select **Host** or **Device (gadget)** on the same USB3.0 Type-C controller. Device mode enables one function at a time: RNDIS, CDC ECM, UVC, ADB, or MSD. RNDIS remains the default for direct computer connectivity, SSH, browser preview, and file transfer.
+The system includes `switch_usb_gadget` to select the USB3 Type-C function. The matching new image defaults to a **CDC NCM NIC** at the factory. Older firmware may still default to RNDIS or lack NCM support; check `switch_usb_gadget --help` first. Only one function runs at a time: selecting a camera, ADB, or disk removes USB networking.
 
-USB functions belong to the matching BSP/system image, not the non-ROS or ROS2 application packages. An older image containing only `x5-usb-rndis` does not gain this feature by updating documentation or an application package. Do not mix the new tool with old SDK gadget scripts, GPIO386 routing scripts, or the old `/etc/usb_gadget_default` file.
+## 1. Before Switching
 
-## 1. Check the Image and Safety Conditions First
-
-Read-only checks on the board:
-
-```bash
-command -v switch_usb_gadget
-switch_usb_gadget status
-cat /usr/share/4p-usb/manifest.json
-```
-
-The new tool requires the matching revised-carrier device-tree marker and Linux USB role-switch interface; mismatches are rejected. `status` reports the actual role, requested function, UDC binding, connection state, negotiated speed, backend process identity, and boot default. A requested function or running backend does not prove computer-side enumeration. `not attached` / `UNKNOWN` means no connection is currently established, not necessarily a missing feature.
+Run the commands below in the **board's root terminal**, not in the computer's PowerShell.
 
 ```{warning}
-Switching or stopping disconnects USB networking, SSH, the browser, ADB, or storage. Prepare a confirmed independent Ethernet or debug-serial maintenance connection first; do not operate over the only USB management link. Finalize recording normally and exit acquisition applications. Do not interrupt a starting, recording, or finalizing session, or stop/reconfigure `cam-service`.
+Switching disconnects the current USB connection. Use independent Ethernet or debug UART, not just the USB SSH link you are about to disconnect.
 ```
 
-The tool refuses known acquisition owners, foreign gadget owners, and mounted or process-open USB devices in Host mode. It only gracefully stops backends it started whose process identity still matches; it never force-kills another process. These checks cannot recognize every third-party program or prevent concurrent external changes, so users must still maintain exclusive ownership.
+Stop recording in the browser, wait for saving to finish, then stop acquisition using the {ref}`start/stop instructions <non-ros-autostart>`. **Stopping recording alone is not enough.** Exit manually started camera/IMU programs too, and keep `cam-service` running. All manual switches and `stop` check for acquisition users; they do not close other programs for you.
 
-USB-C is a data interface. See [Hardware Connection and Safety](../getting-started/hardware-and-safety.md) for power, electrical, and cable constraints. A software Host role does not establish safe VBUS output or USB-C/PD power support. Before selecting Host, check the connection and power scheme confirmed by product support; do not connect conflicting powered Hosts directly.
-
+(usb-function-selection)=
 ## 2. Select a Function
 
-Root can use commands directly, or run `switch_usb_gadget` without arguments and enter a function name; blank input cancels. Interactive Host and ADB selection also requires safety confirmation. Every command below changes the active USB function; do not run the table as a sequence of read-only checks.
+Run only the command you need:
 
-| Function | Board command | Usage boundary |
+| Goal | Board command | Notes |
 |---|---|---|
-| Host | `switch_usb_gadget host --host-power-confirmed` | Attach supported USB peripherals after checking VBUS/cable safety. Before leaving Host, unmount storage normally and close applications using the peripheral |
-| RNDIS | `switch_usb_gadget rndis` | Virtual NIC; the computer needs a matching RNDIS driver |
-| CDC ECM | `switch_usb_gadget ecm` | CDC ECM virtual NIC; the computer needs a matching ECM driver |
-| UVC | `switch_usb_gadget uvc` | One MJPEG stream from four real cameras; exclusive camera ownership; see below |
-| ADB | `switch_usb_gadget adb --allow-adb` | Trusted direct debugging only; exposes debug access without an Android-style authorization-prompt guarantee |
-| MSD | `switch_usb_gadget msd` | Dedicated FAT image, read-only by default; initialize first as described below |
+| Direct USB networking | `switch_usb_gadget ncm` | Default on the matching new image; SSH, browser access, and file transfer. The computer must support CDC NCM |
+| RNDIS networking | `switch_usb_gadget rndis` | Retained compatibility option; the computer must support RNDIS. There is no automatic fallback from NCM |
+| ECM networking | `switch_usb_gadget ecm` | Another USB NIC protocol; the computer must support CDC ECM |
+| USB camera | `switch_usb_gadget uvc` | Four images form one camera, with exclusive camera use |
+| ADB debugging | `switch_usb_gadget adb --allow-adb` | Install platform-tools on the computer; trusted direct links only |
+| USB disk | `switch_usb_gadget msd` | Read-only by default; initialize before first use, as shown below |
+| Connect peripherals to the board | `switch_usb_gadget host --host-power-confirmed` | Check VBUS and cable power safety first; do not connect conflicting powered Hosts. Before leaving, unmount storage and exit peripheral users |
 
-When SSH uses this USB NIC, the tool refuses disconnection by default. `--allow-disconnect` explicitly permits losing the connection; it does not provide automatic recovery or rollback. Consider it only with a confirmed independent recovery connection.
+You can also enter `switch_usb_gadget` and follow the prompt. For UVC:
 
-### RNDIS / CDC ECM Network
+```console
+# switch_usb_gadget
+USB3: host / rndis / ecm / uvc / adb / msd / ncm / ip (configure network)
+Mode (blank cancels): uvc
+```
 
-Both NIC functions use board address `192.168.7.2/24`. USB-specific DHCP allocates `192.168.7.10–192.168.7.100` to the computer, without a default gateway or DNS and without automatic Internet sharing. Addressing is independent of wired Ethernet. Enable automatic addressing for the computer's USB NIC and resolve overlapping routes first. When the board Web service is running, this address can access it; the actual port and application version must still match. See [First Power-On](../getting-started/first-boot.md).
+`#` is the shell prompt, not text to enter. Type `uvc` after `Mode (blank cancels):` and press Enter; blank input cancels. Host adds `VBUS/cable power checked? Type YES:`; ADB adds `Trusted direct debug link? Type YES:`. Enter `YES` only after checking those conditions. Complete commands in the table do not prompt for a function.
 
-“USB3 controller” does not prove negotiated SuperSpeed. Use the actual connection, `current_speed`, computer enumeration, and data transfer as evidence; the displayed NIC rate is not sustained throughput.
+NCM is appended to the existing function list; existing modes retain their VID/PID identities.
 
-### Four-Camera UVC Preview
+Use `switch_usb_gadget status` to inspect state; selecting the same function again still reconfigures USB. USB-C is a data interface; see [Hardware Connection and Safety](../getting-started/hardware-and-safety.md) for power requirements.
 
-`x5-uvc-mosaic` consumes real complete SC132 four-camera groups. Four `640×480` images form a `1280×960` image: **CAM1 top-left, CAM2 top-right, CAM3 bottom-left, CAM4 bottom-right**. The X5 hardware JPEG encoder supplies one MJPEG stream with a `30fps` descriptor. This is not four independent USB cameras and includes no IMU, audio, or recording files. It cannot run alongside existing Web/RTSP/ROS2 camera acquisition.
+## 3. Use the UVC Camera
 
-Stop acquisition applications normally before selecting UVC. On the computer, select the device and `1280×960` mode in MJPEG-capable camera software. This profile requires High-Speed or SuperSpeed; Full-Speed is not supported. Backend readiness only means the output node, event subscriptions, and acquisition startup completed, not that the computer received frames or sustained 30fps. Inspect all four real images on the computer. After stopping the backend and switching functions, restart the original application normally if needed.
+The default profile is **MJPEG, 1280×960, 30fps**. Four `640×480` images form a grid: CAM1 top-left, CAM2 top-right, CAM3 bottom-left, CAM4 bottom-right. It includes no IMU, audio, or recording files and cannot run alongside Web/RTSP/ROS2 camera acquisition.
 
-### ADB Debugging
+Over independent Ethernet or debug UART, stop the default application and select UVC:
 
-The computer needs Android platform-tools and matching drivers. After selecting ADB, run `adb devices` on the computer; use `adb shell` only after actual connectivity is established. ADB may expose privileged access: use trusted direct connections and return to RNDIS or stop the USB function afterward. A running backend or FunctionFS mount does not prove computer connectivity or authorization.
+```bash
+cd /root/demo
+./start_sensor_demo.sh stop && switch_usb_gadget uvc
+```
 
-### Dedicated MSD Disk
+In the computer's camera software, select this USB camera and `1280×960` MJPEG, then check all four images. A High-Speed or SuperSpeed link is required; a 30fps profile does not establish sustained 30fps reception.
 
-Initialization creates only a new `128 MiB` FAT backing image at `/root/usb-share.img`; existing files are never overwritten. It does not export the root partition, TF card, or existing recording directories, and does not copy recordings into the image:
+**Closing preview or unplugging USB does not release the cameras.** When finished, close preview and return to the NIC:
+
+```bash
+switch_usb_gadget ncm && switch_usb_gadget status
+```
+
+After confirming the switch succeeded and the UVC backend exited, restore the original application if needed:
+
+```bash
+cd /root/demo
+./start_sensor_demo.sh restart
+```
+
+If networking is not needed, `switch_usb_gadget stop` also exits UVC. Switching neither restarts the original application nor changes the boot default.
+
+## 4. Networking, ADB, and Storage
+
+### NCM / RNDIS / ECM Networking
+
+The factory board address is `192.168.7.2/24`. Set the computer to obtain an address automatically; the allocation range is `192.168.7.10–192.168.7.100`. No default gateway, DNS, or automatic Internet sharing is provided. This is separate from Ethernet addressing; avoid conflicting routes for the same subnet. See [First Power-On](../getting-started/first-boot.md) for browser access.
+
+The computer must support the selected protocol. NCM requires CDC NCM support; this page does not certify Windows compatibility. Select legacy RNDIS or ECM manually when needed; there is no automatic fallback. NCM uses the image's existing `usb_f_ncm.ko`. This default change does not rebuild or replace the kernel or establish real-board or computer-side compatibility acceptance.
+
+(usb-network-address)=
+### Change the USB NIC IPv4 Address
+
+The matching new image adds the `ip` subcommand to `switch_usb_gadget`. Older firmware may lack it; check `switch_usb_gadget --help` first. Run the following commands in a **root terminal on the board**. They configure only the USB NIC address shared by NCM/RNDIS/ECM, not wired Ethernet or Wi-Fi, and do not configure USB through `/etc/network/interfaces`.
+
+```bash
+switch_usb_gadget ip
+```
+
+The interactive screen shows the fixed factory settings (`192.168.7.2/24`, DHCP `192.168.7.10–192.168.7.100`), saved settings, and current configuration. Press Enter at the address prompt to accept its default: the saved address if present, or the factory address on first use. A bare IPv4 address uses `/24`; CIDR prefixes from `/8` through `/30` are also accepted. Finally, choose save, apply, or cancel. **Save only is the default**; applying requires additional explicit confirmation.
+
+Alternatively, specify an address directly or restore the factory network settings. Both commands below **save only**:
+
+```bash
+switch_usb_gadget ip --address 192.168.8.2/24
+switch_usb_gadget ip --reset
+```
+
+Run whichever one you need. The tool automatically generates a DHCP range that excludes the board address. To specify a range, supply both `--dhcp-start` and `--dhcp-end`; the range must be in the same subnet and exclude the board address. No default gateway or DNS is offered.
+
+**Saving alone does not reconfigure USB or interrupt the link, requires no acquisition shutdown, and works in any USB mode.** Settings are stored in `/etc/4p-usb-network.json` and used when networking starts at the next boot or on re-entry into NCM/RNDIS/ECM. The file survives reboot, but not necessarily firmware reflashing. `/etc/4p-usb-default.json` still stores only the boot mode, not network addresses.
+
+Choose a USB subnet distinct from IPv4 subnets on the board's Ethernet, Wi-Fi, and other interfaces. Immediate application and network-mode entry reject detected board-side overlap before teardown, preventing replies on an independent maintenance link from being routed to USB. Save-only does not check live interfaces; resolve conflicts before enabling networking. Check computer-side route conflicts separately.
+
+For immediate application, append `--apply` to the address command or `--reset`. Choose one as needed:
+
+```bash
+switch_usb_gadget ip --address 192.168.8.2/24 --apply
+switch_usb_gadget ip --reset --apply
+```
+
+```{warning}
+`--apply` is valid only while the current function is NCM, RNDIS, or ECM. It retains that mode and uses the existing manager switch path, reconfiguring USB and disconnecting existing links. Use independent Ethernet or debug UART. Follow this page's pre-switch instructions: stop recording normally, wait for saving to finish, exit acquisition applications, and keep `cam-service` running. Immediate application over USB SSH is refused unless `--allow-disconnect` is explicit. That flag only accepts disconnection; it neither ensures recovery nor bypasses acquisition checks.
+```
+
+After application, renew the computer's DHCP lease or disable and re-enable the USB adapter. For a static computer address, choose a different address in the board's new subnet and leave gateway and DNS blank. Reconnect the browser or SSH using the new board address. In `status`, `network.saved` and `network.active` distinguish saved settings from the last successfully configured profile; the latter does not establish computer reachability. This guidance does not establish new hardware verification or remote publication of a release.
+
+### ADB
+
+After selecting ADB, run `adb devices` on the computer and use `adb shell` once the device is recognized. Do not assume an Android-style authorization prompt. Return to networking or stop USB when finished.
+
+### MSD Storage
+
+Before first use, create the dedicated `128 MiB` FAT image `/root/usb-share.img`. Existing files are not overwritten:
 
 ```bash
 switch_usb_gadget init-msd
 switch_usb_gadget msd
 ```
 
-To allow computer writes, explicitly run `switch_usb_gadget msd --writable`. The image must not be mounted or used by a local process. The tool checks loop ownership and direct open users, but users must maintain exclusivity. Never mount or modify the backing file locally while exported, even when the computer sees a read-only disk.
+This is not the whole eMMC, TF card, or recordings directory, and recordings are not copied into it automatically. For computer writes, use `switch_usb_gadget msd --writable`. Do not mount or modify the image on the board while it is exported.
 
-To finish writable export, **safely eject the disk on the computer and wait for completion first**, then run:
-
-```bash
-switch_usb_gadget rndis --host-ejected
-# Or stop only the current function: switch_usb_gadget stop --host-ejected
-```
-
-`--host-ejected` is the user's acknowledgement that computer-side ejection completed; the board cannot verify it automatically. Never use it to bypass an unejected disk. Unplugging or stopping a service is not a substitute for safe ejection. Ejection is also recommended for read-only export.
-
-## 3. Boot Default and Stopping
-
-Only Host, RNDIS, or ECM can be saved as the boot default. Saving does not switch the current function:
+When finished writing, **safely eject on the computer and wait for completion**, then run:
 
 ```bash
-switch_usb_gadget set-default rndis
-# ecm is also allowed; Host requires confirmed wiring and power:
-# switch_usb_gadget set-default host --host-power-confirmed
+switch_usb_gadget ncm --host-ejected
 ```
 
-The setting is stored in `/etc/4p-usb-default.json`. The sole boot entry `/etc/init.d/S99usb.sh` reads it through `switch_usb_gadget boot`. The factory candidate defaults to RNDIS. Boot networking is independent of sensor applications and does not take camera ownership. UVC, ADB, and MSD are not boot defaults, avoiding unexpected camera takeover, debugging, or disk exposure. Building a new image does not change an already-flashed device's default.
+To stop without selecting a NIC, use `switch_usb_gadget stop --host-ejected`. `--host-ejected` confirms ejection; it does not perform it. Ejection is also recommended for read-only storage.
 
-`switch_usb_gadget stop` unbinds/removes the owned function and gracefully stops its backend. Writable MSD still requires safe ejection and `--host-ejected`. `stop` does not change the persistent default or guarantee a change from Host to Device. Failures are reported explicitly. Once a transition is host-visible, the tool does not pretend the previous function was automatically restored; inspect and recover using the independent maintenance connection.
+## 5. Boot Default and Stopping
 
-## 4. Verification Boundaries
+```bash
+switch_usb_gadget set-default ncm
+```
 
-An image containing the tools, backend, and matching dependencies is not proof of flashing or real-board acceptance. Confirm Host peripheral enumeration, RNDIS/ECM addressing and actual bidirectional transfers, four-camera UVC reception, ADB connectivity, MSD read/write/ejection, repeated switching, and reboot defaults on a matching board and computer. Existing USB state-dependent/asymmetric bidirectional throughput and re-enumeration issues do not close automatically, and no sustained-performance guarantee is made. See {ref}`Capability and Verification Boundaries <capability-verification-boundary>`.
+You can also save `rndis` or `ecm`; saving `host` requires `--host-power-confirmed`. This affects the next boot, not the current function. UVC, ADB, and MSD cannot be boot defaults.
+
+The setting is stored in `/etc/4p-usb-default.json` and read by `/etc/init.d/S99usb.sh`. Installer updates preserve an existing boot choice. The matching new image candidate explicitly sets its factory default to NCM; this neither overwrites existing devices' saved choices nor changes the contents of previously published image downloads. Normal use does not require running `boot` or rerunning startup scripts. `boot` actually reconfigures USB; it is not a query.
+
+`switch_usb_gadget stop` stops the current function and tool-started backend. It does not change the default or guarantee a change from Host to Device.
+
+## 6. Status and Troubleshooting
+
+```bash
+switch_usb_gadget status
+switch_usb_gadget --help
+```
+
+| Status field | Interpretation |
+|---|---|
+| `role` / `requested` | Current Host/Device role / requested function |
+| `bound` | Device usually binds to `35100000.usb`; Host needs no binding |
+| `udc_state` | `configured`: the computer selected a configuration; `not attached`: disconnected |
+| `speed` | `super-speed` is negotiated speed; `UNKNOWN` means unconfirmed. Neither establishes sustained throughput |
+| `backend` / `default.mode` | Associated backend process / saved boot default |
+| `network.saved` | Saved USB IPv4/DHCP settings, used on the next entry into networking |
+| `network.active` | Last successfully configured network profile, not a live connectivity or computer-reachability assertion |
+
+Follow the error: exit the occupying program, use independent management, check power, or eject the disk first. Backend logs are in `/run/4p-usb/backend.log` and do not survive reboot. Do not bypass checks by force-killing, deleting ownership records, or writing GPIOs. After a failure, use `status` to inspect the actual state rather than assuming the old function was restored.
+
+`--allow-disconnect` only accepts loss of USB SSH; it provides no automatic recovery and bypasses no other checks. An independent maintenance connection is still needed.
+
+The NCM default and integrated kernel module do not establish computer-side enumeration, video reception, storage operations, sustained throughput, repeated-switching, or reboot acceptance. Existing RNDIS checks do not certify NCM. See {ref}`Capability and Verification Boundaries <capability-verification-boundary>`.
+
+(usb-uvc-development)=
+## 7. Modify and Rebuild UVC
+
+**Camera acquisition, mosaic processing, and JPEG encoding run in a board-side userspace application, not the kernel.** The standalone `/usr/bin/x5-uvc-mosaic` produces USB video; a browser can provide controls but cannot replace it. Sources and tools are under `scripts/env_setup/x5_usb/` in the public non-ROS Demo repository:
+
+| Public file | Modification entry points and responsibilities |
+|---|---|
+| [`uvc_mosaic.cpp`](https://github.com/Hessian-matrix/RoboBaton_4p_demo/blob/V2_main/scripts/env_setup/x5_usb/uvc_mosaic.cpp) | [`Source::Start()`](https://github.com/Hessian-matrix/RoboBaton_4p_demo/blob/V2_main/scripts/env_setup/x5_usb/uvc_mosaic.cpp#L146-L164) configures acquisition; [`Compose()`](https://github.com/Hessian-matrix/RoboBaton_4p_demo/blob/V2_main/scripts/env_setup/x5_usb/uvc_mosaic.cpp#L266-L298) tiles the four images; [`Encoder`](https://github.com/Hessian-matrix/RoboBaton_4p_demo/blob/V2_main/scripts/env_setup/x5_usb/uvc_mosaic.cpp#L340-L423) uses hardware JPEG encoding; `FixedControl()` / `Gadget` handle UVC negotiation and output |
+| [`build_uvc.sh`](https://github.com/Hessian-matrix/RoboBaton_4p_demo/blob/V2_main/scripts/env_setup/x5_usb/build_uvc.sh) | Standalone cross-build entry; does not rebuild producer libraries |
+| [`switch_usb_gadget`](https://github.com/Hessian-matrix/RoboBaton_4p_demo/blob/V2_main/scripts/env_setup/x5_usb/switch_usb_gadget) | Manages USB functions and backend start/stop; [`uvc()`](https://github.com/Hessian-matrix/RoboBaton_4p_demo/blob/V2_main/scripts/env_setup/x5_usb/switch_usb_gadget#L384-L415) creates UVC descriptors and launches the program |
+| [`install.py`](https://github.com/Hessian-matrix/RoboBaton_4p_demo/blob/V2_main/scripts/env_setup/x5_usb/install.py) | `install(root, package)` installs staged artifacts into an offline rootfs and generates the USB manifest |
+| [`S98rootfs.sh`](https://github.com/Hessian-matrix/RoboBaton_4p_demo/blob/V2_main/scripts/env_setup/x5_usb/S98rootfs.sh) / [`S99usb.sh`](https://github.com/Hessian-matrix/RoboBaton_4p_demo/blob/V2_main/scripts/env_setup/x5_usb/S99usb.sh) | Prepare the root filesystem / start USB using the saved default |
+
+Online source links point to `V2_main` and become accessible only after that branch and the corresponding Demo source revision are pushed; see the Demo README for local file links. These files are not root CMake targets. Rebuilding `sensor_demo`, the browser frontend, or other mosaic examples does not update UVC.
+
+### Standalone Build
+
+Run on the development host from the **`RoboBaton_4p_demo` root**; Go is not needed:
+
+```bash
+SDK_ROOT=/path/to/platform_source_code # replace with the X5 SDK source tree matching the target system
+USB_DIR=scripts/env_setup/x5_usb
+OUTPUT_DIR=build_uvc
+mkdir -p "$OUTPUT_DIR"
+bash "$USB_DIR/build_uvc.sh" "$SDK_ROOT" "$OUTPUT_DIR/x5-uvc-mosaic" \
+  --sc132-include "$PWD/include" --producer-lib "$PWD/lib"
+```
+
+You must provide matching SDK `hbre/libmm/inc` headers (including `hb_media_codec.h`), real AArch64 `libmultimedia.so.1` / `libhbmem.so.1`, and the Demo's matched ABI3 headers and `libsc132.so.3`. Add `--sdk-lib-dir /path/to/sdk/lib` if SDK libraries are outside the default search locations. Optional `--cxx /path/to/aarch64-linux-gnu-g++` and `--sysroot /path/to/sysroot` select the toolchain. **The compiler and sysroot must match**; do not mix arbitrary toolchain headers and libraries. The script does not download the SDK, rebuild/copy producers, or deploy to a board. See [Building the Public Demo Source](../development/open-source-build.md) for general application builds.
+
+### Install into an Offline System Image
+
+In the same terminal, stage the three runtime scripts beside the binary, then run the installer:
+
+```bash
+cp "$USB_DIR/switch_usb_gadget" "$USB_DIR/S98rootfs.sh" \
+  "$USB_DIR/S99usb.sh" "$OUTPUT_DIR/"
+python3 "$USB_DIR/install.py" \
+  --rootfs /path/to/OFFLINE-rootfs --package "$OUTPUT_DIR"
+```
+
+Replace the example rootfs path with an unpacked **offline SDK rootfs**. `--package` names the directory containing the binary and the three scripts, not the binary itself. The installer rejects `/`: it is not for a running system and does not upload, flash, or reboot a board. The offline image must already provide Python3, `adbd`, `dnsmasq`, complete `/root/demo/lib`, and SDK runtime dependencies; the installer does not supply these dependencies. Preserve SDK hbre partition libraries, relative SONAME links, and matching dependencies.
+
+### Update an Existing Board
+
+| Change | What to update |
+|---|---|
+| Tile order or image processing, keeping the output profile unchanged | Rebuild and replace `x5-uvc-mosaic`; mosaic logic is compiled into the executable, not a separate SO |
+| Camera-library internals | If ABI and dependencies remain compatible, update the matching `libsc132.so.3` real file, links, and dependencies under `/root/demo/lib` as a set; other camera applications use this library too |
+| Resolution, frame rate, or format | Align backend acquisition, mosaic/encoder buffers, UVC negotiation, manager `uvc()` descriptors, and the UVC profile in the installer and runtime manifests; replacing an SO alone is insufficient |
+
+**With an unchanged output profile and existing kernel/device-tree support, application-logic changes normally do not require reflashing.** Use independent Ethernet or debug UART. Stop recording and wait for saving to finish, exit other acquisition applications normally, then stop UVC with `switch_usb_gadget stop`. Confirm the backend exited and keep `cam-service` running.
+
+Back up old programs, scripts, libraries, and manifests. Stage replacements on the destination filesystem, check architecture, dependencies, and SHA-256, then use atomic renames rather than overwriting executables or SOs in use. Preserve complete libraries and SONAME links. Synchronize `/usr/share/4p-usb/manifest.json` and affected application-package manifests/provenance with the actual artifacts and profile, rather than manually changing hashes alone. The manager launches the fixed `/usr/bin/x5-uvc-mosaic` path; moving it also requires changing that launch path.
+
+Restart UVC, let the computer re-enumerate, then check output format, all four images, and return to the original application. Restore backups on failure. Kernel-driver or device-tree support changes require separate updates to those system components. This section does not establish remote publication, board deployment, video reception, or mode-switching acceptance.

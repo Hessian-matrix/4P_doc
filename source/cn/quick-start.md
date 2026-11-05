@@ -62,14 +62,20 @@ ffprobe -v error -rtsp_transport tcp \
 
 ## 3. ROS2 最短运行
 
-在 X5 SSH 终端执行：
+先等待现有录制收尾，再在 X5 SSH 终端正常停止开机自启的 non-ROS。仅停止成功且旧采集进程退出后继续；超时或失败时不要启动 ROS2，保持 `cam-service` 运行：
+
+```bash
+cd /root/demo && ./start_sensor_demo.sh stop
+```
+
+然后加载 ROS2 环境并启动：
 
 ```bash
 source /root/ros2_demo/install/robobaton_ros2_env.bash
 ros2 launch robobaton_4p_ros2_demo robobaton_sensors.launch.py
 ```
 
-另开一个 X5 终端，加载同一环境后检查：
+默认 FastDDS profile 仅启用 SHM，限本机，不提供跨电脑 UDP 发现或传输。另开一个 X5 终端，加载同一环境后检查：
 
 ```bash
 source /root/ros2_demo/install/robobaton_ros2_env.bash

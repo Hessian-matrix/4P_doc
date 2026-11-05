@@ -7,7 +7,7 @@ This page helps first-time RoboBaton 4P users complete pre-power-on checks, view
 Power, camera cables, UART, and thermal boundaries are governed by [Hardware Connection and Safety](hardware-and-safety.md); see the {ref}`Interface Wiring Diagram <wiring-diagram>` for interface locations, pin order, and mating connections. Before powering on, confirm:
 
 - Camera FPC/coaxial cables are connected with power off; camera/FPC/coaxial cables do not support hot-plug and must be disconnected from power before plug/unplug.
-- XT30 input is `12–27 V DC`: check physical polarity first. USB-C is a data interface, not an assumed power input. Full-load current, the USB-C power role, and fan thresholds still await confirmation; use only a power supply and system confirmed compatible by product support.
+- The confirmed XT30 input range is `9~27V DC`: check physical polarity first. USB-C is a data interface, not an assumed power input. Full-load current, the USB-C power role, and fan thresholds still await confirmation; use only a power supply and system confirmed compatible by product support.
 - The fan is connected at the factory. Keep heatsink, fan, and airflow clear; check readiness from actual system status.
 - UART1 uses GH1.25 4-pin and UART7 GH1.25 5-pin connectors, retaining `3.3V` logic. DEBUG_UART uses SH1.0 3-pin, `1.8V`, `921600` baud. Check pin order against the diagram and physical labeling; leave generic USB-UART VCC disconnected and wire with power off after checking common ground.
 - UART power-pin ratings and hot-plug conditions await confirmation. Wire with power off by default; do not power peripherals or back-feed power.
@@ -18,17 +18,19 @@ Confirm V2 power, harnesses, and actual pinout first, then complete camera, powe
 
 Boards ship with the release system pre-flashed and `sensor_demo` boot autostart configured. Once the system, network, and sensors are ready, use the browser entry below; normal use does not require reflashing, installing the runtime, or running autostart `enable` again. The default startup acquires and previews data without recording automatically; start recording from the page when needed. Do not manually launch a second `sensor_demo`, `cam_demo`, or ROS2 camera node.
 
+The current matching image preinstalls `/root/demo`, `/root/ros2_demo/install`, and `/opt/ros/humble`. ROS2 does not autostart or need first-boot extraction. Boot defaults are four cameras at `1280x1088@30fps`, IMU `800Hz`, Web on, RTSP off, and observer/host timestamps. See [System Flashing](../ops/system-flashing.md) for image contents and public download status.
+
 ## 3. Network and Login
 
-Wired Ethernet is recommended for first login. To configure the on-board Wi-Fi as an AP hotspot or connect to a router, see [Wi-Fi Configuration](wifi-configuration.md); switching Wi-Fi mode resets `wlan0`, so do not rely on the same Wi-Fi SSH session to complete the switch.
+The matching new image defaults to the `RoboBaton-4P` WPA2 hotspot on 5 GHz channel `36` (20 MHz, non-DFS) when no Wi-Fi state exists. Connect a 5 GHz-capable computer or phone using the hotspot password supplied with the device, obtain an address automatically, then open `http://192.168.5.1/` for preview and recording. AP supports manual selection of 2.4 GHz or 5 GHz, one band at a time, without automatic fallback; if the client or regulations do not permit the current band, reconfigure through wired Ethernet or the debug console. Normal reboots preserve existing AP/STA, band/channel, or manual disable choices, while reflashing system restores the new image's 5 GHz default. Older firmware may lack this policy; this guidance does not establish replacement of published downloads. See {ref}`Factory Hotspot and Quick Connection <wifi-factory-hotspot>` for the full channel list, regulatory limits, the `12`-hour DHCP lease, configuration, and recovery. Switching Wi-Fi mode disconnects the same Wi-Fi SSH session, so do not rely on it to complete the change.
 
-For a direct USB computer connection, matching systems default to a USB3 RNDIS NIC, with addressing independent of wired Ethernet. It is not a default USB camera or storage drive. Updated matching images provide Host/Device switching; application updates alone do not add it to older images. Read [USB Interface Functions and Switching Limits](../usage/usb-gadget-switch.md) first; do not mix legacy scripts or switch over the only USB management path.
+For a direct USB computer connection, the matching new image defaults to a USB3 CDC NCM NIC at factory board address `192.168.7.2/24`; set the computer to obtain an address automatically. The computer must support CDC NCM; Windows compatibility is not certified. RNDIS/ECM remain manually selectable, without automatic fallback. Older firmware may still default to RNDIS or lack NCM; check `switch_usb_gadget --help` first. Installer updates preserve an existing boot choice. USB addressing is independent of wired Ethernet. It is not a default USB camera or storage drive. To change the address, see [Change the Device IP Address](#change-the-device-ip-address) below; for Host/Device and function switching, see [USB Interface Functions and Switching Limits](../usage/usb-gadget-switch.md). Do not switch over the only USB management path.
 
-V2 retains factory address `192.168.1.12/24` and the `root` account/password. Network configuration continues to use `/etc/network/interfaces`. These are public factory defaults, not experiment-device addresses or credentials.
+V2 retains factory wired Ethernet address `192.168.1.12/24` and the `root` account/password. Wired Ethernet configuration continues to use `/etc/network/interfaces`. These are public factory defaults, not experiment-device addresses or credentials.
 
 | Item | Factory default |
 |---|---|
-| IP | `192.168.1.12` |
+| Wired Ethernet IP | `192.168.1.12` |
 | User | `root` |
 | Password | `root` |
 
@@ -59,12 +61,12 @@ Windows GUI configuration:
 
 ### View Sensors and Record in the Browser
 
-After establishing network connectivity, enter `http://192.168.1.12/` in the host browser's address bar to open the device overview. If the board IP has changed, use `http://<device-ip>/`. HTTP defaults to port `80`; use the actual port if explicitly changed. Page assets are embedded in the application, requiring no Internet, plugin, or camera/microphone permissions; online documentation links need Internet access. **No prior SSH login or manual application launch is required.**
+After establishing connectivity, open the board HTTP address for that connection: `http://192.168.5.1/` for the factory hotspot, `http://192.168.1.12/` for wired Ethernet, or `http://192.168.7.2/` for the factory USB NIC. Use the actual board address after changing it or when using STA. HTTP defaults to port `80`; use the actual port if explicitly changed. Page assets are embedded in the application, requiring no Internet, plugin, or camera/microphone permissions; online documentation links need Internet access. **No prior SSH login or manual application launch is required.**
 
 **Preview on a phone or tablet**:
 
-1. Connect the board to the LAN and the phone or tablet to the same network with access to the board, such as Wi-Fi on the same router. The board itself does not need Wi-Fi. The mobile device must be able to reach the board IP; guest networks or AP client isolation may block access.
-2. Open `http://192.168.1.12/` directly in the mobile browser, using the actual address/port if changed. No dedicated app or SSH login is required.
+1. Connect directly to the board's factory hotspot, or connect the board to the LAN and the phone/tablet to Wi-Fi on the same router. The latter does not require Wi-Fi on the board, but the devices must be able to reach each other; guest networks or AP client isolation may block access.
+2. On the board's factory hotspot, open `http://192.168.5.1/`. Over the LAN, use the board's current LAN address; its factory Ethernet address is `http://192.168.1.12/`. Use the actual address/port if changed. No dedicated app or SSH login is required.
 3. Wait for four-camera and IMU updates. Narrow screens stack panels vertically for scrolling; landscape provides a wider preview. If autoplay is blocked, tap “Click to play” on the image.
 
 Mobile preview is for viewing the interface, not recording on the phone or proving synchronization/performance. Smooth playback depends on wireless networking, device performance, and browser WebRTC/H.264 decoding support; smooth four-stream playback is not guaranteed on every phone or browser. Recording still runs on the board, and closing the page does not stop it. Use only a trusted LAN; do not expose the unauthenticated page to the Internet.
@@ -82,7 +84,7 @@ Power-on Web interface example (English UI): four cameras, attitude, raw six-axi
 3. **Start recording**: click Start Recording, wait for device confirmation, and observe actual state, device-timed duration, and written size. If state is not ready or an error appears, inspect the message instead of clicking repeatedly.
 4. **Stop and check the result**: click Stop Recording, wait for draining and finalization, then expand Recording Details and Usage to inspect the output path and final result. Only `published_complete`, `data_complete=true`, and `cleanup_complete=true` indicate a completely published session; acknowledgment of a stop request does not mean the files are finished. Paths are on the board, not in the browser's download folder.
 
-Standard-package runtime storage is `/root/demo/bin/recordings`; TF storage is `/mnt/sdcard/recordings`. The device generates session names. Closing or refreshing the page or losing the network **does not stop device recording**; reopen the page and use Query Status to confirm. Stopping recording leaves cameras, IMU, and preview running; switching applications also requires a graceful stop of the whole `sensor_demo`. See [Web Recording Control](../usage/non-ros-demo.md#web-recording-control) and [Saving Data](../usage/save-data-guide.md#dynamic-web-sessions) for details. For recording that requires UTC, confirm synchronization per [NTP Sync](../time-sync/ntp-sync.md) before starting.
+Selecting Runtime / eMMC in Web uses the fixed absolute root `/root/demo/save_data`, independent of the executable location: bag files use `/root/demo/save_data/session-<id>.bag`, and MP4 sessions use `/root/demo/save_data/session-<id>`. TF storage remains `/mnt/sdcard/recordings`. The device generates session names. Closing or refreshing the page or losing the network **does not stop device recording**; reopen the page and use Query Status to confirm. Stopping recording leaves cameras, IMU, and preview running; switching applications also requires a graceful stop of the whole `sensor_demo`. See [Web Recording Control](../usage/non-ros-demo.md#web-recording-control) and [Saving Data](../usage/save-data-guide.md) for details. For recording that requires UTC, confirm synchronization per [NTP Sync](../time-sync/ntp-sync.md) before starting.
 
 ```{warning}
 The page has no authentication: anyone who can reach the device can view sensors and start/stop recording. Use only a trusted isolated LAN; do not expose it to the Internet or untrusted networks.
@@ -90,7 +92,29 @@ The page has no authentication: anyone who can reach the device can view sensors
 
 ### Change the Device IP Address
 
-To adjust the device IP, first SSH into the device using the current IP, then modify the system network configuration:
+Identify the interface first: USB networking and wired Ethernet have independent addresses and use different configuration methods. Run USB configuration commands in a **root terminal on the board**, not directly in a computer terminal.
+
+#### USB Networking (NCM / RNDIS / ECM)
+
+The matching new image provides the `ip` subcommand; on older firmware, check `switch_usb_gadget --help` for support first. SSH into the board using a currently reachable address, then open interactive configuration:
+
+```bash
+switch_usb_gadget ip
+```
+
+Press Enter at the address and DHCP prompts to accept the displayed defaults: saved settings if present, or factory settings on first use. At `save / apply / cancel [save]`, Enter means **save only**. Alternatively, save a specified address directly, for example:
+
+```bash
+switch_usb_gadget ip --address 192.168.8.2/24
+```
+
+Saving alone does not interrupt the current USB link or acquisition. Settings are written to `/etc/4p-usb-network.json`, survive reboot, and are used the next time NCM/RNDIS/ECM starts. This **does not modify `/etc/network/interfaces`**. Avoid subnet conflicts with board Ethernet, Wi-Fi, and existing computer routes.
+
+Immediate application disconnects USB. Stop acquisition normally first and use independent Ethernet or debug UART; do not choose `apply` over the only USB SSH path. For full `--apply`, DHCP range, factory-address reset, status, and computer lease-renewal/reconnection instructions, see {ref}`Change the USB NIC IPv4 Address <usb-network-address>`.
+
+#### Wired Ethernet
+
+To adjust the wired Ethernet IP, first SSH into the device using a currently reachable address, then modify the system network configuration:
 
 ```bash
 X5_IP=192.168.1.12  # change to the actual board address
@@ -145,7 +169,7 @@ passwd
 If the user has changed the IP and needs to enter the system through the debug port to check the address, only DEBUG_UART can be used: `1.8V` logic, debug terminal baud rate `921600`, board TX to adapter RX, board RX to adapter TX, with common ground. Do not use a `3.3V` or `5V` USB-UART on DEBUG_UART.
 
 ```{note}
-Factory pre-flashing and public image downloads are separate: the supplied release system provides the startup workflow above, without implying a public download is available. See [System Flashing](../ops/system-flashing.md) for V2 public-download and recovery status. Official flashing overwrites on-board eMMC and user data and is not a prerequisite for normal power-on use.
+The supplied release system provides the startup workflow above without reflashing first. If reflashing is needed, download [4P_V2.0.0_image.tar.gz](https://www.hessian-matrix.com/wp-content/uploads/2026/automaticupdates/4P_V2.0.0_image.tar.gz); confirm the release archive's SHA-256 and supported hardware with Product Support before flashing. Current firmware supports holding SW1 during power-on or reset, then flashing with XBurn over USB3 Fastboot, without a debug UART connection. See [System Flashing](../ops/system-flashing.md) for the procedure and image/hardware compatibility requirements. Back up data before flashing: official flashing overwrites on-board eMMC and user data and is not a prerequisite for normal power-on use.
 ```
 
 ### Debug-Console Passwordless Login
@@ -158,7 +182,7 @@ uart-autologin disable   # Require username and password at the next console log
 uart-autologin enable    # Enter root without a password at the next console login
 ```
 
-Fresh userdata defaults to passwordless login. Anyone with DEBUG_UART access can obtain root while enabled; use only in trusted physical environments. The choice persists across reboots in `/userdata/uart-autologin/state` and does not affect existing sessions, SSH, or UART1/UART7. If the command is missing, contact product support; copying Demo scripts alone does not enable the feature.
+The matching new implementation defaults to passwordless login. Anyone with DEBUG_UART access can obtain root while enabled; use only in trusted physical environments. The choice is stored in system-partition `/etc/4p/uart-autologin/state`: normal reboot retains it, while reflashing system restores image defaults without importing old userdata policy. Existing sessions, SSH, and UART1/UART7 are unaffected. Older firmware may still use userdata. If the command is missing, contact product support; copying Demo scripts alone does not enable the feature.
 
 ## 4. Minimal System Check
 
@@ -189,9 +213,13 @@ non-ROS `/root/demo`:
 ROS2 `/root/ros2_demo/install`:
 
 ```bash
-/root/ros2_demo/install/lib/robobaton_4p_ros2_demo/robobaton_sensors_node --version
-/root/ros2_demo/install/lib/robobaton_4p_ros2_demo/robobaton_imu_rate_monitor --version
+/root/ros2_demo/install/robobaton_ros2_env.bash \
+  /root/ros2_demo/install/lib/robobaton_4p_ros2_demo/robobaton_sensors_node --version
+/root/ros2_demo/install/robobaton_ros2_env.bash \
+  /root/ros2_demo/install/lib/robobaton_4p_ros2_demo/robobaton_imu_rate_monitor --version
 ```
+
+Even version queries require ROS2 underlay/overlay dependencies. Do not directly run install ELF files from an unconfigured shell. If `libimage_transport.so` or another library is missing, first use the wrapper above rather than copying a single SO from another package.
 
 Software version queries identify the deployed package and may omit the `v` prefix; see [Release, License, and Support](../release-and-support.md) for current software releases. Documentation revisions follow that page's independent [Documentation Version Policy](../release-and-support.md#documentation-version-policy) and need not equal the software query results.
 

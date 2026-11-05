@@ -51,7 +51,7 @@ The script is at `RoboBaton_4p_demo/scripts/env_setup/configure_x5_ptp_master.sh
 
 ```bash
 X5_IP=192.168.1.12  # change to the actual board address
-git clone https://github.com/Hessian-matrix/RoboBaton_4p_demo.git
+git clone --branch V2_main https://github.com/Hessian-matrix/RoboBaton_4p_demo.git
 cd RoboBaton_4p_demo
 scp scripts/env_setup/configure_x5_ptp_master.sh root@${X5_IP}:/root/configure_x5_ptp_master.sh
 ```

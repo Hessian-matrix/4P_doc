@@ -32,6 +32,8 @@ command -v ntpq
 
 进程存在不等于已同步。若系统没有这些工具或开机服务，先联系技术支持确认该系统是否提供此功能；不要把复制 Demo 当作启用 NTP 的步骤。
 
+当前烧录镜像已确认开机启动 `ntpd` 并提供 `ntpq`。未取得授时时，实板可出现初始年份仍为 `2000`、`ntpq -pn` 无 association、`ntpq -c rv` 显示 `leap_alarm` / `sync_unspec` / `stratum=16`；这是未同步，不是传感器采集失败。先检查网络、DNS 与所选时间源，或按下节配置可信局域网源，完成同步后再录制；不要在采集中直接校时。
+
 ## 更换 NTP 服务器
 
 以下操作均在板端以 `root` 执行。先退出 demo、ROS2 节点和其他时间戳敏感任务，保持 `cam-service` 运行。不要同时运行另一个校准 `CLOCK_REALTIME` 的服务；PTP 的使用方向见[时间同步](system-time-sync.md)。
@@ -158,7 +160,7 @@ scripts/env_setup/x5_sync_time.sh
 
 ```bash
 X5_IP=192.168.1.12  # 改成实际板卡地址
-git clone https://github.com/Hessian-matrix/RoboBaton_4p_demo.git
+git clone --branch V2_main https://github.com/Hessian-matrix/RoboBaton_4p_demo.git
 cd RoboBaton_4p_demo
 scp scripts/env_setup/x5_sync_time.sh root@${X5_IP}:/root/x5_sync_time.sh
 ```

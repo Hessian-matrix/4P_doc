@@ -11,8 +11,10 @@ RoboBaton 4P V2 产品文档
 代码仓库
 --------
 
-- non-ROS Demo：`RoboBaton_4p_demo <https://github.com/Hessian-matrix/RoboBaton_4p_demo>`_
-- ROS2 Demo：`RoboBaton_4P_ROS2_demo <https://github.com/Hessian-matrix/RoboBaton_4P_ROS2_demo>`_，发布四目 NV12/raw+compressed 图像、CameraInfo、IMU、温度及 IMU timing topic。
+- non-ROS Demo：`RoboBaton_4p_demo <https://github.com/Hessian-matrix/RoboBaton_4p_demo/tree/V2_main>`_
+- ROS2 Demo：`RoboBaton_4P_ROS2_demo <https://github.com/Hessian-matrix/RoboBaton_4P_ROS2_demo/tree/V2_main>`_，发布四目 NV12/raw+compressed 图像、CameraInfo、IMU、温度及 IMU timing topic。
+
+V2 源码与本文档统一使用 ``V2_main`` 主分支；获取源码时显式选择该分支，不依赖仓库默认分支。
 
 .. toctree::
    :maxdepth: 1

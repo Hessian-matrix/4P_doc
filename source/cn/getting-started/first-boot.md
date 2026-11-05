@@ -7,7 +7,7 @@
 供电、相机线缆、UART 和散热边界以 [硬件连接与安全](hardware-and-safety.md) 为准；接口位置、线序和对插关系见{ref}`接口接线示意图 <wiring-diagram>`。上电前确认：
 
 - 相机 FPC/同轴线已经在断电状态下插好；相机/FPC/同轴线不支持热插拔，插拔前必须断电。
-- XT30 输入为 `12–27 V DC`，先核对实物正负极；USB-C 为数据接口，不将其视为供电输入。满负载电流、USB-C 电源角色和风扇阈值仍待确认，只使用产品支持确认匹配的电源与系统。
+- XT30 输入为已确认的 `9~27V DC`，先核对实物正负极；USB-C 为数据接口，不将其视为供电输入。满负载电流、USB-C 电源角色和风扇阈值仍待确认，只使用产品支持确认匹配的电源与系统。
 - 风扇出厂已接好；保持散热器、风扇与风道畅通，依实际系统状态检查是否就绪。
 - UART1 为 GH1.25 4pin，UART7 为 GH1.25 5pin，逻辑电平保持 `3.3V`；DEBUG_UART 为 SH1.0 3pin、`1.8V`、`921600`。按接线图和实物标识核实线序；通用 USB-UART 不接 VCC，核实共地后断电连接。
 - UART 供电脚额定值与热插拔条件尚待确认，默认断电接线，不向外设供电或反灌。
@@ -18,17 +18,19 @@
 
 发布版系统随板预烧录，并已配置 `sensor_demo` 开机自启动。等待系统、网络和传感器就绪后，即可通过下文网页入口使用；正常使用无需重新烧录、安装运行包或再次执行自启动 `enable`。默认启动用于采集与预览，不会自动录包；需要保存时在网页中开始录制。不要再手动启动第二个 `sensor_demo`、`cam_demo` 或 ROS2 相机节点。
 
+当前匹配镜像同时预装 `/root/demo`、`/root/ros2_demo/install` 和 `/opt/ros/humble`；ROS2 不自启，也不需要首次开机解压安装。开机默认是四路 `1280x1088@30fps`、IMU `800Hz`、Web 开、RTSP 关、observer/host 赋时。镜像组成与公开下载状态见 [系统烧录](../ops/system-flashing.md)。
+
 ## 3. 网络和登录
 
-首次登录建议使用有线以太网。需要把板载 Wi-Fi 配置成 AP 热点或连接路由器时，见 [Wi-Fi 配置](wifi-configuration.md)；切换 Wi-Fi 模式会重置 `wlan0`，不要依赖同一条 Wi-Fi SSH 会话完成切换。
+配套新镜像在没有既有 Wi-Fi 状态时默认开启 `RoboBaton-4P` WPA2 热点，使用 5 GHz 信道 `36`（20 MHz、非 DFS）；支持 5 GHz 的电脑或手机使用随设备提供的热点密码连接，并自动获取地址后，可打开 `http://192.168.5.1/` 预览和录包。AP 可手动选择 2.4 GHz 或 5 GHz，一次只运行一个频段，不自动回退；客户端或法规不允许当前频段时，通过有线以太网或调试串口重新配置。普通重启保留已有 AP/STA、频段/信道或手动关闭选择，重烧 system 恢复新镜像的 5 GHz 默认值；较旧固件可能没有此策略，本说明不表示已发布下载已替换。完整信道、监管限制、`12` 小时 DHCP 租期、配置与恢复方法见{ref}`出厂热点与快速连接 <wifi-factory-hotspot>`。切换 Wi-Fi 模式会断开同一条 Wi-Fi SSH，不要依赖它完成切换。
 
-需要 USB 直连电脑时，匹配系统默认配置 USB3 RNDIS 网卡；它与有线以太网地址独立，不是默认 USB 摄像头或 U 盘。更新后的匹配镜像提供 Host/Device 切换工具，旧镜像不能仅靠应用更新获得；先看 [USB 接口功能与切换边界](../usage/usb-gadget-switch.md)，不要混用旧脚本或在唯一 USB 管理链路上切换。
+需要 USB 直连电脑时，配套新镜像出厂默认配置 USB3 CDC NCM 网卡，出厂板端地址为 `192.168.7.2/24`，电脑选择自动获取地址。电脑必须支持 CDC NCM，Windows 兼容性尚未认证；RNDIS/ECM 仍可手动选择，不自动回退。较旧固件可能仍默认 RNDIS 或不支持 NCM，先查看 `switch_usb_gadget --help`；安装更新保留已有的开机选择。USB 地址与有线以太网独立，不是默认 USB 摄像头或 U 盘。修改地址见下文[修改设备 IP 地址](#修改设备-ip-地址)；切换 Host/Device 和具体 USB 功能见 [USB 接口功能与切换边界](../usage/usb-gadget-switch.md)。不要在唯一 USB 管理链路上切换。
 
-V2 保持出厂地址 `192.168.1.12/24` 和 `root` 账号/密码，系统网络配置继续使用 `/etc/network/interfaces`。这是公开出厂设置，不是实验设备的实际地址或凭据。
+V2 保持有线以太网出厂地址 `192.168.1.12/24` 和 `root` 账号/密码，有线以太网配置继续使用 `/etc/network/interfaces`。这是公开出厂设置，不是实验设备的实际地址或凭据。
 
 | 项目 | 出厂默认值 |
 |---|---|
-| IP | `192.168.1.12` |
+| 有线以太网 IP | `192.168.1.12` |
 | 用户 | `root` |
 | 密码 | `root` |
 
@@ -59,12 +61,12 @@ Windows 图形界面配置：
 
 ### 通过网页查看传感器与录包
 
-网络连通后，在开发机浏览器地址栏输入 `http://192.168.1.12/`，打开设备总览。若已修改板卡 IP，使用 `http://<设备IP>/`；HTTP 默认端口为 `80`，显式修改端口后使用实际端口。网页资源随程序内嵌，不需要互联网、插件或摄像头/麦克风权限；在线文档链接需要互联网。**无需先 SSH 登录或手动启动程序。**
+网络连通后，在开发机浏览器地址栏输入当前连接对应的板端 HTTP 地址：出厂热点为 `http://192.168.5.1/`，有线以太网为 `http://192.168.1.12/`，出厂 USB 网卡为 `http://192.168.7.2/`。已修改地址或使用 STA 时，使用实际板端地址；HTTP 默认端口为 `80`，显式修改后使用实际端口。网页资源随程序内嵌，不需要互联网、插件或摄像头/麦克风权限；在线文档链接需要互联网。**无需先 SSH 登录或手动启动程序。**
 
 **使用手机或平板进行效果预览**：
 
-1. 将板卡接入局域网，将手机或平板接入与板卡互通的同一网络（例如同一路由器的 Wi-Fi）。无需板卡自身开启 Wi-Fi；移动设备须能够访问板卡 IP，访客网络或 AP 客户端隔离可能阻止连接。
-2. 在移动浏览器直接打开 `http://192.168.1.12/`；若板卡地址或端口已修改，使用实际地址。无需安装专用 App，也不需要 SSH 登录。
+1. 直接连接板卡出厂热点；也可将板卡接入局域网，手机或平板连接同一路由器的 Wi-Fi。后者无需板卡自身开启 Wi-Fi，但须能互访；访客网络或 AP 客户端隔离可能阻止连接。
+2. 连接板卡出厂热点时打开 `http://192.168.5.1/`；经局域网访问时使用板卡当前局域网地址，出厂有线地址为 `http://192.168.1.12/`。地址或端口已修改时使用实际值。无需专用 App 或 SSH 登录。
 3. 等待四路画面和 IMU 更新；手机窄屏纵向排列面板，可上下滚动，横屏可获得更宽的预览。若自动播放被阻止，点击画面中的“点击播放”。
 
 移动预览用于查看效果，不是手机本机录像或同步/性能验收。实际播放流畅度取决于无线网络、设备性能和浏览器 WebRTC/H.264 解码支持，不保证所有手机或浏览器四路同时流畅。录制操作仍在板端执行，关闭网页不会停录；只在可信局域网使用，不要将无认证页面映射到公网。
@@ -82,7 +84,7 @@ Windows 图形界面配置：
 3. **开始录制**：点击“开始录制”，等待设备确认，观察实际状态、设备计时时长及已写入量。状态未就绪或报错时，先查看提示，不要反复点击。
 4. **停止并确认结果**：点击“停止录制”，等待排空与封装完成，再展开“录制详情与使用说明”检查输出路径和最终结果。只有 `published_complete`、`data_complete=true`、`cleanup_complete=true` 才表示会话完整发布；停止请求被接受不等于文件已经完成。路径位于板端，不是浏览器下载目录。
 
-标准包的运行目录为 `/root/demo/bin/recordings`，TF 目录为 `/mnt/sdcard/recordings`，会话名由设备生成。关闭网页、刷新或断网**不会停止设备录制**；重新打开后使用“查询状态”确认。停止录制不会停止相机、IMU 与预览；切换应用时还须正常停止整个 `sensor_demo`。操作细节见 [网页控制录制](../usage/non-ros-demo.md#网页控制录制) 和 [数据保存](../usage/save-data-guide.md#网页动态会话)。需要 UTC 时间的录包，开始前先按 [NTP 同步](../time-sync/ntp-sync.md) 确认授时。
+网页选择“运行目录 / eMMC”时固定保存到 `/root/demo/save_data`，不随可执行文件位置变化：bag 为 `/root/demo/save_data/session-<id>.bag`，MP4 为 `/root/demo/save_data/session-<id>`；TF 目录仍为 `/mnt/sdcard/recordings`，会话名由设备生成。关闭网页、刷新或断网**不会停止设备录制**；重新打开后使用“查询状态”确认。停止录制不会停止相机、IMU 与预览；切换应用时还须正常停止整个 `sensor_demo`。操作细节见 [网页控制录制](../usage/non-ros-demo.md#网页控制录制) 和 [数据保存](../usage/save-data-guide.md)。需要 UTC 时间的录包，开始前先按 [NTP 同步](../time-sync/ntp-sync.md) 确认授时。
 
 ```{warning}
 网页没有身份认证，能够访问设备的人都可以查看传感器和开始/停止录制。只在可信隔离局域网内使用，不要开放到公网或不可信网络。
@@ -90,7 +92,29 @@ Windows 图形界面配置：
 
 ### 修改设备 IP 地址
 
-需要调整设备 IP 时，先用当前 IP SSH 登录设备，再修改系统网络配置：
+先区分需要修改的接口：USB 网卡和有线以太网地址独立，使用不同的配置方式。USB 配置命令须在**板端 root 终端**执行，不是在电脑终端直接执行。
+
+#### USB 网卡（NCM / RNDIS / ECM）
+
+配套新镜像提供 `ip` 子命令，旧固件先用 `switch_usb_gadget --help` 确认是否支持。通过当前可达的地址 SSH 登录板端后，执行交互配置：
+
+```bash
+switch_usb_gadget ip
+```
+
+地址和 DHCP 提示处回车接受显示的默认值；已有保存配置时使用它，首次使用采用出厂值。最后在 `save / apply / cancel [save]` 提示处回车为**仅保存**。也可直接保存指定地址，例如：
+
+```bash
+switch_usb_gadget ip --address 192.168.8.2/24
+```
+
+仅保存不打断当前 USB 连接或采集；配置写入 `/etc/4p-usb-network.json`，重启后保留，在下次启用 NCM/RNDIS/ECM 时使用，**不修改 `/etc/network/interfaces`**。新子网须与板端以太网、Wi-Fi 及电脑已有路由避开冲突。
+
+立即生效会断开 USB，须先正常停采，并使用独立以太网或调试串口；不要在唯一 USB SSH 链路上选择 `apply`。完整的 `--apply`、DHCP 范围、恢复出厂地址、状态查看和电脑续租/重连方法见{ref}`修改 USB 网卡 IPv4 地址 <usb-network-address>`。
+
+#### 有线以太网
+
+需要调整有线以太网 IP 时，先用当前可达地址 SSH 登录设备，再修改系统网络配置：
 
 ```bash
 X5_IP=192.168.1.12  # 改成实际板卡地址
@@ -145,7 +169,7 @@ passwd
 如果用户修改过 IP 且需要通过调试口进入系统查看地址，只能使用 DEBUG_UART：`1.8V` 逻辑，调试终端波特率设置为 `921600`，板端 TX 接适配器 RX，板端 RX 接适配器 TX，并共地。禁止在 DEBUG_UART 使用 `3.3V` 或 `5V` USB-UART。
 
 ```{note}
-出厂预烧录与公开镜像下载是两件事：随板的发布版系统提供上述开机使用流程，不表示已有公开下载。V2 系统镜像的公开下载与恢复步骤仍以[系统烧录](../ops/system-flashing.md)为准；正式烧录会覆盖板载 eMMC 与用户数据，不是正常开机使用的前置步骤。
+随板的发布版系统提供上述开机使用流程，无需先重新烧录。需要重刷时，可下载 [4P_V2.0.0_image.tar.gz](https://www.hessian-matrix.com/wp-content/uploads/2026/automaticupdates/4P_V2.0.0_image.tar.gz)；发布包 SHA-256 与适用硬件须在烧录前向产品支持核对。当前固件支持按住 SW1 上电或复位，再通过 USB3 Fastboot 使用 XBurn 烧录，无需调试串口；操作、镜像与硬件匹配要求见[系统烧录](../ops/system-flashing.md)。烧录前须备份数据；正式烧录会覆盖板载 eMMC 与用户数据，不是正常开机使用的前置步骤。
 ```
 
 ### 调试串口免密登录
@@ -158,7 +182,7 @@ uart-autologin disable   # 下次调试串口登录要求用户名和密码
 uart-autologin enable    # 下次调试串口登录免密进入 root
 ```
 
-全新 userdata 默认启用免密登录；能接触 DEBUG_UART 的人可直接获得 root，仅适用于可信物理环境。选择保存在 `/userdata/uart-autologin/state`，重启后保留，不影响已有会话、SSH 或 UART1/UART7。命令不存在时联系产品支持；仅复制 Demo 脚本不会启用该功能。
+配套新实现缺省启用免密登录；能接触 DEBUG_UART 的人可直接获得 root，仅适用于可信物理环境。选择保存在系统分区 `/etc/4p/uart-autologin/state`：普通重启保留，重烧 system 恢复镜像默认值，不导入旧 userdata 策略。不影响已有会话、SSH 或 UART1/UART7。旧固件可能仍使用 userdata；命令不存在时联系产品支持，仅复制 Demo 脚本不会启用该功能。
 
 ## 4. 最小系统检查
 
@@ -189,9 +213,13 @@ non-ROS `/root/demo`：
 ROS2 `/root/ros2_demo/install`：
 
 ```bash
-/root/ros2_demo/install/lib/robobaton_4p_ros2_demo/robobaton_sensors_node --version
-/root/ros2_demo/install/lib/robobaton_4p_ros2_demo/robobaton_imu_rate_monitor --version
+/root/ros2_demo/install/robobaton_ros2_env.bash \
+  /root/ros2_demo/install/lib/robobaton_4p_ros2_demo/robobaton_sensors_node --version
+/root/ros2_demo/install/robobaton_ros2_env.bash \
+  /root/ros2_demo/install/lib/robobaton_4p_ros2_demo/robobaton_imu_rate_monitor --version
 ```
+
+ROS2 即使只查询版本也需加载 underlay/overlay 依赖。不要在未加载环境的 shell 直接运行 install 内 ELF；缺少 `libimage_transport.so` 等库时，先使用上述 wrapper，不从其他包复制单个 SO。
 
 软件查询结果以已部署包为准，可能不带 `v` 前缀；当前软件发布版本见 [发布、授权与支持](../release-and-support.md)。文档修订号按该页的 [文档版本政策](../release-and-support.md#文档版本政策) 独立维护，不要求与软件查询结果相等。
 

@@ -10,7 +10,7 @@
 
 完整复制必须保留动态库的相对链接：`libNAME.so -> libNAME.so.M -> libNAME.so.M.m.p`，最后一个是唯一实体。使用下文不带解引用选项的 `tar`（或 `cp -a`/`rsync -a`），不要把链接展开。主机运行当前 package/install verifier，检查精确链接目标与 ELF；板端 `sha256sum -c` 仍检查别名解析后的字节，不能单独证明链接元数据正确。non-ROS 旧 provenance 包须用当前脚本重新打包为 v3。
 
-当前 SC132 实体为 `libsc132.so.3.0.0`、符号节点 `LIBSC132_3.0`；PRRTSP 实体为 `libprrtsp.so.2.0.1`、SONAME `libprrtsp.so.2`、符号节点 `LIBPRRTSP_2.0`。清除 ICM42670 与 SC132 的旧 `.2` 工件，不能只换新实体而保留旧 consumer。ROS2 不携带 PRRTSP。完整工件校验不认证压力/长录或干净系统中 `python3`/`libstdc++` 的依赖归属；当前限制见{ref}`能力与验证边界 <capability-verification-boundary>`。
+当前 SC132 实体为 `libsc132.so.3.0.0`、符号节点 `LIBSC132_3.0`；PRRTSP 实体为 `libprrtsp.so.2.0.1`、SONAME `libprrtsp.so.2`、符号节点 `LIBPRRTSP_2.0`。清除 ICM42670 与 SC132 的旧 major 工件，不能只换新实体而保留旧 consumer。ROS2 不携带 PRRTSP。当前匹配镜像预装 Python、C++/SDK 运行库及 ROS2 underlay；应用更新不替代 BSP、内核或系统依赖，见[镜像组成](../ops/system-flashing.md)。工件校验不认证压力/长录，当前限制见{ref}`能力与验证边界 <capability-verification-boundary>`。
 
 ## 1. non-ROS 预检
 

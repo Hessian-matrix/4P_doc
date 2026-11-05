@@ -62,14 +62,20 @@ To save four-channel images and IMU, continue reading {ref}`non-ROS Demo Usage: 
 
 ## 3. Shortest ROS2 Run
 
-In the X5 SSH terminal:
+Wait for any existing recording to finalize, then gracefully stop boot-started non-ROS in the X5 SSH terminal. Continue only after a successful stop and exit of the old acquisition process. Do not start ROS2 after a timeout or failure; keep `cam-service` running:
+
+```bash
+cd /root/demo && ./start_sensor_demo.sh stop
+```
+
+Then load the ROS2 environment and launch:
 
 ```bash
 source /root/ros2_demo/install/robobaton_ros2_env.bash
 ros2 launch robobaton_4p_ros2_demo robobaton_sensors.launch.py
 ```
 
-Open another X5 terminal, load the same environment, then check:
+The default FastDDS profile is SHM-only and same-host, without cross-computer UDP discovery or transport. Open another X5 terminal, load the same environment, then check:
 
 ```bash
 source /root/ros2_demo/install/robobaton_ros2_env.bash

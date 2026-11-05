@@ -48,7 +48,7 @@ RTSP uses `/PRR`, H.264 by default with optional H.265. NV12 native output is `1
 
 | Item | Public conclusion |
 |---|---|
-| Main-board power | XT30 input: `12–27 V DC`; follow physical polarity markings. Full-load current, reverse-feed protection, and the USB-C power role still await confirmation. Use only a power supply confirmed compatible by product support; do not treat the USB-C data interface as a power input. |
+| Main-board power | Confirmed XT30 input range: `9~27V DC`; follow physical polarity markings. Full-load current, reverse-feed protection, and the USB-C power role still await confirmation. Use only a power supply confirmed compatible by product support; do not treat the USB-C data interface as a power input. |
 | Camera FPC / coaxial cable | Connect with power off; hot-plug is not supported. |
 | UART | UART1/UART7 use `3.3V`; see the diagram and table below for pin numbers and signal order. Power-pin load ratings and hot-plug conditions await confirmation. Wire with power off by default; no hot-plug promise. |
 | Thermal | The fan is connected at the factory. Keep heatsink and airflow clear; verify V2 thermal control and full-load cooling on the actual system. |

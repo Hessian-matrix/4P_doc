@@ -51,7 +51,7 @@ X5 eth0  <---- 非 PoE 网线/普通交换机 ---->  Mid-360 RJ45
 
 ```bash
 X5_IP=192.168.1.12  # 改成实际板卡地址
-git clone https://github.com/Hessian-matrix/RoboBaton_4p_demo.git
+git clone --branch V2_main https://github.com/Hessian-matrix/RoboBaton_4p_demo.git
 cd RoboBaton_4p_demo
 scp scripts/env_setup/configure_x5_ptp_master.sh root@${X5_IP}:/root/configure_x5_ptp_master.sh
 ```

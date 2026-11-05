@@ -62,12 +62,22 @@ Before switching, confirm the old ROS2 node has exited and keep `cam-service` ru
 
 ## Running
 
+The current image starts non-ROS `sensor_demo` at boot. Before launching ROS2, wait for any recording session to finalize, then gracefully exit non-ROS. IMU-only nodes also require capture-owner handoff. Run:
+
+```bash
+cd /root/demo && ./start_sensor_demo.sh stop
+```
+
+Wait for a successful stop and for the old acquisition process to exit before running the launch commands below. Do not start ROS2 after a stop timeout or failure, or use another instance to compete for resources. Keep `cam-service` running.
+
 On the X5 device, loading the install-root environment script is recommended. The script loads `/opt/ros/humble/setup.bash` by default, then loads this package's overlay, and sets the FastDDS SHM profile and `RCUTILS_LOGGING_BUFFERED_STREAM=0`:
 
 ```bash
 source /root/ros2_demo/install/robobaton_ros2_env.bash
 ros2 launch robobaton_4p_ros2_demo robobaton_sensors.launch.py
 ```
+
+The default FastDDS profile **enables only SHM and disables built-in transports, so it is same-host only**. Run the subscriber checks below on the X5 itself; this profile does not enable cross-computer UDP discovery or data transport. Loading the overlay sets both `FASTDDS_DEFAULT_PROFILES_FILE` and `FASTRTPS_DEFAULT_PROFILES_FILE`, overriding profile variables set beforehand. Cross-computer DDS requires an explicitly applicable network profile and separate validation, not an assumption based on this default configuration.
 
 To run a single command once, execute the script directly as a wrapper:
 

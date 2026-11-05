@@ -10,6 +10,10 @@
 | Common causes | Mixed artifacts, 80/8189 conflicts, routing/firewall issues, unsupported Web H.265, unsupported actual H.264 profile/level, source startup failure, or no fresh telemetry for 500ms. |
 | Recovery / info to collect | Verify and deploy the whole package. Use an explicit alternate port for conflicts, without taking over services. Collect versions, effective configuration, source/Web logs, browser version, per-camera decoded/lost/decoder stats, and network details. `decoder: unknown` means diagnostics are unavailable, not proven software decoding or hardware failure. Anonymous HTTP is for trusted LANs; do not expose it publicly for diagnosis. |
 
+### `invalid host or query` After Joining the Hotspot
+
+Run `ip -4 addr show wlan0` on the board and enter `http://<AP-address>/` directly in the phone browser, without `?` query parameters or a custom hostname. Confirm effective `web.listen_address` is `0.0.0.0` or the current AP address. The current implementation does not cache the startup address list: HTTP and new WebRTC sessions support addresses configured later. If the running package still caches startup addresses, deploy a complete matching update and restart the application normally. A system reboot may repeat the same startup timing and is not a fix. Retain Host/Origin checks; do not enable cross-origin access or disable validation for troubleshooting.
+
 ### Windows Video Shows Colored Vertical Stripes While Decoded Frames Increase
 
 An older H.264 producer may advertise Main while retaining the SDK's default High-only 8×8 transform. Some hardware decoders continue producing incorrect pixels even with zero packet loss. The current producer explicitly disables that tool; H.265 is unchanged. Verify and update the whole runtime package, stop and restart `sensor_demo` normally, then refresh the page. Replacing page assets alone cannot fix a running encoder. Temporarily disabling accelerated video decoding in an isolated browser process can provide a comparison, not a permanent fix; do not close unrelated user browsers. Collect screenshots, browser/OS/driver versions, and source SPS/PPS. The current SDK may still emit zero-valued PPS extension fields, so strict Main syntax conformance or compatibility with every hardware decoder is not guaranteed.
@@ -32,9 +36,9 @@ For full image integration, interactive configuration, and log paths see [Wi-Fi 
 | Item | Content |
 |---|---|
 | Symptom | `wifi_setup` reports a missing command, cannot scan any SSID, authentication fails, DHCP fails, AP cannot start, or Wi-Fi is not restored after boot. |
-| Check | Log in through wired Ethernet or `1.8V` DEBUG_UART; run `wifi_setup --status`; check `ip link show wlan0`, `iw dev wlan0 info`, `/userdata/wifi/logs/`, and `/userdata/wifi/boot.log`. |
-| Normal result | AP mode shows hostapd `ENABLED` and clients get addresses in the configured subnet; STA mode shows association and a DHCP address; with boot restore enabled, `/userdata/wifi/autostart.enabled` and `current.conf` exist. |
-| Common causes | Missing Wi-Fi user-space tools, antenna/signal problems, wrong SSID/password, hidden SSID, router DHCP problems, AP channel/IP/DHCP subnet misconfiguration, or the dedicated entry running before userdata mounting/driver readiness. |
+| Check | Log in through wired Ethernet or `1.8V` DEBUG_UART; run `wifi_setup --status`; check `ip link show wlan0`, `iw dev wlan0 info`, `/run/4p-wifi/logs/`, and `/run/4p-wifi/boot.log`. |
+| Normal result | AP mode shows hostapd `ENABLED` and clients get addresses in the configured subnet; STA mode shows association and a DHCP address; with boot restore enabled, `/etc/4p/wifi/autostart.enabled` and `current.conf` exist. |
+| Common causes | Missing Wi-Fi user-space tools, antenna/signal problems, wrong SSID/password, hidden SSID, router DHCP problems, AP channel/IP/DHCP subnet misconfiguration, the entry running before driver readiness, or a read-only system partition preventing configuration saves. |
 | Recovery / info to collect | Do not switch modes in the same Wi-Fi SSH session; reconfigure through the wired entry. To disable, run `wifi_setup --disable`; collect full script errors, interface state, and credential-stripped logs. |
 
 ## Runtime Package Verification Failure

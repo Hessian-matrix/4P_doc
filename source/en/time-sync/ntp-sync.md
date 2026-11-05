@@ -32,6 +32,8 @@ command -v ntpq
 
 A running process is not proof of synchronization. If the system lacks these tools or the boot service, contact technical support to confirm feature availability. Copying the Demo is not an NTP-enablement step.
 
+The current flashed image starts `ntpd` at boot and provides `ntpq`. Without a usable time source, a board may still show year `2000`, no association in `ntpq -pn`, and `leap_alarm` / `sync_unspec` / `stratum=16` in `ntpq -c rv`. This means unsynchronized time, not failed sensor acquisition. Check networking, DNS, and the chosen source, or configure a trusted LAN source below. Synchronize before recording, not by manually setting time during acquisition.
+
 ## Change NTP Servers
 
 Run the following on the board as `root`. Exit demos, ROS2 nodes, and other timestamp-sensitive tasks first; keep `cam-service` running. Do not run another service disciplining `CLOCK_REALTIME` at the same time. See [Time Synchronization](system-time-sync.md) for the PTP direction.
@@ -158,7 +160,7 @@ Upload from the host:
 
 ```bash
 X5_IP=192.168.1.12  # change to the actual board address
-git clone https://github.com/Hessian-matrix/RoboBaton_4p_demo.git
+git clone --branch V2_main https://github.com/Hessian-matrix/RoboBaton_4p_demo.git
 cd RoboBaton_4p_demo
 scp scripts/env_setup/x5_sync_time.sh root@${X5_IP}:/root/x5_sync_time.sh
 ```

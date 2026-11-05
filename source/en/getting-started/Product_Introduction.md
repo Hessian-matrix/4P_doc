@@ -39,7 +39,7 @@ The supplied Ethernet cable is for testing and temporary connections, not reliab
 | Platform | D-Robotics X5, 8-core ARM Cortex-A55 @ 1.5 GHz |
 | Memory | 4 GB (1 GB fixed for system and hardware) |
 | Storage | 32 GB |
-| Power input | 12–27 V |
+| Power input | 9~27V DC |
 | Cameras | 4 RGB cameras: CAM1, CAM2, CAM3, CAM4 |
 | Standard image output | NV12; native `1280x1088`, with VSE scaling to `640x480` / `720x480` / `1280x720`; rotation `90/270` swaps external width/height |
 | Camera frame rate | Default `30fps`; supports `25fps`, `30fps`, `40fps`, `50fps`, and `60fps` |

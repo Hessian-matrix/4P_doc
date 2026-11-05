@@ -1,6 +1,6 @@
 # non-ROS Demo 使用
 
-[`RoboBaton_4p_demo`](https://github.com/Hessian-matrix/RoboBaton_4p_demo) 是面向用户的 V2 non-ROS 公开源码仓库。联合入口 `sensor_demo` 提供四路 SC132 相机网页预览、ICM-42670-P 六轴/温度、惯性姿态预览，以及 ROS1 bag / H.264 MP4 录制；另有独立相机 RTSP、四路拼接 RTSP、IMU、UART 和 SocketCAN CAN 示例。
+[`RoboBaton_4p_demo`](https://github.com/Hessian-matrix/RoboBaton_4p_demo/tree/V2_main) 是面向用户的 V2 non-ROS 公开源码仓库。联合入口 `sensor_demo` 提供四路 SC132 相机网页预览、ICM-42670-P 六轴/温度、惯性姿态预览，以及 ROS1 bag / H.264 MP4 录制；另有独立相机 RTSP、四路拼接 RTSP、IMU、UART 和 SocketCAN CAN 示例。
 
 当前参数支持范围与实际验证范围分别定义，见{ref}`能力与验证边界 <capability-verification-boundary>`。控制台关联成功不证明保存图像可解码或全部样本已保存，不承诺所有路径持续高帧率或当前组成已完成长录。
 
@@ -55,6 +55,8 @@ non-ROS 联合入口的网页工作台（中文界面示例）。画面、数值
 
 **移动端效果预览**：手机或平板接入与板卡互通的同一局域网后，可直接用浏览器打开上述设备地址，无需安装 App 或 SSH 登录。窄屏面板纵向排列，可滚动查看四路相机、姿态与六轴数据；自动播放受限时点击“点击播放”。网络、WebRTC/H.264 解码支持和移动设备性能会影响流畅度，不保证任意手机四路同时流畅。连接步骤见{ref}`首次上电 <first-boot-web>`。网页录制仍保存到板端，不是手机本机录像。
 
+**连接板卡 AP**：手机接入板卡热点后，在板端运行 `ip -4 addr show wlan0`，使用其中 `inet` 的板端地址打开 `http://<AP地址>/`；不要使用手机获分配的地址或板卡有线地址。默认 Web 监听 `0.0.0.0`，允许 AP/STA 地址在服务启动后才配置完成；HTTP 校验实际连接的本机 IPv4，新建 WebRTC 会话读取当前网卡地址。显式绑定单个地址时仍只服务该地址；地址改变后刷新或重新连接，新会话不会迁移已有连接。需要同时放通 TCP `80` 和 UDP/TCP `8189`，仅用于可信隔离网络。
+
 右上角语言按钮用 `CH` / `EN` 表示切换目标：中文页面显示 `EN`，英文页面显示 `CH`；默认中文，本浏览器允许本地存储时记住选择，存储被禁用时仍可在当前页面切换。切换更新静态文案、动态状态和无障碍提示，不刷新页面、不重建 WebRTC、SSE 或姿态 Worker，不重置录制选项、设备录制或已接受的陀螺零偏。刷新仍按下文恢复选项默认值并清除校准，但会保留可存储的语言选择。“在线文档 / Online Docs”随当前语言在新标签页打开[中文文档](https://4p-docs.readthedocs.io/zh-cn/latest/index.html)或[英文文档](https://4p-doc-en.readthedocs.io/en/latest/index.html)；访问在线文档需要互联网，设备页面和切换不依赖互联网。会话 ID、输出路径、API 状态码和设备原始错误保留原值。
 
 ### 首页功能与操作
@@ -74,7 +76,7 @@ non-ROS 联合入口的网页工作台（中文界面示例）。画面、数值
 
 相机网格和单路放大按源比例完整显示，不裁剪或拉伸，源画面黑边保留。键盘聚焦画面后按 Enter/空格也可放大或还原；`Esc` 只返回网格，不停止录制。若浏览器阻止自动播放，点击画面中的“点击播放”。界面 CAM1～CAM4 对应内部 `camera_id` 0～3，API、录制文件名和索引仍使用内部 ID；并排画面不证明显示同步或 FSYNC 精度。
 
-切换语言、放大画面、展开/折叠高级选项、详情或诊断都不重建 WebRTC、SSE 或姿态 Worker，不改变设备录制，也不清除当前页面已接受的零偏。**刷新恢复浏览器本地录制选项默认值并清除姿态零偏，但不会停止设备录制**；重新打开后查询真实状态。网页不提供相机分辨率、帧率、曝光、IMU 原生采样率或 FSYNC 硬件参数控制；分辨率、帧率、原生采样率、FSYNC 等启动参数在 YAML/CLI 配置后重启应用生效。
+切换语言、放大画面、展开/折叠高级选项、详情或诊断都不重建 WebRTC、SSE 或姿态 Worker，不改变设备录制，也不清除当前页面已接受的零偏。**刷新恢复浏览器本地录制选项默认值并清除姿态零偏，但不会停止设备录制**；重新打开后查询真实状态。网页不提供相机分辨率、帧率、曝光或 IMU 原生采样率控制；这些启动参数在 YAML/CLI 配置后重启应用生效。当前 IIO V3/ABI5 不提供 FSYNC 配置或关联。
 
 ### 网页控制录制
 
@@ -91,11 +93,13 @@ non-ROS 联合入口的网页工作台（中文界面示例）。画面、数值
 
 要停止录制，在常驻卡片中点击“停止录制”，随后等待设备排空和封装；只有设备最终返回 `published_complete`、`data_complete=true` 和 `cleanup_complete=true` 才表示本次会话完整发布，可展开“录制详情与使用说明”查看最终结果及完整性字段。录制停止后相机、IMU 与预览继续，可再次开始另一会话。
 
-网页不能指定任意路径：运行目录固定为真实可执行文件目录下的 `recordings`（标准包为 `/root/demo/bin/recordings`），TF 固定为已挂载的 `/mnt/sdcard/recordings`；文件名由设备分配。MP4 要求四路 H.264 编码且不支持隔帧；bag 保留严格丢组间隔，隔帧为 1 时间隔必须为 2。同一时间只能运行一个 bag 或 MP4 会话。
+网页不能指定任意路径：“运行目录 / eMMC”固定使用绝对路径 `/root/demo/save_data`，不从可执行文件位置推导；bag 为 `/root/demo/save_data/session-<id>.bag`，MP4 为 `/root/demo/save_data/session-<id>`。TF 仍固定为已挂载的 `/mnt/sdcard/recordings`；会话名由设备分配。MP4 要求四路 H.264 编码且不支持隔帧；bag 保留严格丢组间隔，隔帧为 1 时间隔必须为 2。同一时间只能运行一个 bag 或 MP4 会话。
 
 TF 必须实际挂载在 `/mnt/sdcard`，缺卡或未挂载会明确失败，**不会退回 eMMC**。开始时要求至少 64 MiB 可用空间，不保证整个录制期间空间充足；先在详情中检查空间。网页固定路径不受 YAML `save_data.save_path` 改写；需要自定义路径时使用命令行或 YAML 启动录制。
 
-关闭网页或断网不会停止录制；重新打开页面并查询实际状态。命令超时不代表设备未执行，不要盲目重发。录制/存储故障结束本次会话并报告失败或 partial，源故障仍按失败路径停止。保存读取原生 IMU，不使用网页降频/姿态滤波数据；动态 MP4 的健康范围为 `callback_window`，不等同于整个 producer 停止后的最终健康认证。启动参数 `--record-bag`、`--record-mp4-dir` 和 YAML `save_data` 自动录制保留，也可由网页停止；详见[数据保存](save-data-guide.md)。
+CLI/YAML 的 `save_data.save_path` 及默认 `/root/demo/save_mp4/` 不变。已有数据保留在原目录，不会自动移动或删除；固定目录仍受既有符号链接安全检查约束，不能用符号链接绕过路径限制。
+
+关闭网页或断网不会停止录制；重新打开页面并查询实际状态。命令超时不代表设备未执行，不要盲目重发。录制/存储故障结束本次会话并报告失败或 partial，源故障仍按失败路径停止。保存读取原生 IMU，不使用网页降频/姿态滤波数据；动态 MP4 的健康范围为 `callback_window`，不等同于整个 producer 停止后的最终健康认证。启动参数 `--record-bag`、`--record-mp4-dir` 和 YAML `save_data` 自动录制保留；网页可请求停止，但启动自动 MP4 提前停录的完整发布限制见{ref}`数据保存 <startup-mp4-web-stop>`。
 
 **此页面没有身份认证。** 能访问设备的局域网用户可以开始写盘或停止会话；同源校验不是用户认证。仅用于可信隔离 LAN，不要暴露到公网或不可信网络。更新需成套重建运行包并正常重启应用；不能只替换网页或单个 ELF。
 
@@ -236,7 +240,7 @@ save_data:
 - IMU 原生采样率支持 `25/50/100/200/400/800/1600Hz`，默认 `800Hz`；其他值明确拒绝，不会重采样。
 - `save_data.format` 默认是 `mp4`，同时支持 `rosbag`；保存路径必须是绝对路径。
 
-`save_data.save: false` 表示启动时不自动录制，不会禁用网页录制。改为 `true` 时按 YAML 指定的格式与绝对路径开始会话；网页可停止它。YAML 的自动录制设置与网页固定存储选择是两套入口，网页选择不会写回 YAML。
+`save_data.save: false` 表示启动时不自动录制，不会禁用网页录制。改为 `true` 时按 YAML 指定的格式与绝对路径开始会话；网页可请求停止，但{ref}`启动自动 MP4 的提前停录限制 <startup-mp4-web-stop>`仍适用。YAML 的自动录制设置与网页固定存储选择是两套入口，网页选择不会写回 YAML。
 
 ### 手动曝光示例
 
@@ -488,11 +492,13 @@ cd /root/demo
 ./start_sensor_demo.sh status     # 查看自启动与运行状态
 ```
 
-开机自启动通过板端 `/userdata/startup.sh` 实现：系统 `S99auto_startup` 在 `/userdata` 挂载后执行该文件。脚本只追加/删除自己带 `SENSOR_DEMO_AUTOSTART_MANAGED` 标记的块，不会覆盖其它应用写入的内容；取消自启动时若文件只剩余注释/空行残留会整体删除。镜像内 `wifi_setup` 使用独立启动入口，不占用该文件。开机自启动使用运行包内默认配置，直接修改 `config/sensor_config.yaml` 即可调整，无需重新执行 `enable`。`enable`/`disable` 需要 root 权限。
+配套新系统入口 `/etc/init.d/S98sensor_demo_autostart` 直接调用本包 `--boot`，从系统分区 `/etc/4p/sensor-demo-autostart` 读取 `enabled`/`disabled`，缺失时默认开启；损坏、符号链接或不安全权限会拒绝启动。`enable`/`disable` 原子写入该策略，不再编辑 `/userdata/startup.sh` 或读取旧注册标记；遗留的本脚本 `--boot` 调用也遵守新策略，不修改其他应用命令。普通重启保留选择，重烧 system 恢复镜像默认值；更新时须同时安装匹配的系统入口与运行包，不能只换脚本。开机使用包内 `config/sensor_config.yaml`，修改后下次启动生效；Wi-Fi 使用独立入口。
 
 `stop`/`restart` 通过 `/proc/<pid>/exe` 识别本包 `bin/sensor_demo` 和 `bin/sensor_web`，使用 Linux pidfd 绑定进程身份；同名但来自其他目录的进程不属于管理对象。`stop` 仅向主进程发送 `SIGINT`，由主进程完成录制保存、资源释放与 Web 子进程回收；重复停止已退出的程序也成功。默认最多等待 1800 秒，可通过 `SENSOR_DEMO_STOP_TIMEOUT_S` 设置正数秒；超时返回非零，不强杀，`restart` 也不会启动新实例。正常运行板端需要支持 pidfd 的 Linux/Python 3.10 或更新版本。
 
 `restart` 使用包内 `config/sensor_config.yaml`，不保留上次命令行参数；后台日志默认写入 `/userdata/sensor_demo_autostart.log`，可用 `SENSOR_DEMO_LOG_FILE` 指定。返回成功仅表示新进程启动后 2 秒内未退出，不是相机/IMU/Web 就绪保证；仍需检查日志和实际页面。`stop`/`restart` 不改变自启动注册、不停止或重启 `cam-service`；不要与手动启动相机应用并发执行。
+
+开机自启动及 `restart` 会在 YAML 之上固定传入 `--print-rate-hz 0`，关闭高频 IMU 样本块（包含其 metrics）的打印，保留启动信息、错误、录制结果与退出健康摘要。这不改变 IMU 原生采样率、网页遥测或保存数据。前台 `./sensor_demo` 和无参数 `./start_sensor_demo.sh` 仍按 YAML 打印；需要详细输出时先正常停止后台实例，再前台运行 `./sensor_demo --print-rate-hz 10 --print-metrics`。日志仍为追加写入，不自动清空已有日志，也不提供容量上限。
 
 (non-ros-can)=
 

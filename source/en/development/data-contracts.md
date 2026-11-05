@@ -126,7 +126,7 @@ Host mode preserves the kernel MONOTONIC estimate without a physical-error bound
 
 ### Web Attitude Preview Inputs
 
-The `sensor_demo` IMU SSE uses **`schema_version: 2`**, without legacy `sample_timestamp_ns` / `host_timestamp_ns` aliases. Session `session_id`, application identity, and `sequence` remain distinct; every u64 field is a decimal string to avoid JavaScript precision loss.
+The `sensor_demo` IMU SSE uses **`schema_version: 2`**, without legacy `sample_timestamp_ns` / `host_timestamp_ns` aliases. SSE `session_id` matches `/api/v1/info.application_session_id` as the application-session identity; `source_generation` identifies the producer session, and `sample_sequence` is the native sample sequence. There is no SSE field named `sequence`. Every u64 field is a decimal string to avoid JavaScript precision loss.
 
 Explicit time fields are `sample_realtime_ns`, `sample_monotonic_ns`, `sample_raw_ns`, `observation_monotonic_ns`, `burst_complete_raw_ns`, and `estimated_period_ns`. `timestamp_mode` is `host` or `tmst`; host `timestamp_uncertainty_ns` is JSON `null` (no error bound), while tmst reports computational mapping admission. Retain `source_generation`, `evidence_id`, `burst_flags`, `packet_flags`, `timestamp_source`, `fifo_tmst`, and `bridge_monotonic_ns`, `bridge_raw_ns`, `bridge_realtime_ns`, `bridge_uncertainty_ns`. Never subtract directly across RAW/MONOTONIC. ABI5 exposes no per-sample GPIO/mapper counters; SSE neither fabricates zeros nor retains those fields.
 

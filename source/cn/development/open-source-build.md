@@ -4,8 +4,10 @@
 
 适用范围：
 
-- [`RoboBaton_4p_demo`](https://github.com/Hessian-matrix/RoboBaton_4p_demo)：non-ROS 四目 RTSP、IMU、UART 和 SocketCAN CAN 示例。
-- [`RoboBaton_4P_ROS2_demo`](https://github.com/Hessian-matrix/RoboBaton_4P_ROS2_demo)：ROS2 四目 NV12/raw+compressed 图像、CameraInfo、曝光观测、IMU、温度及IMU 时钟元数据 topic 示例。
+- [`RoboBaton_4p_demo`](https://github.com/Hessian-matrix/RoboBaton_4p_demo/tree/V2_main)：non-ROS 四目 RTSP、IMU、UART 和 SocketCAN CAN 示例。
+- [`RoboBaton_4P_ROS2_demo`](https://github.com/Hessian-matrix/RoboBaton_4P_ROS2_demo/tree/V2_main)：ROS2 四目 NV12/raw+compressed 图像、CameraInfo、曝光观测、IMU、温度及IMU 时钟元数据 topic 示例。
+
+V2 源码与文档统一使用 `V2_main` 主分支，以下 clone 命令显式选择该分支；已有 checkout 也须切换到 `V2_main` 后再构建。
 
 ## 1. 编译边界
 
@@ -28,10 +30,12 @@ RoboBaton_4P_ROS2_demo
 
 公开 demo 仓库已经携带编译所需的公开头文件和匹配的预编译运行库：
 
-- non-ROS：`include/`、`lib/libicm42670.so*`、`lib/libsc132.so*`、`lib/libprrtsp.so*`。
+- non-ROS：`include/`、`lib/libicm42670.so*`、`lib/libsc132.so*`、`lib/libprrtsp.so*`；还需要匹配 X5 SDK 的媒体头文件（如 `hbn_api.h`）、`libhbmem.so` 和 `libmultimedia.so`，由交叉编译包提供，不由此 consumer 仓编译。
 - ROS2：`include/robobaton_4p_ros2_demo/`、`lib/libicm42670.so*`、`lib/libsc132.so*`，构建时还需要 X5 交叉编译包提供目标侧 ROS2、`hb_media_codec.h`、`libmultimedia.so.1`、`libhbmem.so.1` 和 `libalog.so.1`。
 
 这些仓库不编译底层 ICM42670、SC132 或 PRRTSP producer 源码。如果没有 X5 交叉编译工具链，不能重新编译源码，只能直接使用仓库里的 `demo/` 或已生成的 install 包部署运行。
+
+系统 USB 摄像头程序 `x5-uvc-mosaic` 不在上述根 CMake 编译目标中；其完整后端、独立构建和离线安装工具位于公开 `RoboBaton_4p_demo` 的 [`scripts/env_setup/x5_usb/`](https://github.com/Hessian-matrix/RoboBaton_4p_demo/tree/V2_main/scripts/env_setup/x5_usb)。该构建不需要 Go，但需要匹配的 X5 SDK 和 SC132 ABI3 库。修改其他 non-ROS 拼图或 JPEG 示例不会更新系统 USB 摄像头；源码/函数链接、独立构建命令、离线 `--package` 安装及已有板卡的安全更新见{ref}`USB 开发修改入口 <usb-uvc-development>`。
 
 每套库固定为一份普通文件 `libNAME.so.M.m.p`，加两个同目录相对链接 `libNAME.so.M -> libNAME.so.M.m.p`、`libNAME.so -> libNAME.so.M`。non-ROS 使用 ICM42670、SC132、PRRTSP；ROS2 只使用前两者。同步、打包和 install 保留链接，verifier 拒绝展开别名、错误/绝对/断裂链接。完整复制使用 `tar`、`cp -a` 或 `rsync -a`，不要解引用链接。
 
@@ -39,7 +43,7 @@ non-ROS `runtime-provenance.json` 使用 v3：普通文件字节与链接原始�
 
 当前成套库为 ICM42670 `libicm42670.so.5.0.0`、SONAME `libicm42670.so.5`、九个导出均为 `ICM42670_X5_5.0`；SC132 `libsc132.so.3.0.0`、SONAME `libsc132.so.3`、`LIBSC132_3.0`；PRRTSP `libprrtsp.so.2.0.1`、SONAME `libprrtsp.so.2`、`LIBPRRTSP_2.0`。同步公开头文件与库，移除 ICM42670 旧 `.2/.3/.4` 及 SC132 旧 `.2` 库，成套重建所有 consumer，不建立跨 major 链接。四种启动时间戳组合使用相同二进制/IIO 采集，不构建方案专属二进制，见 [non-ROS 使用](../usage/non-ros-demo.md) 与 [ROS2 使用](../usage/ros2-demo.md)。每种 IMU 模式均要求匹配的内核 IIO V3 capture 模块，现有 V2 模块不兼容；公开 demo 构建/package verifier 不构建、安装或升级内核模块。软件 `2.0.0`、硬件 V2.2、文档修订及 SO ABI 独立。当前 non-ROS HO 短窗证据及未验收范围见{ref}`能力与验证边界 <capability-verification-boundary>`。编译成功不认证四组合运行、吞吐、压力或长录，见{ref}`能力与验证边界 <capability-verification-boundary>`。
 
-干净目标系统中 `python3`/`libstdc++` 的镜像与运行包归属仍待确认。构建、链接与 package/install verifier 不等于所有干净镜像运行依赖已经验证；部署前按实际系统确认依赖，不依靠文档版本推断。
+当前匹配的 Buildroot 镜像负责提供 `/usr/bin/python3`、C++/SDK 运行库及 `/opt/ros/humble`；应用包负责各自程序、配置、匹配 producer 和工具。ROS2 install 还携带指定的传递依赖与 NumPy 所需 BLAS/LAPACK/Fortran 库，不是只有两个 producer；它不替代系统解释器或 BSP。烧录设备已检查 Python `3.10.12`、non-ROS 实际加载及 ROS2 包环境下版本/包查询。构建和 package/install verifier 不等于全部运行路径已验证，见[当前镜像组成](../ops/system-flashing.md)。
 
 ## 2. 准备交叉编译环境
 
@@ -94,7 +98,7 @@ file -L "$TARGET_ROS_PREFIX/lib/librclcpp.so"
 获取源码：
 
 ```bash
-git clone https://github.com/Hessian-matrix/RoboBaton_4p_demo.git
+git clone --branch V2_main https://github.com/Hessian-matrix/RoboBaton_4p_demo.git
 cd RoboBaton_4p_demo
 ```
 
@@ -189,7 +193,7 @@ python3 scripts/verify_runtime_package.py demo
 获取源码：
 
 ```bash
-git clone https://github.com/Hessian-matrix/RoboBaton_4P_ROS2_demo.git
+git clone --branch V2_main https://github.com/Hessian-matrix/RoboBaton_4P_ROS2_demo.git
 cd RoboBaton_4P_ROS2_demo
 ```
 

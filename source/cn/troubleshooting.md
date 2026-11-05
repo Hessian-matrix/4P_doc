@@ -10,6 +10,10 @@
 | 常见原因 | 混用旧工件、80/8189 冲突、跨网段/防火墙、H.265 不受 Web 支持、浏览器不支持真实 H.264 profile/level、源启动失败或遥测超过 500ms 未更新。 |
 | 恢复/需收集信息 | 整包校验后部署；有端口冲突时显式配置备用端口，不抢占。提供版本、有效配置、源/Web 日志、浏览器版本、逐路 decoded/lost/decoder 及网络信息。`decoder: unknown` 只表示诊断未提供，不证明软解或硬解失败。匿名 HTTP 仅用于可信 LAN；不开放公网来排障。 |
 
+### 手机连接热点后出现 `invalid host or query`
+
+在板端执行 `ip -4 addr show wlan0`，手机浏览器直接输入 `http://<AP地址>/`，不要附加 `?` 查询参数或使用自定义域名。确认有效 `web.listen_address` 为 `0.0.0.0` 或当前 AP 地址。当前实现不缓存启动时的地址列表；AP 后就绪时，HTTP 和新建 WebRTC 会话使用当前地址。若运行包仍有启动时地址缓存，按部署流程更新完整匹配包并正常重启应用，单纯重启系统可能重复启动时序，不能视为修复。保留 Host/Origin 校验，不以开放跨域或关闭安全校验排障。
+
 ### Windows 视频彩色竖条，但 decoded 仍增加
 
 旧 H.264 producer 可能声明 Main 却保留 SDK 默认的 High-only 8×8 transform；部分硬解器会持续输出错误画面，即使 lost 为零。当前 producer 显式关闭该功能，H.265 不受此修改影响。校验并更新完整运行包后正常重启 `sensor_demo`，再刷新网页；只换网页资源无法修复正在运行的编码器。可在独立浏览器进程临时禁用加速视频解码作对照，但这不是正式修复，也不要据此关闭所有用户浏览器。收集实际截图、浏览器/系统/驱动版本及源 SPS/PPS；当前 SDK 仍可能输出取值为零的 PPS 扩展字段，不承诺严格 Main 语法合规或全部硬解器兼容。
@@ -32,9 +36,9 @@
 | 项目 | 内容 |
 |---|---|
 | 现象 | `wifi_setup` 提示缺少命令、扫描不到 SSID、认证失败、DHCP 失败、AP 无法启动，或开机后没有恢复 Wi-Fi。 |
-| 检查 | 使用有线网络或 `1.8V` DEBUG_UART 登录；执行 `wifi_setup --status`；检查 `ip link show wlan0`、`iw dev wlan0 info`、`/userdata/wifi/logs/` 和 `/userdata/wifi/boot.log`。 |
-| 正常结果 | AP 模式显示 hostapd `ENABLED`，客户端能获得配置网段地址；STA 模式显示已关联并获得 DHCP 地址；启用开机恢复时 `/userdata/wifi/autostart.enabled` 和 `current.conf` 存在。 |
-| 常见原因 | Wi-Fi 用户态工具缺失、天线或信号问题、SSID/密码错误、隐藏 SSID、路由器 DHCP 异常、AP 信道/IP/DHCP 网段配置错误，或专用启动入口早于 userdata 挂载/驱动就绪。 |
+| 检查 | 使用有线网络或 `1.8V` DEBUG_UART 登录；执行 `wifi_setup --status`；检查 `ip link show wlan0`、`iw dev wlan0 info`、`/run/4p-wifi/logs/` 和 `/run/4p-wifi/boot.log`。 |
+| 正常结果 | AP 模式显示 hostapd `ENABLED`，客户端能获得配置网段地址；STA 模式显示已关联并获得 DHCP 地址；启用开机恢复时 `/etc/4p/wifi/autostart.enabled` 和 `current.conf` 存在。 |
+| 常见原因 | Wi-Fi 用户态工具缺失、天线或信号问题、SSID/密码错误、隐藏 SSID、路由器 DHCP 异常、AP 信道/IP/DHCP 网段配置错误，专用入口早于驱动就绪，或系统分区只读导致配置无法保存。 |
 | 恢复/需收集信息 | 不要在同一条 Wi-Fi SSH 会话中切换模式；通过有线入口重新配置。需要停用时执行 `wifi_setup --disable`；收集脚本完整错误、接口状态和去除凭据后的日志。 |
 
 ## 运行包校验失败

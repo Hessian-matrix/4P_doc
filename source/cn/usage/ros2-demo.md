@@ -62,12 +62,22 @@ ROS2 install 包部署到 `/root/ros2_demo/install`，不改动 non-ROS `/root/d
 
 ## 运行
 
+当前镜像开机已启动 non-ROS `sensor_demo`。启动 ROS2 前先等待录制会话完成收尾，再正常退出 non-ROS；IMU-only 节点也必须交接采集 owner。执行：
+
+```bash
+cd /root/demo && ./start_sensor_demo.sh stop
+```
+
+等待停止命令成功且旧采集进程退出，再执行下文启动命令；停止超时或失败时不要启动 ROS2，不要用第二实例抢占资源。保持 `cam-service` 运行。
+
 X5 板端推荐加载 install 根目录环境脚本。脚本默认加载 `/opt/ros/humble/setup.bash`，再加载本包 overlay，并设置 FastDDS SHM profile 和 `RCUTILS_LOGGING_BUFFERED_STREAM=0`：
 
 ```bash
 source /root/ros2_demo/install/robobaton_ros2_env.bash
 ros2 launch robobaton_4p_ros2_demo robobaton_sensors.launch.py
 ```
+
+默认 FastDDS profile **仅启用 SHM、禁用内置传输，限同一主机**；下面的订阅检查也在 X5 板端执行，不提供跨电脑 UDP 发现或数据传输。加载 overlay 时会设置 `FASTDDS_DEFAULT_PROFILES_FILE` 与 `FASTRTPS_DEFAULT_PROFILES_FILE`，预先设置其他 profile 变量不会保留。跨机 DDS 需要明确适用的网络 profile 和独立验证，不能按本页默认配置推定可用。
 
 只想运行一次命令时，可以直接执行脚本作为 wrapper：
 

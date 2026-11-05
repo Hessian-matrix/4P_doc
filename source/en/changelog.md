@@ -2,6 +2,134 @@
 
 This file records user-visible updates in the RoboBaton 4P public delivery, following the shared [Documentation Version Policy](release-and-support.md#documentation-version-policy). Documentation revisions on this page do not automatically change software versions and are distinct from SO SONAME/ABI versions.
 
+## 2.0.81 - 2026-11-05
+
+- Use `V2_main` as the V2 main branch in all three public repositories. Bilingual homepages, READMEs, source-file/directory links, and non-ROS, ROS2, NTP, and PTP clone examples select it explicitly rather than relying on the default branch.
+- Preserve the system-image download URL, software versions, and SO ABI. Changing branches does not establish a new software release, a remote-default-branch change, or an updated Read the Docs build configuration. Remote source links require the matching branch and revision to be pushed.
+
+## 2.0.80 - 2026-11-05
+
+- Formally support selectable 2.4 GHz or 5 GHz AP operation, one band at a time. `wifi_setup` prompts for band first (default `5`), then channel (default `1` for 2.4 GHz, `36` for 5 GHz). 2.4 GHz permits `1–13`; 5 GHz permits only `36`, `40`, `44`, `48`, `149`, `153`, `157`, `161`, `165`, at 20 MHz without DFS.
+- AP uses the existing STA country code `CN`, subject to actual driver/regulatory constraints; `36–48` are indoor-only where required by applicable regulations. There is no automatic channel change or band fallback. The saved format remains `AP_CHANNEL`, with band derived from channel and existing 2.4 GHz settings preserved.
+- Change the matching new image's factory AP default to 5 GHz, `AP_CHANNEL=36`, retaining `RoboBaton-4P`, WPA2, the hotspot password, and IP/DHCP settings. Normal reboot preserves the selected band/channel; reflashing system restores image defaults. Synchronize bilingual Wi-Fi, First Power-On, and flashing guidance.
+- This documentation revision does not change software versions or SO ABI or establish replacement of immutable published image downloads, upgrades to existing devices, or new real-board radio, reboot, or client-compatibility acceptance.
+
+## 2.0.79 - 2026-11-05
+
+- The matching new implementation moves Wi-Fi, debug UART passwordless-login, and Demo autostart policies into system-partition `/etc/4p`: normal reboot retains manual choices, while reflashing system restores image defaults without importing old userdata configuration. Recordings and existing logs remain; formatting the data partition is not a configuration-reset mechanism.
+- Move generated Wi-Fi configuration, PID, and this boot's logs into `/run/4p-wifi`. Demo uses an independent system boot entry and atomic policy writes instead of editing shared startup.sh. Synchronize bilingual usage, troubleshooting, and flashing boundaries; older images need matching entries, not just copied Demo scripts.
+- This documentation revision does not change software versions or SO ABI or establish replacement of existing downloads, flashing, or new real-board reboot, radio, or UART acceptance.
+
+## 2.0.78 - 2026-11-05
+
+- Add {ref}`Factory Hotspot and Quick Connection <wifi-factory-hotspot>` for the matching new image: enable the `RoboBaton-4P` WPA2 hotspot only without existing Wi-Fi state, use the supplied device password, then open `http://192.168.5.1/` for preview and recording. Synchronize First Power-On, phone access, and System Flashing guidance.
+- Distinguish factory hotspot settings from manual AP prompt defaults. Explain preservation of existing AP/STA settings, disabled choices, and userdata across reflashing; document boot entries, the protected template, and how to disable future boot restore.
+- Explain automatic renewal of the `12`-hour DHCP lease rather than a connection-duration limit, independent Wi-Fi/USB DHCP instances, distinct default subnets, and no automatic Internet sharing. Synchronize both languages and the documentation revision without changing software versions or SO ABI or establishing replacement of old image downloads, device upgrades, or new real-board/compatibility acceptance.
+
+## 2.0.77 - 2026-11-05
+
+- Update the matching new image's USB factory-default guidance to CDC NCM across First Power-On, System Flashing, release guidance, and [USB Usage](usage/usb-gadget-switch.md). Document `switch_usb_gadget ncm`, `set-default ncm`, and shared IPv4 save/immediate-application behavior for NCM/RNDIS/ECM. The address remains `192.168.7.2/24`, with DHCP `192.168.7.10–192.168.7.100` and no gateway or DNS.
+- Retain RNDIS/ECM options, existing saved boot choices, and acquisition-stop, independent-management, and Host-power protections. Append NCM to the existing function list without changing existing VID/PID identities. Older firmware may still default to RNDIS or lack NCM. The computer must support CDC NCM; Windows compatibility is not certified, with no automatic fallback.
+- NCM uses the image's existing `usb_f_ncm.ko`, without a kernel rebuild for this default change. This documentation revision does not change software versions or SO ABI or establish replacement of published images, upgrades to existing devices, or new real-board, compatibility, or throughput acceptance. Historical changelog entries remain unchanged.
+
+## 2.0.76 - 2026-11-05
+
+- Add the factory USB NIC address, interactive `switch_usb_gadget ip` configuration, and a direct save example to the First Power-On network/IP entry point, linking to full immediate-application, factory-reset, DHCP, and reconnection instructions.
+- Distinguish USB and wired Ethernet addresses, configuration files, and where commands run, preventing USB changes through `/etc/network/interfaces`. Emphasize save-only defaults and normal acquisition shutdown plus independent maintenance access for immediate application. Synchronize both languages and the documentation revision without software-version or SO ABI changes.
+
+## 2.0.75 - 2026-11-05
+
+- Document interactive and direct `switch_usb_gadget ip` commands in {ref}`USB NIC IPv4 configuration <usb-network-address>`, including factory defaults, CIDR/DHCP ranges, factory network reset, and the distinction between saved settings and the last successfully configured profile.
+- Clarify save-only defaults without acquisition or link interruption, application at the next networking boot/re-entry, persistence and reflashing limits. Immediate application requires current RNDIS/ECM, retains its mode, and requires normal acquisition shutdown, independent maintenance access, and USB SSH disconnection consent. Add computer DHCP renewal and static-address reconnection steps.
+- Synchronize both languages and the documentation revision without software-version or SO ABI changes. The command requires the matching new image and may be absent from older firmware; this does not establish new hardware verification or remote publication of a release.
+
+## 2.0.74 - 2026-11-05
+
+- Align Web Runtime / eMMC recording with the fixed absolute root `/root/demo/save_data`: bag files use `/root/demo/save_data/session-<id>.bag`, and MP4 sessions use `/root/demo/save_data/session-<id>`, no longer derived from the executable location. Update bilingual First Boot, non-ROS usage, Saving Data, and Demo README guidance and copy examples.
+- TF remains `/mnt/sdcard/recordings`, with no eMMC fallback for absent/unmounted cards. Web accepts no custom path, and symlink security constraints are unchanged. CLI/YAML `save_data.save_path` and its default `/root/demo/save_mp4/` are unchanged; old data is not automatically moved or deleted.
+- Synchronize documentation and its revision only, without changing software versions or SO ABI or establishing new board deployment, recording, or acceptance results. Historical changelog entries retain their original meaning.
+
+## 2.0.73 - 2026-11-05
+
+- Publish the system image download [4P_V2.0.0_image.tar.gz](https://www.hessian-matrix.com/wp-content/uploads/2026/automaticupdates/4P_V2.0.0_image.tar.gz). Align bilingual System Flashing, First Power-On, compatibility, release guidance, and repository READMEs, replacing obsolete current-page statements that the download URL is unannounced.
+- Retain pre-flash backups, whole-package consistency, supported-hardware checks, and verification against the publisher's SHA-256. Do not supply an unconfirmed checksum or hardware-compatibility list.
+- Update documentation and its revision only, without software-version or SO ABI changes. The download link does not establish new flashing, reboot, or system acceptance.
+
+## 2.0.72 - 2026-11-04
+
+- Unify entry points for the UVC backend, standalone build, USB manager, and offline installer under non-ROS Demo `scripts/env_setup/x5_usb/`. Add direct source/function links and local links in both Demo READMEs; remove the obsolete claim that public repositories lack UVC source.
+- Preserve the concise USB operation guide. Add a Go-free standalone build, matching SDK/compiler/sysroot requirements, staging of three runtime scripts, offline `--rootfs` / `--package` usage, and existing-board graceful-stop, backup, verification, atomic-replacement, and manifest-synchronization boundaries.
+- Change source-delivery entry points, the offline installation CLI, and guidance only, without new runtime functionality, software-version changes, or SO ABI changes. Remote source links require publication of the corresponding revision; this does not establish publication, deployment, flashing, or new on-device video-reception/switching acceptance.
+
+## 2.0.71 - 2026-11-04
+
+- Fix access rejection when the Web service starts before a Wi-Fi AP/STA address is ready. HTTP validates Host against the connection's actual local IPv4, and new WebRTC sessions enumerate current UDP/TCP addresses rather than startup caches.
+- Document address selection and troubleshooting for phones using the board hotspot. Preserve explicit binds, Host/Origin, cross-site and query restrictions; software versions and SO ABI are unchanged. This does not establish compatibility with every phone or network.
+
+## 2.0.70 - 2026-11-04
+
+- Unify the main-board XT30 power input as the confirmed `9~27V DC` across bilingual product specifications, first-power-on guidance, hardware safety guidance, and wiring diagrams, removing old range labels.
+- Distinguish the input range from the supplied adapter's `DC 12 V / 1.5 A` rated output. This does not confirm full-load current, reverse-feed protection, the USB-C power role, or UART power-pin ratings.
+- Update documentation and its revision only; software versions and SO ABI remain unchanged, with no new on-device testing or runtime-acceptance claims.
+
+## 2.0.69 - 2026-11-04
+
+- Remove old-environment and alternative-script claims that do not match the current image. Replace {ref}`USB function-selection guidance <usb-function-selection>` with directly usable commands and interactive examples showing actual prompts, distinguishing program output from user input.
+- Document UVC system source, standalone build, and public Demo boundaries. Explain persistent camera ownership after computer preview closes or USB is unplugged, with acquisition-stop, switching, and original-application recovery order.
+- Synchronize both languages and the documentation revision only. USB implementation, software versions, and SO ABI remain unchanged; no new on-device switching, reception, or reboot acceptance is established.
+
+## 2.0.68 - 2026-11-04
+
+- Update [USB Interface Functions and Switching Limits](usage/usb-gadget-switch.md) from the flashed device's actual tool and read-only state. Explain the uses and mutual exclusion of Host, RNDIS, CDC ECM, UVC, ADB, and MSD, interactive input, status fields, safety options, and boot defaults.
+- Clarify that all manual switches require stopping acquisition applications normally: stopping Web recording does not exit acquisition. Add USB network-disconnection, UVC camera-library dependency, and MSD safe-ejection limits.
+- Update documentation and its revision only; software versions, SO ABI, and USB implementation are unchanged. Read-only inspection did not switch modes or reboot and adds no streaming, disk, or throughput acceptance.
+
+## 2.0.67 - 2026-11-04
+
+- Add real bilingual device screenshots of expanded Recording details and guidance to {ref}`Saving Data <web-recording-details>`, with session IDs redacted, and explain each status field and the four guidance notes.
+- Clarify that initial idle `0 B` does not mean a full disk; distinguish bag group drops from MP4 encoded-frame drops, completeness from cleanup, and the existing limits of the Web health-scope label.
+- Update documentation and its revision only; software versions, SO ABI, and recording implementation are unchanged. No recording was started for the screenshots, and no new recording-completeness acceptance is established.
+
+## 2.0.66 - 2026-11-04
+
+- Make [Saving Data](usage/save-data-guide.md) Web-first, using a recording-card detail image to explain format/storage selection, start, stop/finalization, final outcome and device path checks, and copying a bag or complete MP4 session.
+- Retain CLI/YAML as advanced usage and clarify that device-side saving is not a browser download, closing the page does not stop recording, TF does not fall back, and existing partial/completeness and startup-auto MP4 limits still apply.
+- Synchronize both language trees and the documentation revision only. Software versions, SO ABI, and recorder implementation are unchanged; no new on-device acceptance is established.
+
+## 2.0.65 - 2026-11-04
+
+- Replace the flashing configuration image with an `800 × 882` native window screenshot, preserving its layout and directly highlighting settings 1–8 so a very wide image no longer shrinks to unreadable text on the page.
+- Update documentation illustrations and their revision only; flashing settings, software versions, and SO ABI remain unchanged.
+
+## 2.0.64 - 2026-11-04
+
+- Add the [system flashing procedure](ops/system-flashing.md) for holding SW1 during power-on or reset, then using XBurn over USB3 Fastboot. Clarify that flashing does not require debug UART, and replace the old serial-download illustration with an annotated XBurn configuration screenshot.
+- Align flashing links in first-boot, compatibility, and release guidance. Public image download URLs and checksums remain unannounced; retain hardware/image matching, whole-package consistency, and pre-flash backup requirements.
+- Update bilingual documentation, illustrations, and the documentation revision only. Software versions and SO ABI remain unchanged; this does not establish new system acceptance.
+
+## 2.0.63 - 2026-11-04
+
+- Reduce background logging for `sensor_demo` boot autostart and `restart`: disable IMU sample blocks while retaining startup information, errors, recording results, and final health summaries. Foreground print settings, native sampling, browser telemetry, and saved data are unchanged. Existing logs are not cleared and append-only logs have no size limit.
+- This documentation revision does not change software versions or SO ABI. Deploy a matched runtime package to apply the change; it does not establish a device update or long-run acceptance.
+
+## 2.0.62 - 2026-11-04
+
+- Add a [standalone interface-name overview (PNG)](../image/V2.3_board_interfaces.png) at `1000 × 800`, labeling interface names and locations without detailed pinouts. Both languages share the image; the detailed wiring diagrams remain available.
+
+## 2.0.61 - 2026-11-04
+
+- Shorten the exposed cable runs in both interface wiring diagrams by approximately 25%. Use high-contrast blue for primary labels and orange-red for notes, preserving the board, connectors, pin numbers, wire order, and electrical guidance.
+- Update documentation illustrations and their revision only, without changing software versions, SO ABI, or hardware wiring contracts.
+
+## 2.0.60 - 2026-11-04
+
+- Align image, first-boot, compatibility, and dependency guidance with a flashed, booted V2 system: Buildroot `2022.08`, Linux `6.1.83-DR-PL5.1_V1.1.2`, non-ROS boot autostart, and preinstalled ROS2 Humble/applications plus Python/C++/SDK dependencies. Image completion is not public availability or system acceptance; public flashing/recovery instructions remain pending.
+- Run ROS2 version queries through the package environment script to avoid missing `libimage_transport.so` without the underlay/overlay. Align saving-tool system-dependency ownership.
+- State the read-only boot-time RNDIS inspection boundary and how to recognize boot-started but unsynchronized `ntpd` with no association and `stratum=16`. These checks do not validate computer-side USB enumeration/throughput, all ROS2/saving paths, long runs, repeated switching, or reboot behavior.
+- Add capture-owner handoff from boot-started non-ROS before ROS2 and the default SHM-only same-host transport boundary. Remove obsolete configurable-FSYNC wording, correct the SSE sample-order field to `sample_sequence`, and distinguish application/producer identities.
+- Document the source-inferred partial-publication limit and health-scope label mismatch when Web stops startup-auto MP4 early. This is a documentation correction, not a code fix or new on-device reproduction.
+- Update bilingual documentation and its revision only, without changing software versions, SO ABI, or device configuration.
+
 ## 2.0.59 - 2026-11-04
 
 - Integrate remote `2.0.58` Web preview/attitude/recording, official hardware, and USB/system-image documentation with parallel IIO/manual-exposure changes. Preserve remote versioned history; label parallel former `2.0.16`–`2.0.18` entries as topic-specific checkpoints instead of assigning competing topics the same revision heading. Historical ABI3/ABI4 and measurement scope remain historical, not current evidence.
@@ -25,7 +153,7 @@ This file records user-visible updates in the RoboBaton 4P public delivery, foll
 ## 2.0.56 - 2026-11-03
 
 - Correct USB guidance against the matching V2 Buildroot system: RNDIS on the USB3 controller by default, USB-specific addressing/DHCP without gateway/DNS, and distinctions between controller selection, physical routing, function classes, and negotiated speed.
-- Remove the unintegrated `switch_usb_gadget` five-mode menu and `/etc/usb_gadget_default` persistence steps. Explain ECM network configuration, the missing UVC video backend, ADB acceptance limits, and MSD ownership/unmounting risks. Retain the independent-management prerequisite and no switching during acquisition/saving.
+- Correct USB usage guidance, covering ECM network configuration, UVC video-backend and ADB acceptance limits, and MSD ownership/unmounting risks. Retain the independent-management prerequisite and no switching during acquisition/saving.
 - Align First Power-On, release boundaries, and version information. Documentation only: no system-default, SDK/board artifact, software-version, or public SO ABI/SONAME changes; no mode-switching, re-enumeration, reboot, or performance acceptance.
 
 ## 2.0.55 - 2026-11-03
@@ -215,7 +343,7 @@ This file records user-visible updates in the RoboBaton 4P public delivery, foll
 ## 2.0.23 - 2026-10-30
 
 - Add the full-resolution interface wiring diagram, original-image download, and reading guidance to both hardware-and-safety pages, with direct links from first power-on.
-- Align XT30 `12–27 V DC`, UART1 CN1 4-pin, UART7 CN2 5-pin, and independent PPS pin numbers with the diagram. Correct old wiring descriptions in serial, PPS, data-contract, and troubleshooting pages; retain power-pin load, PPS electrical, and hot-plug limits.
+- Align XT30 power wiring, UART1 CN1 4-pin, UART7 CN2 5-pin, and independent PPS pin numbers with the diagram. Correct old wiring descriptions in serial, PPS, data-contract, and troubleshooting pages; retain power-pin load, PPS electrical, and hot-plug limits. The latest revision and hardware guidance define the current power input range.
 - Update only the documentation revision to `2.0.23`; software versions and SO SONAME/ABI are unchanged, with no new real-board acceptance claims.
 
 ## 2.0.22 - 2026-10-30
@@ -408,7 +536,7 @@ V2.0.0 release: software and documentation versions unified to 2.0.0, with defau
 
 ## Parallel Development Checkpoints and Unreleased History
 
-These entries retain their original parallel-branch documentation identifiers, ABI versions, and verification boundaries. They are not additional release revisions; use `2.0.59` and current API/data pages for the present contract.
+These entries retain their original parallel-branch documentation identifiers, ABI versions, and verification boundaries. They are not additional release revisions; use the latest revision entry and current API/data pages for the present contract.
 
 ### Manual Exposure Checkpoint (Parallel Documentation Formerly 2.0.18, 2026-10-30)
 

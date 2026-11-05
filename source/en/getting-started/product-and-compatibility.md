@@ -41,19 +41,21 @@ Cameras support only full four-camera operation or single-sensor diagnostics, no
 
 The ROS2 path does not provide RTSP; use the non-ROS path when RTSP is needed. TF, extrinsics, camera intrinsics, and distortion calibration are not currently provided; CameraInfo only has width/height, and IMU orientation is unavailable.
 
-Camera ABI 3.0 retains frozen per-frame ISP `exposure` observations and frame-info prefix-size reads; estimates do not certify applied-frame exposure. Camera timing is unchanged. Identical software versions do not prove identical packages: check [Changelog](../changelog.md), manifest, headers, and loaded libraries.
+Camera ABI 3.0 retains frozen per-frame ISP `exposure` observations and frame-info prefix-size reads; estimates do not certify applied-frame exposure. The startup selector chooses observer or official timestamps, still estimating trigger time by default; see [Data Contracts](../development/data-contracts.md). Identical software versions do not prove identical packages: check [Changelog](../changelog.md), manifests, headers, and loaded libraries.
 
 ## Factory system image and target-board compatibility
 
-Public information for the matching V2 BSP/system image and recovery channel is pending confirmation. No public image download or confirmed flashing procedure is currently available; see [System Flashing](../ops/system-flashing.md). Do not write an image unless its compatibility with the current hardware is confirmed.
+The V2 system image has been built and devices have booted after flashing. The current matching image preinstalls non-ROS, ROS2 Humble, the IIO capture module, and system dependencies; only non-ROS autostarts by default. Current firmware supports holding SW1 during power-on or reset, then flashing with XBurn over USB3 Fastboot, without a debug UART connection. See [System Flashing](../ops/system-flashing.md) for the procedure. Image download: [4P_V2.0.0_image.tar.gz](https://www.hessian-matrix.com/wp-content/uploads/2026/automaticupdates/4P_V2.0.0_image.tar.gz); confirm the release archive's SHA-256 and supported hardware with Product Support before flashing. Image completion does not establish acceptance of every interface. Before flashing, confirm that the image matches the current hardware and back up data; do not flash an image of unconfirmed compatibility.
 
 ## Version query and whole-package matching
 
 ```bash
 /root/demo/cam_demo --version
 /root/demo/sensor_demo --version
-/root/ros2_demo/install/lib/robobaton_4p_ros2_demo/robobaton_sensors_node --version
-/root/ros2_demo/install/lib/robobaton_4p_ros2_demo/robobaton_imu_rate_monitor --version
+/root/ros2_demo/install/robobaton_ros2_env.bash \
+  /root/ros2_demo/install/lib/robobaton_4p_ros2_demo/robobaton_sensors_node --version
+/root/ros2_demo/install/robobaton_ros2_env.bash \
+  /root/ros2_demo/install/lib/robobaton_4p_ros2_demo/robobaton_imu_rate_monitor --version
 ```
 
 Deploy and verify as a whole package: non-ROS uses `manifest.sha256`, and the ROS2 install uses the archive checksum plus the runtime `abi_manifest.sha256`. Do not replace only a single executable or a single `.so`; programs, headers, and runtime libraries must come from the same verified software package. The documentation revision cannot establish software or ABI compatibility.
