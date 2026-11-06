@@ -126,6 +126,8 @@ host 模式保留内核 MONOTONIC 估计，不提供物理误差上界。tmst �
 
 ### Web 姿态预览输入
 
+`GET /api/v1/info` 保留软件 `version` 和应用会话身份；当前 Web 服务报告 `web_implementation: "rust"`、`webrtc_stack: "str0m"` 和 `webrtc_version: "0.24.1"`。WebRTC 版本由 `webrtc_version` 读取，不再提供旧 Go/Pion 的 `pion_version` 字段；这些实现信息不改变软件版本或 SO ABI。
+
 `sensor_demo` 的 IMU SSE 使用 **`schema_version: 2`**，不保留旧 `sample_timestamp_ns` / `host_timestamp_ns` 别名。SSE `session_id` 与 `/api/v1/info.application_session_id` 标识同一应用会话，`source_generation` 标识 producer 会话，`sample_sequence` 为原生样本序号；没有名为 `sequence` 的 SSE 字段。所有 u64 字段用十进制字符串传输，避免 JavaScript 精度损失。
 
 时间字段显式区分 `sample_realtime_ns`、`sample_monotonic_ns`、`sample_raw_ns`、`observation_monotonic_ns`、`burst_complete_raw_ns` 和 `estimated_period_ns`。`timestamp_mode` 为 `host` 或 `tmst`；host 的 `timestamp_uncertainty_ns` 为 JSON `null`（没有误差上界），tmst 为计算映射 admission。保留 `source_generation`、`evidence_id`、`burst_flags`、`packet_flags`、`timestamp_source`、`fifo_tmst` 及 `bridge_monotonic_ns`、`bridge_raw_ns`、`bridge_realtime_ns`、`bridge_uncertainty_ns`。不能跨 RAW/MONOTONIC 直接作差。ABI5 不提供逐样本 GPIO/mapper 计数，SSE 不伪造零值或继续输出这些字段。

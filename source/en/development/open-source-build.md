@@ -35,7 +35,7 @@ The public demo repositories already carry the public headers and matching preco
 
 These repositories do not compile the underlying ICM42670, SC132, or PRRTSP producer source. Without the X5 cross-compilation toolchain, you cannot recompile the source and can only use the `demo/` in the repository or a pre-generated install package for deployment.
 
-The system USB camera program `x5-uvc-mosaic` is not a root CMake target listed above. Its complete backend, standalone build, and offline installer are under [`scripts/env_setup/x5_usb/`](https://github.com/Hessian-matrix/RoboBaton_4p_demo/tree/V2_main/scripts/env_setup/x5_usb) in public `RoboBaton_4p_demo`. This build needs no Go, but requires the matching X5 SDK and SC132 ABI3 library. Editing other non-ROS mosaic or JPEG examples does not update the system USB camera. See {ref}`USB Development Entry Points <usb-uvc-development>` for source/function links, standalone commands, offline `--package` installation, and safe updates on an existing board.
+The system USB camera program `x5-uvc-mosaic` is not a root CMake target listed above. Its complete backend, standalone build, and offline installer are under [`scripts/env_setup/x5_usb/`](https://github.com/Hessian-matrix/RoboBaton_4p_demo/tree/V2_main/scripts/env_setup/x5_usb) in public `RoboBaton_4p_demo`. This build does not need the Web service's Rust toolchain, but requires the matching X5 SDK and SC132 ABI3 library. Editing other non-ROS mosaic or JPEG examples does not update the system USB camera. See {ref}`USB Development Entry Points <usb-uvc-development>` for source/function links, standalone commands, offline `--package` installation, and safe updates on an existing board.
 
 Each library family has one regular `libNAME.so.M.m.p` file and two exact same-directory relative links: `libNAME.so.M -> libNAME.so.M.m.p`, `libNAME.so -> libNAME.so.M`. Non-ROS uses ICM42670, SC132, and PRRTSP; ROS2 uses only the first two. Synchronization, packaging, and install preserve links; verifiers reject flattened aliases and wrong, absolute, or broken links. Copy complete trees with `tar`, `cp -a`, or `rsync -a`, without dereferencing links.
 
@@ -102,19 +102,22 @@ git clone --branch V2_main https://github.com/Hessian-matrix/RoboBaton_4p_demo.g
 cd RoboBaton_4p_demo
 ```
 
-Building all six demos and application-owned `sensor_web` additionally requires exact Go `1.27.3` on the host, not the device. Install and verify it first; use `go mod download` during a network-enabled dependency-provisioning step. Actual builds enforce `GOTOOLCHAIN=local`, an offline module cache, and readonly modules, without automatic compiler/dependency downloads.
+Building all six demos and application-owned `sensor_web` additionally requires exact Rust `1.95.0`, cargo-zigbuild `0.23.0`, Zig `0.16.0`, and the `aarch64-unknown-linux-musl` target on the host; the device needs no compiler. Install these tools and fetch Cargo.lock dependencies during a network-enabled provisioning step. Actual builds are frozen/offline and do not automatically install toolchains or dependencies.
 
 ```bash
-export GO=/path/to/go1.27.3/bin/go # replace with the installed exact compiler
-GOTOOLCHAIN=local "$GO" env GOVERSION # must be go1.27.3
-(cd web/server && GOTOOLCHAIN=local "$GO" mod download)
+export CARGO=/path/to/rust1.95/bin/cargo # replace with the installed toolchain
+export PATH="$(dirname "$CARGO"):$PATH" # make matching rustc/cargo and cargo-zigbuild discoverable
+rustc --version # must be rustc 1.95.0 (59807616e 2026-04-14)
+"$CARGO" fetch --locked --manifest-path web/server/Cargo.toml
 cmake -S . -B build_x5 \
   -DCMAKE_TOOLCHAIN_FILE="$TOOLCHAIN_FILE" \
-  -DSENSOR_WEB_GO_EXECUTABLE="$GO"
+  -DSENSOR_WEB_CARGO_EXECUTABLE="$CARGO"
 cmake --build build_x5 -j
 ```
 
-`sensor_web` is a static Linux ARM64 executable embedding assets and Pion; the `sensor_demo` target depends on it. The runtime contains complete notices and the module lock under `licenses/sensor_web/`. Rebuild after changes to Web source/assets/locks. The verifier reads fixed Go/module identity, application version, and source digest from ELF and rejects stale binaries; do not strip this Go ELF or merely update sidecar hashes. Build it alone with `scripts/build_sensor_web.sh --go "$GO" --output build_x5/sensor_web`, or package everything with `scripts/package_runtime.sh --go "$GO"`.
+`sensor_web` is a static Linux ARM64 musl executable embedding browser assets and str0m; the `sensor_demo` target depends on it. The runtime contains complete notices and the crate lock under `licenses/sensor_web/`. Rebuild after changes to Web source/assets/locks. The verifier cross-checks ELF `.sensor_web`, the runtime-consumed `.sensor_web_runtime`, and current source/locks, verifies both sections are covered by loadable segments, and rejects old binaries with only refreshed identity JSON. Preserve these sections and complete runtime provenance; these consistency checks are not digital signatures or independent proof of compiler authenticity. Build it alone with `scripts/build_sensor_web.sh --cargo "$CARGO" --output build_x5/sensor_web`, or package everything with `scripts/package_runtime.sh --cargo "$CARGO"`. HTTP, four-camera WebRTC, IMU SSE, and recording endpoints are unchanged. Measure overhead on the same device under the same load; changing language alone does not establish a performance improvement.
+
+Final linkage uses `rust-lld` and musl `1.2.5` / mallocng bundled with the pinned Rust ARM64 target. cargo-zigbuild/Zig compile native C/assembly dependencies only, not the final libc. The verifier also checks native mallocng symbols; stripping those symbols from `sensor_web` makes runtime-package verification fail. mallocng can return idle allocation groups, but closing the page guarantees neither zero RSS nor a full return to the initial value, and does not prove leak freedom for arbitrary durations. Rebuild the complete runtime package and restart the application normally.
 
 Or build a single target:
 

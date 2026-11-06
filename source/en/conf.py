@@ -34,7 +34,7 @@ html_js_files = ["language-switcher.js"]
 # The Chinese and English projects share the same page paths; the switcher builds the matching
 # cross-language link from the current page.
 html_context = {
-    "rtd_version": os.environ.get("READTHEDOCS_VERSION", "latest"),
+    "rtd_version": os.environ.get("READTHEDOCS_VERSION", "4pv2.main"),
     "docs_base_url_zh": "https://4p-docs.readthedocs.io",
     "docs_base_url_en": "https://4p-doc-en.readthedocs.io",
 }

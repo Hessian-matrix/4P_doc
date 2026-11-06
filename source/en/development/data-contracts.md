@@ -126,6 +126,8 @@ Host mode preserves the kernel MONOTONIC estimate without a physical-error bound
 
 ### Web Attitude Preview Inputs
 
+`GET /api/v1/info` retains the software `version` and application-session identity. The current Web service reports `web_implementation: "rust"`, `webrtc_stack: "str0m"`, and `webrtc_version: "0.24.1"`. Read the WebRTC version from `webrtc_version`; the former Go/Pion `pion_version` field is no longer provided. These implementation fields do not change the software version or SO ABI.
+
 The `sensor_demo` IMU SSE uses **`schema_version: 2`**, without legacy `sample_timestamp_ns` / `host_timestamp_ns` aliases. SSE `session_id` matches `/api/v1/info.application_session_id` as the application-session identity; `source_generation` identifies the producer session, and `sample_sequence` is the native sample sequence. There is no SSE field named `sequence`. Every u64 field is a decimal string to avoid JavaScript precision loss.
 
 Explicit time fields are `sample_realtime_ns`, `sample_monotonic_ns`, `sample_raw_ns`, `observation_monotonic_ns`, `burst_complete_raw_ns`, and `estimated_period_ns`. `timestamp_mode` is `host` or `tmst`; host `timestamp_uncertainty_ns` is JSON `null` (no error bound), while tmst reports computational mapping admission. Retain `source_generation`, `evidence_id`, `burst_flags`, `packet_flags`, `timestamp_source`, `fifo_tmst`, and `bridge_monotonic_ns`, `bridge_raw_ns`, `bridge_realtime_ns`, `bridge_uncertainty_ns`. Never subtract directly across RAW/MONOTONIC. ABI5 exposes no per-sample GPIO/mapper counters; SSE neither fabricates zeros nor retains those fields.

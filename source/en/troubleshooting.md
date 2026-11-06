@@ -18,6 +18,12 @@ Run `ip -4 addr show wlan0` on the board and enter `http://<AP-address>/` direct
 
 An older H.264 producer may advertise Main while retaining the SDK's default High-only 8×8 transform. Some hardware decoders continue producing incorrect pixels even with zero packet loss. The current producer explicitly disables that tool; H.265 is unchanged. Verify and update the whole runtime package, stop and restart `sensor_demo` normally, then refresh the page. Replacing page assets alone cannot fix a running encoder. Temporarily disabling accelerated video decoding in an isolated browser process can provide a comparison, not a permanent fix; do not close unrelated user browsers. Collect screenshots, browser/OS/driver versions, and source SPS/PPS. The current SDK may still emit zero-valued PPS extension fields, so strict Main syntax conformance or compatibility with every hardware decoder is not guaranteed.
 
+### Web Process Memory Does Not Return to Zero After Closing the Page
+
+RSS includes live objects, stacks, and allocator-retained pages, not leaked bytes alone; closing the page does not stop the application or recording. Current source replaces the previous Zig allocator with static musl `1.2.5` / mallocng, allowing idle allocation groups to return to the kernel without guaranteeing zero RSS or a full return to the startup value. Rebuild and verify the complete runtime with the matching toolchain, then update the application normally using [Deployment and Rollback](development/deployment-and-upgrade.md). Refreshing the page cannot replace the running allocator. Do not hide growth through periodic restarts or interrupt recording finalization.
+
+If memory still grows continuously under the same load, collect software versions, manifest, application start time, browser-page count, video configuration, transport, and a continuous interval of RSS/PSS, thread counts, and fd counts. Mark page open/close and reconnection times. Compare similarly aged processes under the same load; neither an absolute drop after restart nor a negative fit spanning a reconnection proves long-term leak freedom. This memory fix does not establish that all capture failures are resolved; retain complete errors and investigate capture exits separately, without stopping `cam-service` as a workaround.
+
 
 ## SSH Cannot Connect
 

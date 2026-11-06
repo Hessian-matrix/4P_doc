@@ -2,6 +2,30 @@
 
 This file records user-visible updates in the RoboBaton 4P public delivery, following the shared [Documentation Version Policy](release-and-support.md#documentation-version-policy). Documentation revisions on this page do not automatically change software versions and are distinct from SO SONAME/ABI versions.
 
+## 2.0.85 - 2026-11-06
+
+- Synchronize the Rust/str0m Web migration and musl mallocng fix across usage, troubleshooting, and build guidance. Clarify `/api/v1/info` implementation identity, toolchain PATH, complete-runtime update/normal-restart requirements, and why RSS alone is not leaked memory.
+- Document spare passive TCP ICE closure behavior and the 64-remote-endpoint limit per RTC, not browser-page capacity. Retain reconnection, capture-failure, and long-term-stability limitations without publishing internal device identity or raw evidence.
+- Align the documentation revision in README and both release pages. Software `2.0.0`, SO ABI, and existing image downloads are unchanged; local commits establish neither remote publication nor upgrades to existing devices.
+
+## 2.0.84 - 2026-11-06
+
+- Link `sensor_web` statically with musl `1.2.5` / mallocng and `rust-lld` bundled with the pinned Rust target. Zig compiles native C/assembly dependencies only, avoiding the previous allocator's long-lived retention of freed small-block slabs. The runtime verifier checks native linked mallocng symbols; third-party notices identify the corresponding libc source.
+- Update bilingual source-build constraints and complete-package rebuild/application-restart requirements. Closing the page guarantees neither zero RSS nor a full return to the initial value. This documentation establishes no arbitrary-duration leak freedom, all-load stability, or upgrades to existing devices. Software `2.0.0` and SO ABI remain unchanged.
+
+## 2.0.83 - 2026-11-06
+
+- Replace application-owned `sensor_web` Go/Pion with Rust/str0m, retaining embedded pages, four H.264 WebRTC views, UDP/passive TCP ICE, IMU SSE, and recording-control endpoints. `sensor_demo` still owns its lifecycle; no standalone service entry is added.
+- Source builds use fixed Rust `1.95.0`, cargo-zigbuild `0.23.0`, Zig `0.16.0`, and the ARM64 musl target, with frozen/offline actual builds. The runtime verifier checks embedded compiler, dependency-lock, version, and source identity in the ELF; complete third-party notices accompany the runtime.
+- Closing a spare passive TCP ICE candidate no longer terminates the active media route. Each RTC admits at most 64 distinct remote protocol/address endpoints over its lifetime; reaching the limit rejects only new endpoints without evicting admitted endpoints or other sessions.
+- Software remains `2.0.0` with unchanged SO ABI. This documentation update establishes no remote publication, upgrades to existing devices, or long-term stability acceptance; measure performance on the same device, configuration, and client workload.
+
+## 2.0.82 - 2026-11-05
+
+- Use the [Chinese](https://4p-docs.readthedocs.io/zh-cn/4pv2.main/) and [English](https://4p-doc-en.readthedocs.io/en/4pv2.main/) online documentation entry points. README and page deep links retain their paths and anchors; local documentation builds default cross-language links to the `4pv2.main` deployment identifier.
+- The `sensor_demo` Web “在线文档 / Online Docs” link opens the matching homepage for the current language, replacing the old `4pv2` entry point. Rebuild `sensor_web` with its embedded assets and update the matched runtime package; refreshing the browser alone cannot update the running program.
+- This documentation revision changes no software version or SO ABI and establishes no remote publication, board update, or additional acceptance.
+
 ## 2.0.81 - 2026-11-05
 
 - Use `V2_main` as the V2 main branch in all three public repositories. Bilingual homepages, READMEs, source-file/directory links, and non-ROS, ROS2, NTP, and PTP clone examples select it explicitly rather than relying on the default branch.

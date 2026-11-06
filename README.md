@@ -2,6 +2,8 @@
 
 `4P_doc` 是 RoboBaton 4P V2 的公开在线产品文档工程，使用 Sphinx + Read the Docs 构建。文档面向拿到 V2 硬件、匹配 non-ROS demo 或 ROS2 demo 的用户，目标是完成接线、开机、路径选择、运行验证和常见问题排查。
 
+在线文档：[中文](https://4p-docs.readthedocs.io/zh-cn/4pv2.main/) · [English](https://4p-doc-en.readthedocs.io/en/4pv2.main/)。
+
 ## 文档边界
 
 本仓只放面向用户的公开说明：
@@ -32,9 +34,11 @@
 
 完整公开政策见 [中文发布说明](source/cn/release-and-support.md#文档版本政策) 和 [English release policy](source/en/release-and-support.md#documentation-version-policy)。主仓门禁命令为 `python3 -B tests/version_reporting_contract_test.py`；中英文仍须分别通过严格 HTML 构建和 linkcheck。
 
-当前文档修订为 `2.0.81`，软件仍为 `2.0.0`；硬件标识与 SO ABI 独立识别。主板 XT30 电源输入已确认为 `9~27V DC`，中英文正文、参数表与接线图采用相同范围。当前 IMU 为内核 IIO V3／公共 ABI5，最终默认 HO（相机 observer + IMU host），其余启动组合保留比较。non-ROS 默认 Web 开、RTSP 关、IMU `800Hz`；手动曝光为显式配置，不更改默认自动曝光。当前镜像已制作并已有烧录启动设备，预装 non-ROS、ROS2 Humble/应用及系统依赖，仅 `sensor_demo` 默认自启；镜像下载：[4P_V2.0.0_image.tar.gz](https://www.hessian-matrix.com/wp-content/uploads/2026/automaticupdates/4P_V2.0.0_image.tar.gz)，发布包 SHA-256 与适用硬件须在烧录前向产品支持核对，镜像完成不等于整机验收。当前固件支持按住 SW1 上电或复位，再通过 USB3 Fastboot 使用 XBurn 烧录，无需调试串口；操作及硬件匹配、备份要求见[中文系统烧录](source/cn/ops/system-flashing.md)和[English System Flashing](source/en/ops/system-flashing.md)。ROS2 版本查询也需包内环境脚本。USB 页提供可照做的命令和交互输入，解释 Host/Device、NCM/RNDIS/ECM/UVC/ADB/MSD、状态字段与安全参数；配套新镜像候选出厂默认 CDC NCM，安装更新保留已有开机选择。较旧固件可能仍默认 RNDIS 或不支持 NCM；电脑须支持 CDC NCM，Windows 兼容性尚未认证，RNDIS/ECM 仍可手动选择而不自动回退。这不表示已发布的旧镜像下载内容发生变化。USB 页也明确 UVC 公开源码、独立构建/离线安装和相机交接：关闭电脑预览或拔线不释放相机，须停止 UVC 或切回网卡后再启动原应用；既有 RNDIS 检查不能认证 NCM 或其他模式。NTP 页说明自动授时和无 association／`stratum=16` 的未同步状态。既有整合包完成 non-ROS HO／四路30fps网页预览与姿态／bag与MP4回读／正常停止短窗验证，不自动推广到新烧录设备、ROS2 板端、其余三组合、物理精度、双机/GPU、压力、`8h` 或重启，也不构成新软件发布。见[中文能力与验证边界](source/cn/release-and-support.md#capability-verification-boundary)和[English capability and verification boundaries](source/en/release-and-support.md#capability-verification-boundary)。
+当前文档修订为 `2.0.85`，软件仍为 `2.0.0`；硬件标识与 SO ABI 独立识别。主板 XT30 电源输入已确认为 `9~27V DC`，中英文正文、参数表与接线图采用相同范围。当前 IMU 为内核 IIO V3／公共 ABI5，最终默认 HO（相机 observer + IMU host），其余启动组合保留比较。non-ROS 默认 Web 开、RTSP 关、IMU `800Hz`；手动曝光为显式配置，不更改默认自动曝光。当前镜像已制作并已有烧录启动设备，预装 non-ROS、ROS2 Humble/应用及系统依赖，仅 `sensor_demo` 默认自启；镜像下载：[4P_V2.0.0_image.tar.gz](https://www.hessian-matrix.com/wp-content/uploads/2026/automaticupdates/4P_V2.0.0_image.tar.gz)，发布包 SHA-256 与适用硬件须在烧录前向产品支持核对，镜像完成不等于整机验收。当前固件支持按住 SW1 上电或复位，再通过 USB3 Fastboot 使用 XBurn 烧录，无需调试串口；操作及硬件匹配、备份要求见[中文系统烧录](source/cn/ops/system-flashing.md)和[English System Flashing](source/en/ops/system-flashing.md)。ROS2 版本查询也需包内环境脚本。USB 页提供可照做的命令和交互输入，解释 Host/Device、NCM/RNDIS/ECM/UVC/ADB/MSD、状态字段与安全参数；配套新镜像候选出厂默认 CDC NCM，安装更新保留已有开机选择。较旧固件可能仍默认 RNDIS 或不支持 NCM；电脑须支持 CDC NCM，Windows 兼容性尚未认证，RNDIS/ECM 仍可手动选择而不自动回退。这不表示已发布的旧镜像下载内容发生变化。USB 页也明确 UVC 公开源码、独立构建/离线安装和相机交接：关闭电脑预览或拔线不释放相机，须停止 UVC 或切回网卡后再启动原应用；既有 RNDIS 检查不能认证 NCM 或其他模式。NTP 页说明自动授时和无 association／`stratum=16` 的未同步状态。既有整合包完成 non-ROS HO／四路30fps网页预览与姿态／bag与MP4回读／正常停止短窗验证，不自动推广到新烧录设备、ROS2 板端、其余三组合、物理精度、双机/GPU、压力、`8h` 或重启，也不构成新软件发布。见[中文能力与验证边界](source/cn/release-and-support.md#capability-verification-boundary)和[English capability and verification boundaries](source/en/release-and-support.md#capability-verification-boundary)。
 
 配套新镜像还在无既有 `/userdata/wifi` 状态时默认初始化 `RoboBaton-4P` WPA2 热点；使用随设备提供的密码连接后，打开 `http://192.168.5.1/` 预览与录包。已有 AP/STA 和停用选择保留；Wi-Fi 与 USB DHCP 独立，`12` 小时租期可自动续租，不是连接时限。出厂与手动配置默认值、恢复方法和验收边界见[中文 Wi-Fi 配置](source/cn/getting-started/wifi-configuration.md)和[English Wi-Fi Configuration](source/en/getting-started/wifi-configuration.md)。
+
+当前 Web 源码使用 Rust/str0m 和静态 musl mallocng，保留四路预览、IMU SSE、录制控制及 `sensor_demo` 子进程生命周期；源码编译、整包更新、内存诊断和 ICE 端点限制已同步两种语言。此源码修订不自动更新已发布镜像或已有设备，也不承诺 RSS 归零、长期无泄漏或无重连。
 
 ## 当前在线文档目录
 

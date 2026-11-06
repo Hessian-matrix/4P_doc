@@ -189,7 +189,7 @@ NCM 默认值与内核模块已集成不代表电脑端枚举、收流、磁盘�
 
 ### 独立构建
 
-在开发机的 **`RoboBaton_4p_demo` 根目录**执行，不需要 Go：
+在开发机的 **`RoboBaton_4p_demo` 根目录**执行，不需要 Web 服务的 Rust 工具链：
 
 ```bash
 SDK_ROOT=/path/to/platform_source_code # 改为匹配目标系统的 X5 SDK 源码树

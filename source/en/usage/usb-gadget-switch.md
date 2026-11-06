@@ -189,7 +189,7 @@ Online source links point to `V2_main` and become accessible only after that bra
 
 ### Standalone Build
 
-Run on the development host from the **`RoboBaton_4p_demo` root**; Go is not needed:
+Run on the development host from the **`RoboBaton_4p_demo` root**; the Web service's Rust toolchain is not needed:
 
 ```bash
 SDK_ROOT=/path/to/platform_source_code # replace with the X5 SDK source tree matching the target system

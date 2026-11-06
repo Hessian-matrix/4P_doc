@@ -35,7 +35,7 @@ RoboBaton_4P_ROS2_demo
 
 这些仓库不编译底层 ICM42670、SC132 或 PRRTSP producer 源码。如果没有 X5 交叉编译工具链，不能重新编译源码，只能直接使用仓库里的 `demo/` 或已生成的 install 包部署运行。
 
-系统 USB 摄像头程序 `x5-uvc-mosaic` 不在上述根 CMake 编译目标中；其完整后端、独立构建和离线安装工具位于公开 `RoboBaton_4p_demo` 的 [`scripts/env_setup/x5_usb/`](https://github.com/Hessian-matrix/RoboBaton_4p_demo/tree/V2_main/scripts/env_setup/x5_usb)。该构建不需要 Go，但需要匹配的 X5 SDK 和 SC132 ABI3 库。修改其他 non-ROS 拼图或 JPEG 示例不会更新系统 USB 摄像头；源码/函数链接、独立构建命令、离线 `--package` 安装及已有板卡的安全更新见{ref}`USB 开发修改入口 <usb-uvc-development>`。
+系统 USB 摄像头程序 `x5-uvc-mosaic` 不在上述根 CMake 编译目标中；其完整后端、独立构建和离线安装工具位于公开 `RoboBaton_4p_demo` 的 [`scripts/env_setup/x5_usb/`](https://github.com/Hessian-matrix/RoboBaton_4p_demo/tree/V2_main/scripts/env_setup/x5_usb)。该构建不需要 Web 服务的 Rust 工具链，但需要匹配的 X5 SDK 和 SC132 ABI3 库。修改其他 non-ROS 拼图或 JPEG 示例不会更新系统 USB 摄像头；源码/函数链接、独立构建命令、离线 `--package` 安装及已有板卡的安全更新见{ref}`USB 开发修改入口 <usb-uvc-development>`。
 
 每套库固定为一份普通文件 `libNAME.so.M.m.p`，加两个同目录相对链接 `libNAME.so.M -> libNAME.so.M.m.p`、`libNAME.so -> libNAME.so.M`。non-ROS 使用 ICM42670、SC132、PRRTSP；ROS2 只使用前两者。同步、打包和 install 保留链接，verifier 拒绝展开别名、错误/绝对/断裂链接。完整复制使用 `tar`、`cp -a` 或 `rsync -a`，不要解引用链接。
 
@@ -102,19 +102,22 @@ git clone --branch V2_main https://github.com/Hessian-matrix/RoboBaton_4p_demo.g
 cd RoboBaton_4p_demo
 ```
 
-完整编译六个 demo 及应用拥有的 `sensor_web`，额外需要精确的 Go `1.27.3`（主机工具，不安装到板端）。预先安装并核对工具链，以允许联网的依赖准备阶段执行 `go mod download`；实际构建强制 `GOTOOLCHAIN=local`、离线 module cache 与 readonly modules，不自动下载工具链或依赖。
+完整编译六个 demo 及应用拥有的 `sensor_web`，额外需要主机上精确的 Rust `1.95.0`、cargo-zigbuild `0.23.0`、Zig `0.16.0` 和 `aarch64-unknown-linux-musl` target；板端无需编译器。先在允许联网的依赖准备阶段安装上述工具，并预取 Cargo.lock 依赖；实际构建使用 frozen/offline，不自动安装工具链或依赖。
 
 ```bash
-export GO=/path/to/go1.27.3/bin/go # 改为已安装的精确工具链
-GOTOOLCHAIN=local "$GO" env GOVERSION # 必须为 go1.27.3
-(cd web/server && GOTOOLCHAIN=local "$GO" mod download)
+export CARGO=/path/to/rust1.95/bin/cargo # 改为已安装的工具链
+export PATH="$(dirname "$CARGO"):$PATH" # 同一套 Rust 的 rustc/cargo 与 cargo-zigbuild 必须可发现
+rustc --version # 必须为 rustc 1.95.0 (59807616e 2026-04-14)
+"$CARGO" fetch --locked --manifest-path web/server/Cargo.toml
 cmake -S . -B build_x5 \
   -DCMAKE_TOOLCHAIN_FILE="$TOOLCHAIN_FILE" \
-  -DSENSOR_WEB_GO_EXECUTABLE="$GO"
+  -DSENSOR_WEB_CARGO_EXECUTABLE="$CARGO"
 cmake --build build_x5 -j
 ```
 
-`sensor_web` 为静态 Linux ARM64 可执行程序，嵌入页面和 Pion；`sensor_demo` 目标依赖它。运行包包含 `licenses/sensor_web/` 的完整 notice 和 module 锁。修改 Web 源码/资源/锁后必须重建，verifier 从 ELF 读取固定 Go/module、应用版本与源码摘要，拒绝旧 binary 配新资源；不要 strip 此 Go ELF，也不要仅修改 sidecar 哈希。独立构建使用 `scripts/build_sensor_web.sh --go "$GO" --output build_x5/sensor_web`；完整打包可用 `scripts/package_runtime.sh --go "$GO"`。
+`sensor_web` 为静态 Linux ARM64 musl 可执行程序，嵌入页面和 str0m；`sensor_demo` 目标依赖它。运行包包含 `licenses/sensor_web/` 的完整 notice 和 crate 锁。修改 Web 源码/资源/锁后必须重建；verifier 交叉核对 ELF 的 `.sensor_web`、运行时实际读取的 `.sensor_web_runtime` 和当前源码/锁，检查两节均由可加载段覆盖，拒绝仅刷新身份 JSON 的旧 binary。保留这些节及完整运行包来源记录；此一致性检查不是数字签名或独立的编译器真实性证明。独立构建使用 `scripts/build_sensor_web.sh --cargo "$CARGO" --output build_x5/sensor_web`；完整打包可用 `scripts/package_runtime.sh --cargo "$CARGO"`。HTTP、四路 WebRTC、IMU SSE 与录制控制入口保持不变；开销变化须在同设备、同负载下测量，语言替换不等于已获得性能提升。
+
+最终链接由固定 Rust 工具链自带的 `rust-lld` 完成，使用该 ARM64 target 随附的 musl `1.2.5` / mallocng；cargo-zigbuild/Zig 仅编译原生 C/汇编依赖，不提供最终 libc。verifier 另外检查 mallocng 原生符号；不得对 `sensor_web` 执行移除这些符号的 strip，否则运行包验证失败。mallocng 可归还空闲分配组，但不保证关闭网页后 RSS 为零或完全回到初始值，也不构成任意时长无泄漏证明。更新需完整重建运行包并正常重启应用。
 
 也可以只编译单个目标：
 

@@ -26,7 +26,7 @@
 
 | 项目 | 当前版本 | 状态 |
 |---|---|---|
-| 文档修订 | `2.0.81` | 本站持续更新；修订内容见 [版本更新记录](changelog.md)，不表示软件版本升级。 |
+| 文档修订 | `2.0.85` | 本站持续更新；修订内容见 [版本更新记录](changelog.md)，不表示软件版本升级。 |
 | non-ROS demo/运行包 | `v2.0.0` | 默认安装位置为 `/root/demo`，按 `manifest.sha256` 整包校验；不表示目标板已安装当前源码对应工件。 |
 | ROS2 package/install | `v2.0.0` | 默认安装位置为 `/root/ros2_demo/install`，包名 `robobaton_4p_ros2_demo`。源码更新或本地重编译不等于目标板已安装修订或正式升级；目标板实际安装版本须核对 manifest 与所加载库。使用前应按 [ROS2 Demo 使用](usage/ros2-demo.md)、[non-ROS Demo 使用](usage/non-ros-demo.md) 和 [保存数据](usage/save-data-guide.md) 完成对应路径的实际检查。 |
 | 系统镜像包 | `V2.0.0` | [4P_V2.0.0_image.tar.gz](https://www.hessian-matrix.com/wp-content/uploads/2026/automaticupdates/4P_V2.0.0_image.tar.gz)；烧录步骤、校验值与硬件匹配要求见[系统烧录](ops/system-flashing.md)。 |
@@ -35,9 +35,11 @@
 
 V2 源码和文档仓库统一使用 `V2_main` 主分支，仓库浏览、源码链接和 clone 示例均显式选择该分支；分支名不代替版本、manifest 或兼容性检查。远端链接须在分支及修订推送后才可访问，Read the Docs 构建配置独立管理。
 
-在线文档会根据用户反馈继续更新；当前没有单独固定的 `stable` 文档版本。文档修订号按上述政策识别，Read the Docs 的 `latest` 是部署标识，不是软件版本。软件正式发布不等同于跳过目标板运行检查。相机参数集合公开支持 `25/30/40/50/60fps`，默认 `30fps`；保存和 ROS2 路径应以实际结果、退出码、manifest 和目标板环境检查判定。
+在线文档会根据用户反馈继续更新；当前入口为[中文文档](https://4p-docs.readthedocs.io/zh-cn/4pv2.main/)和[英文文档](https://4p-doc-en.readthedocs.io/en/4pv2.main/)，没有单独固定的 `stable` 文档版本。文档修订号按上述政策识别，Read the Docs 的 `4pv2.main` 是部署标识，不是软件版本或不可变发布快照。软件正式发布不等同于跳过目标板运行检查。相机参数集合公开支持 `25/30/40/50/60fps`，默认 `30fps`；保存和 ROS2 路径应以实际结果、退出码、manifest 和目标板环境检查判定。
 
 当前使用指南覆盖标识为 `2.0.0` 的 V2 软件及 changelog 中明确列出的未发布源码更新；同一个版本字符串不证明工件组成相同，应核对运行包 manifest、实际链接库和对应说明。ICM-42670-P 头文件、库、consumer 与配置必须成套匹配。ICM 原生 `25/50/100/200/400/800/1600Hz`，默认 `800Hz`；不支持的速率明确拒绝，不静默重采样。文档修订不代表实板或整机验收。
+
+当前 `sensor_web` 源码为 Rust/str0m，使用静态 musl `1.2.5` / mallocng；应用拥有的子进程、WebRTC/SSE/录制入口保持不变。升级需完整匹配运行包及正常应用重启，不升级内核、SO ABI 或已发布镜像，也不代表任意时长无泄漏、无重连或所有采集异常已关闭。要求与限制见[源码编译](development/open-source-build.md)、[non-ROS 使用](usage/non-ros-demo.md)和[故障排查](troubleshooting.md)。
 
 硬件标识、软件 `2.0.0`、文档修订及各 SO ABI 是独立维度；不能互相代替兼容性或验收结论。本次只同步文档，不改变软件行为或发布状态。
 
