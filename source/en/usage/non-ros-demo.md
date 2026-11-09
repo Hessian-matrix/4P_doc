@@ -66,7 +66,7 @@ All functionality is on **one homepage**, without switching between camera, IMU,
 | Live summary | Camera connection count, source capture state, native/preview rates, and sensor temperature; assess connection and capture states separately. |
 | Cameras | CAM1–CAM4 in a 2×2 grid, with source resolution, frame rate, and codec beside the heading; double-click an image to expand/restore it. |
 | Inertial Attitude | Coordinate-model illustration, Roll/Pitch/relative Yaw, and automatic stationary bias-estimation status; Calibrate Gyro Bias and Reset Relative Heading affect browser preview only. |
-| Raw Six-Axis Telemetry | X/Y/Z acceleration (`m/s²`), angular rate (`rad/s`), and last-second trends; native/preview rates, sample sequence, and temperature below. No GPIO/mapper counters absent from ABI5 are displayed. |
+| Raw Six-Axis Telemetry | X/Y/Z acceleration (`m/s²`), angular rate (`rad/s`), and last-second trends; native/preview rates, sample sequence, and temperature below. No GPIO/mapper counters absent from ABI6 are displayed. |
 | Recording and Saving | ROS bag or MP4, runtime/eMMC or TF; start/stop/query, device-timed duration, and written size. Expand details for the output path and final outcome. |
 | Diagnostics | Expand below the workspace for source state, per-camera browser reception/decoding, fps, and packet loss. Browser fields not reported show `unknown`. |
 
@@ -211,6 +211,7 @@ web:
   max_imu_clients: 2
 imu:
   sample_rate_hz: 800
+  fsync_diagnostics: true
   print_rate_hz: 10
   print_metrics: false
 save_data:
@@ -223,14 +224,15 @@ save_data:
 
 Boundaries:
 
-- Top-level `camera_timestamp_path` accepts `observer` (default) or `official`; top-level `imu_timestamp_mode` accepts `host` (default) or `tmst`. They are not fields under `camera`/`imu`. CLI `--camera-timestamp-path` and `--imu-timestamp-mode` override YAML. Stop and restart to change them; invalid values are rejected before hardware startup.
+- Top-level `camera_timestamp_path` accepts `observer` (default) or `official`; top-level `imu_timestamp_mode` accepts `host` (default) or `tmst`. They are not fields under `camera`/`imu`. CLI `--camera-timestamp-path` and `--imu-timestamp-mode` override YAML. Stop and restart to change them; invalid values are rejected before hardware startup. `imu.fsync_diagnostics` is a boolean, default true; `sensor_demo --imu-fsync-diagnostics on|off` overrides YAML, and standalone `imu_reader_demo` supports the same switch.
 
 - `camera.width` / `camera.height` support `1280x1088` (default), `640x480`, `720x480`, `1280x720`, either axial orientation; other values are rejected before the camera starts.
 - The full four-camera path is fixed to four channels; single-sensor diagnostics use `cam_demo --camera-id`.
 - The non-ROS public frame-rate set is 25/30/40/50/60fps; default `30`, other values rejected before the camera starts.
 - `camera.auto_exposure` is a boolean, default `true`: ignore the exposure duration and preserve the SDK tuning's automatic-exposure policy. Set `false` to use `camera.exposure_time_us` (default `2000`): each enabled camera enters ISP `HBN_ISP_MODE_MANUAL`, with analog, sensor digital, and ISP gains fixed to `1x` for repeatable calibration.
 - `camera.exposure_time_us` must be an integer in `1..4294967295` microseconds; zero, negatives, fractions, overflow, and trailing text are rejected. Divide by `1000000` for SDK seconds; the SDK/profile limits the usable range, and configuration failure fails startup without silently reverting to auto. Settings are startup-only: stop and restart after changes, and rebuild both the application and a supporting `libsc132.so`.
-- `camera.test_exposure_midpoint` defaults to `false`; set `true` and restart `sensor_demo` to use estimated exposure-midpoint image timestamps: trigger time plus half exposure duration. An explicit YAML value overrides `SC132_TEST_EXPOSURE_MIDPOINT`; older files omitting the field preserve the environment setting (off when unset). Rebuild both the application and a supporting `libsc132.so`. IMU stamps and bag record time are unchanged. Use the image `header.stamp` for ROS1 bag alignment; do not add half exposure again. Unavailable exposure stops acquisition; this is not a calibrated actual midpoint. See {ref}`Data Contracts <test-exposure-midpoint>`.
+- `camera.test_exposure_midpoint` defaults to `false`; set `true` and restart `sensor_demo` to use estimated exposure-midpoint image timestamps: trigger time plus half the matched exposure estimate. The library already associates the getter at raw hardware frame N with adjacent N+1; recorders/forwarders must not shift another frame. An explicit YAML value overrides `SC132_TEST_EXPOSURE_MIDPOINT`; older files omitting the field preserve the environment setting (off when unset). Rebuild both the application and a supporting `libsc132.so`. Default trigger stamps, IMU stamps, and bag record time are unchanged. Use the image `header.stamp` for ROS1 bag alignment; do not add half exposure again. No predecessor, hardware gaps, or invalid predecessor queries yield unavailable/all-zero exposure; test mode still stops without trigger-time fallback. This certifies neither a true midpoint nor a measured physical-error bound. See {ref}`Data Contracts <test-exposure-midpoint>`.
+- Fixed N→N+1 is only an exposure estimated-association rule, not a universal AE application delay. Real AE can have a different effective lag; there is no per-frame applied-exposure guarantee or AE acceptance claim.
 - `rtsp.codec` supports `h264` and `h265`.
 - `web.enabled` and `rtsp.enabled` are independent; CLI `--web/--no-web` and `--rtsp/--no-rtsp` take precedence. Limits are 2 video readers per camera, 8 globally, and 2 SSE subscriptions. `imu_push_hz` is `1..50`, without inventing samples at low ODR. Settings apply at application restart; there are no browser hardware controls.
 - IMU native sample rates are `25/50/100/200/400/800/1600Hz`, default `800Hz`; other values are rejected, not resampled.
@@ -270,9 +272,9 @@ For YAML use, choose one row and set the two top-level keys in `config/sensor_co
 | Official + host | `official` | `host` |
 | Official + sensor TMST | `official` | `tmst` |
 
-Camera consumers set `SC132_TIMESTAMP_PATH` explicitly before startup; direct library use defaults to observer when the variable is unset. Observer retains the `500µs` SIF capture-window admission. Official uses the same frame's RAW IRQ `timestamps − (tv − trig_tv) × 1000`, never starts the SIF observer, and reports timing validity `0` with uncertainty `UINT32_MAX` (unknown physical bound). Host preserves MONOTONIC with unknown physical error. TMST unwraps kernel-owned FIFO/UI transition evidence into bounded affine RAW sample time with a `200µs` computational admission, not physical accuracy. No mode restores FSYNC, spidev, or automatic fallback. See [Data Contracts](../development/data-contracts.md).
+Camera consumers set `SC132_TIMESTAMP_PATH` explicitly before startup; direct library use defaults to observer when the variable is unset. Observer retains the `500µs` SIF capture-window admission. Official uses the same frame's RAW IRQ `timestamps − (tv − trig_tv) × 1000`, never starts the SIF observer, and reports timing validity `0` with uncertainty `UINT32_MAX` (unknown physical bound). Host preserves MONOTONIC with unknown physical error. TMST unwraps kernel-owned FIFO/UI transition evidence into bounded affine RAW sample time with a `200µs` computational admission, not physical accuracy. No mode provides FSYNC association, spidev, or automatic fallback. See [Data Contracts](../development/data-contracts.md).
 
-**Prerequisite for every pair:** a matching kernel IIO V3 capture module must already be bound. The existing V2 module is incompatible even for host; app deployment does not upgrade it. See {ref}`Capability and Verification Boundaries <capability-verification-boundary>` for the current non-ROS HO short smoke and unverified scope.
+**Prerequisite for every pair:** a matching kernel IIO V4 capture module must already be bound. The existing V2/V3 module is incompatible even for host; app deployment does not upgrade it. See {ref}`Capability and Verification Boundaries <capability-verification-boundary>` for the current non-ROS HO short smoke and unverified scope.
 
 (non-ros-save)=
 
@@ -404,6 +406,38 @@ retain_release_balance=... copy_duration_avg_ms=... send_duration_avg_ms=...
 
 Like `cam_demo`/`sensor_demo`, `mosaic_rtsp_demo` exclusively holds the four-camera resources; exit other camera applications before running it and keep `cam-service` running.
 
+(non-ros-panorama)=
+### Calibrated 360° Panorama (panorama_demo)
+
+`panorama_demo` is an independent geometric panorama, not the four-tile mosaic above or a `sensor_demo` homepage mode. Rebuild a complete runtime package from current source; do not assume older packages contain it. Gracefully stop other camera applications and keep `cam-service` running:
+
+```bash
+cd /root/demo
+./panorama_demo --calibration config/calibration.yaml --port 8080
+```
+
+Open `http://<device-ip>:8080/` on a trusted isolated LAN for one equirectangular image, coverage, processing time, group ID, and dropped groups. Stop with `Ctrl+C`. Default bind is `0.0.0.0:8080`; `--listen` selects a local IPv4 address. HTTP is unauthenticated and unencrypted; never expose it to public networks. `/frame.jpg` and `/status.json` serve latest-only read-only snapshots. This entry neither acquires IMU nor saves raw data nor starts/stops other applications, and does not replace combined recording.
+
+Calibration requires schema 7, four `kannala-brandt4` intrinsics, and `T_camN_from_imu` poses (wxyz quaternion, metres). cam0..3 must match the same fixed assembly, resolution, and calibrated pixel orientation; live orientation matches the standard `--rotate 0` output. The example's `pending_human_review` means human review is pending, not calibration for arbitrary devices. Changed mounting requires new calibration.
+
+Defaults: `1600×600`, 360° azimuth, ±60° elevation. Centre is IMU +X, positive azimuth toward +Y, positive elevation toward +Z, without automatic gravity levelling. `--yaw` changes the centre. `--distance-m 0` uses rotation-only infinity; positive values ≥0.1m place output rays on an IMU-centred sphere before applying extrinsics including translation. Each frame robustly estimates brightness ratios from calibrated overlaps and solves exposure gains bounded to 0.5–2 for reliably connected cameras. Dark, clipped, and strongly chromatically inconsistent samples are excluded; cameras without reliable evidence retain their brightness. Optical-axis/source-border quality selects one primary view. Near ownership boundaries, a continuous seam search uses local color disagreement, structural edges, and projection quality, with a soft penalty for movement from the previous processed frame. Broad smooth compensation corrects low-frequency illumination differences around the seam and fades at valid overlap/ownership edges. High-frequency detail remains single-view; only colors agreeing after compensation blend within four output pixels on either side, avoiding wide foreground ghosting. The 360° join uses the same wrapped processing. RGB/NV12 share photometric correction and source selection without image blur, optical-flow deformation, or changes to calibrated sampling coordinates. Compensation does not control camera exposure or restore clipped/crushed details. Missing reliable common content, strong chromatic disagreement, or parallax can leave seams; motion is not guaranteed flicker-free. A fixed sphere cannot remove arbitrary-depth parallax, and near objects can retain discontinuities. Uncovered directions remain black. Geometric coverage does not certify valid scene pixels, calibration accuracy, or full-sphere coverage.
+
+The page's azimuth ticks follow `--yaw`, displaying the centre modulo 360°. Both ends represent the same wrapped direction, with values 360° apart. The caption reports actual upper/lower elevation limits rather than assuming the default range.
+
+Capture stays at four-channel 30fps. Processing defaults to `--max-fps 10`, retaining only the latest complete group and intentionally dropping groups under load. Measure actual board throughput; browser refresh is not display-synchronization or physical-timing acceptance.
+
+Host offline mode needs C++17, CMake, and LibYAML/JPEG development headers/static archives, without X5/Go. From the Demo source root:
+
+```bash
+cmake -S . -B build_panorama_host -DPANORAMA_OFFLINE_ONLY=ON
+cmake --build build_panorama_host -j
+./build_panorama_host/panorama_demo --calibration config/calibration.yaml \
+  --images /path/to/group --once --output /path/to/new-panorama.jpg
+```
+
+The directory must contain `cam0.jpg`..`cam3.jpg` from one group in calibrated dimensions/orientation; filenames do not establish synchronization. Omit `--once` to preview the static image through the same Web page. `--output` refuses existing paths. Full X5 builds also require target LibYAML/JPEG development headers/static archives; standard packaging includes the entry, calibration, and notices, with no installation of those libraries required on-device. JPEG handling is based in part on the Independent JPEG Group; notices are at `licenses/panorama/THIRD_PARTY_NOTICES.txt`. This source feature and documentation do not establish board deployment, performance, seam accuracy, or a new software release.
+
+
 ## 7. Run IMU Alone
 
 First gracefully stop `sensor_demo` or other applications holding the IMU. Stopping browser recording does not release the IMU device.
@@ -426,7 +460,7 @@ After normal stop, `imu_reader_demo` emits one `IMU_RUNTIME_HEALTH final=yes` re
 Key fields:
 
 - `sample_monotonic_ns`: kernel-assigned MONOTONIC host estimate, retained without Unix conversion by standalone CLI; `sample_seq` is the sequence. `TIME_BASE domain=monotonic` declares the native clock.
-- `timestamp_mode`, `fifo_tmst`, `sample_raw_ns`, `timestamp_uncertainty_ns`: mode and raw FIFO low16; host leaves RAW sample zero and uncertainty `UINT32_MAX`, tmst adds mapped RAW sample and computational uncertainty without replacing MONOTONIC. Standalone output never converts either mode to Unix time.
+- `timestamp_mode`, `fifo_tmst`, `sample_raw_ns`, `timestamp_uncertainty_ns`: mode and raw FIFO low16; host leaves RAW sample zero and uncertainty `UINT32_MAX`, tmst adds mapped RAW sample and computational uncertainty without replacing MONOTONIC. Standalone output never converts either mode to Unix time. Each printed sample also carries `fifo_header,fsync_flags,fsync_sequence,fsync_raw_ns,fsync_uncertainty_ns,fsync_delta_us`; tagged `fifo_tmst` is delta microseconds, not an absolute tick. Diagnostic RAW edges never correct normal time or associate cameras; see [Data Contracts](../development/data-contracts.md#imu) for flags and fields.
 - `accel_mps2`: acceleration in `m/s^2`.
 - `gyro_rps`: angular velocity in `rad/s`.
 - `--print-metrics` adds generation, evidence, source, packet/burst flags, MONOTONIC observation, independent RAW burst completion, estimated period, and same-domain MONOTONIC differences. Never directly subtract RAW and MONOTONIC.
@@ -435,7 +469,7 @@ V2 `accel_mps2` outputs `[X, Y, Z]`; PCB orientation and signs still need six-fa
 
 The library, standalone demos, and checked-in default YAML all use `800Hz`; explicit CLI values can override YAML. Distinguish supported rates, defaults, and the actual configuration after site-specific changes.
 
-The kernel IIO V3 driver owns IMU SPI/INT1; the older V2 module is incompatible. Discover the unique `icm42670-capture` instance and validate its control node without fixed device numbers. Buffer defaults to4096, API accepts powers of two in256..8192; watermark1 and seven native ODRs. Both modes use this same capture path, without userspace SPI/spidev, FSYNC, or automatic fallback.
+The kernel IIO V4 driver owns IMU SPI/INT1; the older V2/V3 module is incompatible. Discover the unique `icm42670-capture` instance and validate its control node without fixed device numbers. Buffer defaults to4096, API accepts powers of two in256..8192; watermark1 and seven native ODRs. Both modes use this same capture path, without userspace SPI/spidev, trigger-to-sample association, or automatic fallback.
 
 
 Realtime scheduling requires camera `observer` `SCHED_FIFO/60` (not started in `official`), IMU owner `SCHED_FIFO/20`, and consumers `SCHED_RR/3`. Failure rejects startup without automatic IRQ/debug/realtime-quota changes. The observer window remains `500µs`; official has unknown physical error. Neither IMU mode guarantees physical accuracy or zero loss.

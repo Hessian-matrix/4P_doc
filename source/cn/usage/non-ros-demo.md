@@ -66,7 +66,7 @@ non-ROS 联合入口的网页工作台（中文界面示例）。画面、数值
 | 顶部实时摘要 | 查看相机连接数、源采集状态、原生/预览采样率和传感器温度；连接与采集状态分别判断。 |
 | 相机 | CAM1～CAM4 以 2×2 网格显示，标题旁显示源分辨率、帧率和编码；双击画面放大/还原。 |
 | 惯性姿态 | 查看板体坐标示意、Roll/Pitch/相对 Yaw、自动静置零偏估计状态；可手动“静置校准零偏”或“重置相对航向”。只影响浏览器预览。 |
-| 六轴原始遥测 | 查看 X/Y/Z 加速度（`m/s²`）、角速度（`rad/s`）与最近 1 秒趋势；底部显示原生/预览采样率、样本序号和温度，不显示 ABI5 未提供的 GPIO/mapper 计数。 |
+| 六轴原始遥测 | 查看 X/Y/Z 加速度（`m/s²`）、角速度（`rad/s`）与最近 1 秒趋势；底部显示原生/预览采样率、样本序号和温度，不显示 ABI6 未提供的 GPIO/mapper 计数。 |
 | 录制与保存 | 选择 ROS bag 或 MP4、运行目录/eMMC 或 TF，开始/停止录制、查询状态，查看设备计时时长和已写入量；展开详情查看输出路径和最终结果。 |
 | 运行诊断 | 在工作区下方展开源状态、各路浏览器接收/解码、帧率与丢包信息；浏览器未报告的字段显示 `unknown`。 |
 
@@ -211,6 +211,7 @@ web:
   max_imu_clients: 2
 imu:
   sample_rate_hz: 800
+  fsync_diagnostics: true
   print_rate_hz: 10
   print_metrics: false
 save_data:
@@ -223,14 +224,15 @@ save_data:
 
 边界：
 
-- 顶层 `camera_timestamp_path` 接受 `observer`（默认）或 `official`；顶层 `imu_timestamp_mode` 接受 `host`（默认）或 `tmst`，不能放在 `camera`/`imu` 下。CLI `--camera-timestamp-path`、`--imu-timestamp-mode` 覆盖 YAML。切换必须停止后重启；非法值在硬件启动前拒绝。
+- 顶层 `camera_timestamp_path` 接受 `observer`（默认）或 `official`；顶层 `imu_timestamp_mode` 接受 `host`（默认）或 `tmst`，不能放在 `camera`/`imu` 下。CLI `--camera-timestamp-path`、`--imu-timestamp-mode` 覆盖 YAML。切换必须停止后重启；非法值在硬件启动前拒绝。 `imu.fsync_diagnostics`为boolean，默认true；`sensor_demo --imu-fsync-diagnostics on|off`覆盖YAML，独立`imu_reader_demo`支持同开关。
 
 - `camera.width` / `camera.height` 支持 `1280x1088`（默认）、`640x480`、`720x480`、`1280x720`，两种轴向写法均合法，其余值在启动相机前拒绝。
 - 完整四目路径固定为四路；单颗 sensor 诊断使用 `cam_demo --camera-id`。
 - non-ROS公开帧率集合为25/30/40/50/60fps；默认`30`，其他值在启动相机前拒绝。
 - `camera.auto_exposure` 是布尔值，默认 `true`：忽略曝光时长，保留 SDK tuning 的自动曝光策略。设为 `false` 后使用 `camera.exposure_time_us`（默认 `2000`），每路启用相机进入 ISP `HBN_ISP_MODE_MANUAL`，模拟、sensor digital 和 ISP 增益固定 `1x`，用于可重复标定。
 - `camera.exposure_time_us` 必须是 `1..4294967295` 的整数微秒值；零、负数、小数、溢出和尾随文本均拒绝。时长除以 `1000000` 转为 SDK 秒数；实际范围由 SDK/profile 限制，配置失败即启动失败，不静默回退自动曝光。仅启动时生效，修改后须停止并重启；需重建应用和支持此配置的 `libsc132.so`。
-- `camera.test_exposure_midpoint` 默认 `false`；改为 `true` 并重启 `sensor_demo`，图像时间戳使用“触发时间＋半曝光时长”的估算曝光中点。显式 YAML 值优先于 `SC132_TEST_EXPOSURE_MIDPOINT`；旧配置省略此字段时沿用环境变量（未设置则关闭）。需要同时重建应用和支持该开关的 `libsc132.so`；不影响 IMU 时间戳或 bag record time。ROS1 bag 对齐读取图像 `header.stamp`，不要再加半曝光。曝光不可用时停止采集，不宣称已校准的真实曝光中点，详见 {ref}`数据合同 <test-exposure-midpoint>`。
+- `camera.test_exposure_midpoint` 默认 `false`；改为 `true` 并重启 `sensor_demo`，图像时间戳使用“触发时间＋匹配曝光估计半时长”的估算曝光中点。估计已由库按原始硬件帧 N 的 getter→相邻 N+1 关联，保存/转发端不得再移一帧。显式 YAML 值优先于 `SC132_TEST_EXPOSURE_MIDPOINT`；旧配置省略此字段时沿用环境变量（未设置则关闭）。需要同时重建应用和支持该开关的 `libsc132.so`；不影响默认触发 stamp、IMU 时间戳或 bag record time。ROS1 bag 对齐读取图像 `header.stamp`，不要再加半曝光。无前驱、硬件缺口或无效前驱查询使曝光不可用且全零，测试模式仍停止采集，不回退触发时间；不宣称已校准的真实曝光中点或已测物理误差上界，详见 {ref}`数据合同 <test-exposure-midpoint>`。
+- 固定 N→N+1 只是曝光估计关联规则，不是通用 AE 生效延迟；真实 AE 的有效滞后可能不同，不提供逐帧实际应用曝光保证或 AE 验收结论。
 - `rtsp.codec` 支持 `h264` 和 `h265`。
 - `web.enabled`、`rtsp.enabled` 独立，CLI `--web/--no-web`、`--rtsp/--no-rtsp` 优先。Web 限额为每 camera 最多 2、全局最多 8 视频会话与最多 2 SSE 订阅；`imu_push_hz` 为 `1..50`，低 ODR 不补点；配置在重启应用后生效，不提供网页硬件控制。
 - IMU 原生采样率支持 `25/50/100/200/400/800/1600Hz`，默认 `800Hz`；其他值明确拒绝，不会重采样。
@@ -270,9 +272,9 @@ camera:
 | Official + host | `official` | `host` |
 | Official + sensor TMST | `official` | `tmst` |
 
-相机 consumer 在启动前显式设置 `SC132_TIMESTAMP_PATH`；直接使用库且未设置变量时默认 observer。observer 保留 `500µs` SIF 捕获窗口 admission。official 使用同帧 RAW IRQ `timestamps − (tv − trig_tv) × 1000`，绝不启动 SIF observer，timing validity 为 `0`，uncertainty 为 `UINT32_MAX`（物理上界未知）。host 保留 MONOTONIC，物理误差未知；tmst 对内核拥有的 FIFO/UI 跳变证据解绕并作有界仿射 RAW 映射，`200µs` 为计算 admission 而非物理精度。任何模式均不恢复 FSYNC、spidev 或自动回退。见[数据合同](../development/data-contracts.md)。
+相机 consumer 在启动前显式设置 `SC132_TIMESTAMP_PATH`；直接使用库且未设置变量时默认 observer。observer 保留 `500µs` SIF 捕获窗口 admission。official 使用同帧 RAW IRQ `timestamps − (tv − trig_tv) × 1000`，绝不启动 SIF observer，timing validity 为 `0`，uncertainty 为 `UINT32_MAX`（物理上界未知）。host 保留 MONOTONIC，物理误差未知；tmst 对内核拥有的 FIFO/UI 跳变证据解绕并作有界仿射 RAW 映射，`200µs` 为计算 admission 而非物理精度。任何模式均不提供 FSYNC 关联、spidev 或自动回退。见[数据合同](../development/data-contracts.md)。
 
-**每种组合的前提：**匹配的内核 IIO V3 capture 模块已绑定。现有 V2 模块即使 host 模式也不兼容，部署应用不会升级模块。当前 non-ROS HO 短窗证据及未验收范围见{ref}`能力与验证边界 <capability-verification-boundary>`。不声明四组合实板验收通过。
+**每种组合的前提：**匹配的内核 IIO V4 capture 模块已绑定。现有 V2/V3 模块即使 host 模式也不兼容，部署应用不会升级模块。当前 non-ROS HO 短窗证据及未验收范围见{ref}`能力与验证边界 <capability-verification-boundary>`。不声明四组合实板验收通过。
 
 (non-ros-save)=
 
@@ -404,6 +406,38 @@ retain_release_balance=... copy_duration_avg_ms=... send_duration_avg_ms=...
 
 与 `cam_demo`/`sensor_demo` 一样，`mosaic_rtsp_demo` 独占四路相机资源，运行前先退出其他相机应用，并保持 `cam-service` 运行。
 
+(non-ros-panorama)=
+### 标定驱动的 360° 环视（panorama_demo）
+
+`panorama_demo` 是独立的几何环视入口，不是上面的四格拼图，也不接入 `sensor_demo` 首页。此入口需从当前源码重新构建完整运行包；不能假设旧包已有。先正常停止其他相机应用，保持 `cam-service` 运行：
+
+```bash
+cd /root/demo
+./panorama_demo --calibration config/calibration.yaml --port 8080
+```
+
+同一可信隔离局域网打开 `http://<设备IP>:8080/`，查看单张等距柱状图、覆盖率、处理耗时、组 ID 与丢组计数；`Ctrl+C` 退出。默认监听 `0.0.0.0:8080`，可用 `--listen` 指定本地 IPv4。HTTP 无认证、无加密，不得暴露公网。`/frame.jpg`、`/status.json` 为只读最新快照；本入口不采集 IMU、不保存原始数据、不自动启停其他应用，不替代联合录制。
+
+标定要求 schema 7、四路 `kannala-brandt4` 内参和 `T_camN_from_imu` 外参（wxyz 四元数、米）。cam0..3 必须匹配同一固定安装、分辨率及标定像素方向；默认 live 与标准 `--rotate 0` 交付方向相同。示例配置的 `pending_human_review` 表示待人工复核，不适用于任意设备。更换安装后须提供新标定。
+
+默认 `1600×600`、360° 方位角、仰角 ±60°：中心 IMU +X、正方位角朝 +Y、正仰角朝 +Z，不自动重力调平。`--yaw` 改变中心；`--distance-m 0` 为无穷远旋转投影，正值 ≥0.1m 则将输出射线落到 IMU 原点球面，再应用含平移的外参。每帧从标定重叠区域稳健估计亮度比例，对可靠连通的相机求解 0.5–2 倍曝光增益；暗部、饱和和明显色彩不一致的样本不参与，无可靠证据的相机保持原亮度。主体像素按光轴/源边缘质量选择一路；在选路边界附近按局部颜色差、结构边缘和投影质量搜索连续接缝，对上一处理帧的位置施加软约束。接缝处对平滑低频照明差做较宽渐变补偿，并在有效重叠/归属边缘淡出；高频细节保留单路，仅在接缝两侧各 4 个输出像素内对补偿后接近的颜色窄幅融合，避免宽幅前景重影。360° 首尾同样环绕处理。RGB/NV12 共用亮度补偿和选路逻辑，不做图像模糊、光流形变或改变标定采样坐标。补偿不控制相机曝光、不恢复过曝/欠曝细节；无可靠共同内容、明显色差或强视差时仍可能残留接缝，运动场景不保证无闪跳。固定球面不能消除任意深度视差，近物仍可能断接。未覆盖方向黑色；几何覆盖率不证明有效像素、标定精度或全天球覆盖。
+
+页面方位刻度随 `--yaw` 更新，中心角按 360° 周期显示；两端表示同一环绕方向，数值相差 360°。图注同步显示实际上下沿仰角，不固定假设为默认范围。
+
+采集固定四路 30fps；处理默认上限 `--max-fps 10`，仅保留最新完整组，慢处理主动丢组。板端实际吞吐需实测；浏览器刷新不是显示同步或物理时间精度验收。
+
+主机离线模式无需 X5/Go，仅需 C++17、CMake、LibYAML/JPEG 开发头及静态库，在 Demo 源码根目录执行：
+
+```bash
+cmake -S . -B build_panorama_host -DPANORAMA_OFFLINE_ONLY=ON
+cmake --build build_panorama_host -j
+./build_panorama_host/panorama_demo --calibration config/calibration.yaml \
+  --images /path/to/group --once --output /path/to/new-panorama.jpg
+```
+
+目录须有同一帧组的 `cam0.jpg`～`cam3.jpg`，与标定尺寸/方向一致；程序不会按文件名验证同步。去掉 `--once` 可用同一 Web 页面查看静态图。`--output` 拒绝覆盖已有路径。X5 全量构建同样需要目标 LibYAML/JPEG 静态库及开发头；标准打包包含新入口、标定及许可证，板端无需安装这两个库。JPEG 部分基于 Independent JPEG Group；许可随包位于 `licenses/panorama/THIRD_PARTY_NOTICES.txt`。此源码功能及说明不构成板端部署、性能、接缝精度或新软件版本发布结论。
+
+
 ## 7. 单独运行 IMU
 
 先正常停止 `sensor_demo` 等已占用 IMU 的应用，再运行独立 IMU Demo；停止网页录制不会释放 IMU 设备。
@@ -426,7 +460,7 @@ cd /root/demo
 关键字段：
 
 - `sample_monotonic_ns`：内核赋予的 MONOTONIC 主机估计，独立 CLI 不转 Unix 时间；`sample_seq` 为序号。`TIME_BASE domain=monotonic` 明确本地时钟域。
-- `timestamp_mode`、`fifo_tmst`、`sample_raw_ns`、`timestamp_uncertainty_ns`：模式和原始 FIFO low16；host 的 RAW sample 为零、不确定度 `UINT32_MAX`，tmst 增加映射 RAW sample 与计算不确定度，不覆盖 MONOTONIC。独立输出两模式均不转 Unix 时间。
+- `timestamp_mode`、`fifo_tmst`、`sample_raw_ns`、`timestamp_uncertainty_ns`：模式和原始 FIFO low16；host 的 RAW sample 为零、不确定度 `UINT32_MAX`，tmst 增加映射 RAW sample 与计算不确定度，不覆盖 MONOTONIC。独立输出两模式均不转 Unix 时间。 诊断字段`fifo_header,fsync_flags,fsync_sequence,fsync_raw_ns,fsync_uncertainty_ns,fsync_delta_us`逐样本打印；tagged的`fifo_tmst`是delta微秒，不是绝对tick。诊断RAW沿不校正正常时间、不关联相机；字段/flags见[数据合同](../development/data-contracts.md#imu)。
 - `accel_mps2`：加速度，单位 `m/s^2`。
 - `gyro_rps`：角速度，单位 `rad/s`。
 - `--print-metrics` 输出 generation、evidence、source、packet/burst flags、MONOTONIC 观测、独立 RAW burst 完成值、估计周期与 MONOTONIC 差值；RAW 与 MONOTONIC 不可直接作差。
@@ -435,7 +469,7 @@ V2 `accel_mps2` 按 `[X, Y, Z]` 输出；PCB 安装方向和符号尚待实板�
 
 公共库、独立 demo 与当前仓内默认 YAML 均为 `800Hz`；CLI 可显式覆盖 YAML。不要把硬件支持档位、默认值与现场修改后的实际配置混为同一值。
 
-IMU SPI/INT1 由内核 IIO V3 驱动拥有；旧 V2 模块不兼容。按 name `icm42670-capture` 发现唯一实例并验证控制节点，不依赖固定编号。buffer 默认4096、API接受256..8192的2次幂，watermark1，原生七档 ODR。两模式使用此同一采集路径，无用户态 SPI/spidev、FSYNC 或自动回退。
+IMU SPI/INT1 由内核 IIO V4 驱动拥有；旧 V2/V3 模块不兼容。按 name `icm42670-capture` 发现唯一实例并验证控制节点，不依赖固定编号。buffer 默认4096、API接受256..8192的2次幂，watermark1，原生七档 ODR。两模式使用此同一采集路径，无用户态 SPI/spidev、触发—样本关联或自动回退。
 
 
 实时调度要求相机 `observer` 为 `SCHED_FIFO/60`（`official` 不启动该线程）、IMU owner `SCHED_FIFO/20`、consumer `SCHED_RR/3`；失败拒绝启动，不自动改 IRQ/debug/实时配额。observer 窗口仍为 `500µs`，official 物理误差未知；两种 IMU 模式均不保证物理精度或零丢样。

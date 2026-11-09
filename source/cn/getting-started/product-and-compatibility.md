@@ -8,7 +8,7 @@
 
 硬件标识、软件 `2.0.0`、文档和 SO ABI 独立识别。参数受支持不等于所有模式/负载/时长已通过；当前高帧率、压力、长录及外设限制见{ref}`能力与验证边界 <capability-verification-boundary>`。
 
-当前 IMU 使用内核 IIO 公共 ABI 5.0：实体 `libicm42670.so.5.0.0`、SONAME `libicm42670.so.5`，九个导出均为 `ICM42670_X5_5.0`。设备必须已绑定匹配的内核 IIO V3 capture 模块；现有 V2 模块即使 host 模式也不兼容。全部 consumer 与匹配头文件/库成套重建并清除旧 major 工件，不建立跨 major 链接。启动 `camera_timestamp_path=observer|official`（默认 observer）与 `imu_timestamp_mode=host|tmst`（默认 host）提供四种组合，共用同一二进制和同一 IIO 读取/owner，停止/重启后切换。host 保留 MONOTONIC，物理误差未知；tmst 依据内核 FIFO/UI 跳变证据增加有界仿射 RAW sample 映射，同时保留 MONOTONIC，`200µs` 计算 admission 不是物理精度。official 相机时间是物理上界未知的同帧 IRQ 派生估计，绝不是 SIF observer 结果。保存/ROS2 将所选原生模式桥接到 realtime 并保留原生证据。无用户态 SPI/spidev、FSYNC 恢复或回退。见 [non-ROS 使用](../usage/non-ros-demo.md)、[ROS2 使用](../usage/ros2-demo.md) 与[数据合同](../development/data-contracts.md)。当前 non-ROS HO 短窗证据及未验收范围见{ref}`能力与验证边界 <capability-verification-boundary>`。不声明四组合实板验收；软件、文档、ABI 与发布状态独立。
+当前 IMU 使用内核 IIO 公共 ABI 6.0：实体 `libicm42670.so.6.0.0`、SONAME `libicm42670.so.6`，九个导出均为 `ICM42670_X5_6.0`。设备必须已绑定匹配的内核 IIO V4 capture 模块；现有 V2/V3 模块即使 host 模式也不兼容。全部 consumer 与匹配头文件/库成套重建并清除旧 major 工件，不建立跨 major 链接。启动 `camera_timestamp_path=observer|official`（默认 observer）与 `imu_timestamp_mode=host|tmst`（默认 host）提供四种组合，共用同一二进制和同一 IIO 读取/owner，停止/重启后切换。host 保留 MONOTONIC，物理误差未知；tmst 依据内核 FIFO/UI 跳变证据增加有界仿射 RAW sample 映射，同时保留 MONOTONIC，`200µs` 计算 admission 不是物理精度。official 相机时间是物理上界未知的同帧 IRQ 派生估计，绝不是 SIF observer 结果。保存/ROS2 将所选原生模式桥接到 realtime 并保留原生证据。无用户态 SPI/spidev、FSYNC 关联或回退。见 [non-ROS 使用](../usage/non-ros-demo.md)、[ROS2 使用](../usage/ros2-demo.md) 与[数据合同](../development/data-contracts.md)。当前 non-ROS HO 短窗证据及未验收范围见{ref}`能力与验证边界 <capability-verification-boundary>`。不声明四组合实板验收；软件、文档、ABI 与发布状态独立。
 
 | 交付物 | 用户入口 |
 |---|---|
@@ -41,7 +41,9 @@
 
 ROS2 路径不提供 RTSP；需要 RTSP 时使用 non-ROS 路径。当前不提供TF、外参、相机内参或畸变标定；CameraInfo 只有宽高，IMU orientation 不可用。
 
-当前相机 ABI 3.0 提供逐帧冻结的 ISP `exposure` 观测及 frame-info 前缀尺寸读取；估计不证明该帧实际生效曝光。相机时间算法未改变。软件版本相同不证明包组成相同，须核对 [changelog](../changelog.md)、manifest、头文件与实际库。
+相机 ABI 3.0 的 `exposure` 冻结固定单硬件帧关联估计：采集原始硬件帧 N 时取得的 getter 只估计相邻 N+1（允许 uint32 回绕），不使用归一化组号或 SDK 源帧号匹配。无前驱、硬件缺口或无效前驱查询时不可用且全零，来源保留更早 getter 原值；consumer 原样转发不得再移一帧。估计不认证实际生效曝光或已测物理误差上界。frame-info 前缀尺寸读取、公开布局、SONAME、软件版本和默认触发 stamp 不变；显式中点模式使用匹配估计且仍在不可用时停止。软件版本相同不证明包组成相同，须核对 [changelog](../changelog.md)、manifest、头文件与实际库；完整状态/warmup 合同见[逐帧曝光观测](../development/data-contracts.md#逐帧曝光观测)。
+
+固定 N→N+1 只是估计关联规则；真实 AE 的有效滞后可能不同，不提供逐帧实际应用曝光保证或 AE 验收结论。
 
 ## 出厂系统镜像与目标板兼容性
 

@@ -30,7 +30,9 @@
 
 完整公开政策见 [中文发布说明](source/cn/release-and-support.md#文档版本政策) 和 [English release policy](source/en/release-and-support.md#documentation-version-policy)。主仓门禁命令为 `python3 -B tests/version_reporting_contract_test.py`；中英文仍须分别通过严格 HTML 构建和 linkcheck。
 
-当前文档修订为 `2.0.59`，软件仍为 `2.0.0`；硬件标识与 SO ABI 独立识别。当前 IMU 为内核 IIO V3／公共 ABI5，最终默认 HO（相机 observer + IMU host），其余启动组合保留比较。non-ROS 默认 Web 开、RTSP 关、IMU `800Hz`；手动曝光为显式配置，不更改默认自动曝光。首次上电页保留随板预烧录、自启 `sensor_demo`、网页预览与录包说明，出厂预烧录不等于公开镜像下载。USB 页保留匹配镜像的 Host/Device、RNDIS/ECM/UVC/ADB/MSD 功能与安全切换边界；NTP 页描述板端自动授时、服务器配置、局域网源和手动恢复。当前整合包已完成 non-ROS HO／四路30fps网页预览与姿态／bag与MP4回读／正常停止短窗验证；不认证 ROS2 板端、其余三组合、物理精度、双机/GPU、压力、`8h` 或重启，也不构成新软件发布。见[中文能力与验证边界](source/cn/release-and-support.md#capability-verification-boundary)和[English capability and verification boundaries](source/en/release-and-support.md#capability-verification-boundary)。
+当前文档修订为 `2.0.62`，软件仍为 `2.0.0`；硬件标识与 SO ABI 独立识别。当前 IMU 为内核 IIO V4／公共 ABI6，最终默认 HO（相机 observer + IMU host），其余启动组合保留比较。non-ROS 默认 Web 开、RTSP 关、IMU `800Hz`；手动曝光为显式配置，不更改默认自动曝光。相机曝光使用固定单硬件帧估计关联（采集 N 时的 getter→相邻 N+1），保留更早 getter 来源；缺少有效相邻前驱时不可用且全零，consumer 不再移帧，无额外图像缓冲或延迟。默认触发 stamp 不变，显式中点使用匹配估计且仍失败关闭；不认证实际生效曝光、物理误差上界、AE 或实板验收。首次上电页保留随板预烧录、自启 `sensor_demo`、网页预览与录包说明，出厂预烧录不等于公开镜像下载。USB 页保留匹配镜像的 Host/Device、RNDIS/ECM/UVC/ADB/MSD 功能与安全切换边界；NTP 页描述板端自动授时、服务器配置、局域网源和手动恢复。此前V3／ABI5整合包已完成 non-ROS HO／四路30fps网页预览与姿态／bag与MP4回读／正常停止短窗验证；该历史证据不认证当前V4／ABI6，也不认证 ROS2 板端、其余三组合、物理精度、双机/GPU、压力、`8h` 或重启，也不构成新软件发布。见[中文能力与验证边界](source/cn/release-and-support.md#capability-verification-boundary)和[English capability and verification boundaries](source/en/release-and-support.md#capability-verification-boundary)。
+
+固定 N→N+1 仅为选择的估计关联规则；真实 AE 的有效滞后可能不同，不提供逐帧实际应用曝光保证或 AE 验收结论。
 
 ## 当前在线文档目录
 

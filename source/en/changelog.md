@@ -2,6 +2,26 @@
 
 This file records user-visible updates in the RoboBaton 4P public delivery, following the shared [Documentation Version Policy](release-and-support.md#documentation-version-policy). Documentation revisions on this page do not automatically change software versions and are distinct from SO SONAME/ABI versions.
 
+## 2.0.62 - 2026-11-06
+
+- Document the independent calibrated four-camera `panorama_demo`, trusted-LAN read-only Web preview, offline JPEG input, and build/packaging workflow, distinct from four-tile mosaic RTSP and the combined-capture homepage.
+- Specify schema 7 KB4/extrinsics, fixed mounting/pixel orientation, infinity/finite-sphere projection, blind regions/near-field parallax, latest-only drops, and pending human review. Add no board, performance, or seam-accuracy acceptance claims; software versions and SO ABI remain unchanged.
+- Describe reliable-overlap exposure balancing and low-frequency illumination transitions for RGB/NV12 and the 360° join, preserving single-view high-frequency detail and blind regions. This neither controls camera exposure nor removes arbitrary-depth parallax or guarantees flicker-free motion.
+
+## 2.0.61 - 2026-11-05
+
+- Fix the public exposure estimate's frame-association semantics: each acquisition worker exclusively owns zero-initialized per-session state; a getter obtained while acquiring raw hardware frame N estimates adjacent N+1 only. Match acquired hardware frame-ID adjacency with uint32 wrap, never normalized group IDs or SDK `source_frame_id`. Frame-set warmup primes the state without extra image buffering or delivery delay.
+- The first acquired frame without a predecessor, hardware gaps, or invalid predecessor queries yield UNAVAILABLE/all-zero exposure, never stretched across gaps. Query failure at N makes N+1 unavailable; a valid predecessor can still estimate N. `duration_ns` comes from SDK seconds. Source identity, opaque source time, and RAW query-completion time retain the older getter's original values rather than target-image values. Bag/tee/MP4/ROS2 forward unchanged; consumers must not shift another frame.
+- Default trigger timestamps remain unchanged. Opt-in midpoint testing uses the matched estimate and still fails closed when unavailable, without fallback. Align the three public-header comments and bilingual current contracts without public ABI-layout, SONAME, or software-version changes. Only documentation revision becomes `2.0.61`; preserve historical entries.
+- This fixes estimated association semantics only and remains ESTIMATED: no applied-exposure certificate or measured physical-error bound, and no physical-accuracy, AE behavior/convergence-performance, or real-board acceptance claims. Validation results are supplied separately; this entry is not passing evidence.
+- Fixed N→N+1 is only the chosen estimated-association rule. Real AE can have a different effective lag; do not interpret the rule as a universal AE application delay or a per-frame applied-exposure guarantee.
+
+## 2.0.60 - 2026-11-05
+
+- Move the public IMU contract to matching kernel IIO V4 / ABI6.0: `libicm42670.so.6.0.0`, SONAME `.6`, and nine `ICM42670_X5_6.0` exports. Config remains32 bytes; sample retains its original160-byte prefix and expands to192 bytes. Update headers/libraries/consumers/modules together.
+- Independent FSYNC diagnostics default on and can be disabled through non-ROS YAML/CLI and a ROS2 startup parameter. Timing JSON becomes `robobaton_imu_timing_v3`; bag/ROS2/MP4 IMU CSV preserve original time fields and append six real per-sample diagnostic fields. Tagged FIFO fields retain delta microseconds, never absolute ticks; unavailable edges retain0/unknown uncertainty.
+- FSYNC diagnostics never correct ordinary host/tmst or camera time, perform nearest-neighbor frame/group matching, or certify physical synchronization accuracy. Camera and Web time contracts retain their meanings. This documentation revision adds no real-board acceptance claims and does not change product software VERSION.
+
 ## 2.0.59 - 2026-11-04
 
 - Integrate remote `2.0.58` Web preview/attitude/recording, official hardware, and USB/system-image documentation with parallel IIO/manual-exposure changes. Preserve remote versioned history; label parallel former `2.0.16`–`2.0.18` entries as topic-specific checkpoints instead of assigning competing topics the same revision heading. Historical ABI3/ABI4 and measurement scope remain historical, not current evidence.

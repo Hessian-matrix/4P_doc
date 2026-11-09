@@ -53,7 +53,7 @@
 |---|---|
 | 现象 | `error while loading shared libraries` 或运行到 `bin/` 程序时报 `.so` 缺失。 |
 | 检查 | `ls -l /root/demo/lib`；从 `/root/demo` 顶层启动脚本运行；直接运行 `bin/` 前执行 `. ./env.sh`。 |
-| 正常结果 | `libsc132.so*`、`libicm42670.so*`、`libprrtsp.so*` 优先从 `/root/demo/lib` 加载；ICM 为 SONAME `libicm42670.so.5`、实体 `libicm42670.so.5.0.0`、九个 `ICM42670_X5_5.0` 导出及成套重建 consumer，无旧 `.2/.3/.4` 库或跨 major 链接。 |
+| 正常结果 | `libsc132.so*`、`libicm42670.so*`、`libprrtsp.so*` 优先从 `/root/demo/lib` 加载；ICM 为 SONAME `libicm42670.so.6`、实体 `libicm42670.so.6.0.0`、九个 `ICM42670_X5_6.0` 导出及成套重建 consumer，无旧 `.2/.3/.4/.5` 库或跨 major 链接。 |
 | 常见原因 | 只复制单个 ELF、漏复制 `lib/`、未加载 `env.sh`、混用了其他工程的同名 `.so`。 |
 | 恢复/需收集信息 | 重新整包部署并提供 `ls -l /root/demo /root/demo/lib` 和完整错误文本。 |
 
@@ -190,18 +190,20 @@ selector 非法或只读参数错误时，使用准确的顶层 `camera_timestam
 
 | 项目 | 内容 |
 |---|---|
-| 检查 | 运行 `./imu_reader_demo --sample-rate-hz 800 --count 800 --print-metrics --imu-timestamp-mode host`（停止后也可选 `tmst`）；核对 ABI5 头文件/库、匹配内核 IIO V3 capture 模块，以及唯一 `icm42670-capture` sysfs/控制身份。现有 V2 模块两模式均不兼容，不硬编码编号。 |
+| 检查 | 运行 `./imu_reader_demo --sample-rate-hz 800 --count 800 --print-metrics --imu-timestamp-mode host`（停止后也可选 `tmst`）；核对 ABI6 头文件/库、匹配内核 IIO V4 capture 模块，以及唯一 `icm42670-capture` sysfs/控制身份。现有 V2/V3 模块两模式均不兼容，不硬编码编号。 |
 | 正常合同 | 两模式均分开保留 MONOTONIC 主机估计和 RAW burst 观测。host 的 `sample_raw_ns=0`、uncertainty `UINT32_MAX`；tmst 增加 RAW sample 映射，不替代 MONOTONIC。count 为 STOP 阈值，最终数量可更大；独立 CLI 不转 Unix 时间。 |
-| 常见原因 | V3 模块/设备树缺失或不匹配、身份歧义、scan 布局不符、其他 owner 占用、调度权限、内核 I/O/overflow/push/evidence/quiesce 错误，或 TMST FIFO/UI 时间证据非法。库不加载模块、不抢资源、不使用 spidev、不回退到 host；部署应用不升级模块。 |
+| 常见原因 | V4 模块/设备树缺失或不匹配、身份歧义、scan 布局不符、其他 owner 占用、调度权限、内核 I/O/overflow/push/evidence/quiesce 错误，或 TMST FIFO/UI 时间证据非法。库不加载模块、不抢资源、不使用 spidev、不回退到 host；部署应用不升级模块。 |
 | 需保留信息 | 完整启动/退出日志、stop返回值、`IMU_TIMING_SUMMARY`、最终`IMU_RUNTIME_HEALTH`和实际序号/载荷；stop失败仍读取终态诊断。检查record/ACK与transport_complete，不把物理尾部排除解释为所有物理采样已交付。 |
 
 `timestamp_hz`是主机赋时统计，`acquisition_hz`来自普通burst的独立RAW端点且需`acquisition_valid=yes`；二者不证明物理精度。不要跨MONOTONIC/RAW作差。保存/ROS2输出桥失败会令输出失败，不能扩大括号或合成递增值掩盖错误。参考[IMU数据合同](development/data-contracts.md#imu)。
 
-TMST 证据缺失、矛盾、过期、歧义或超预算均失败，`200µs` 计算 admission 不是物理精度，不得扩大门限掩盖失败。保存/ROS2 使用 host MONOTONIC→REALTIME 或 tmst RAW→REALTIME；核对 `bridge_clock`、独立 `bridge_monotonic_ns`/`bridge_raw_ns` 和 schema `robobaton_imu_timing_v2`。不恢复 FSYNC 关联。当前 non-ROS HO 短窗证据及未验收范围见{ref}`能力与验证边界 <capability-verification-boundary>`。
+TMST 证据缺失、矛盾、过期、歧义或超预算均失败，`200µs` 计算 admission 不是物理精度，不得扩大门限掩盖失败。保存/ROS2 使用 host MONOTONIC→REALTIME 或 tmst RAW→REALTIME；核对 `bridge_clock`、独立 `bridge_monotonic_ns`/`bridge_raw_ns` 和 schema `robobaton_imu_timing_v3`。不恢复 FSYNC 关联。当前 non-ROS HO 短窗证据及未验收范围见{ref}`能力与验证边界 <capability-verification-boundary>`。
 
 ## 曝光观测不可用
 
-从bag frame metadata、MP4 `exposure.jsonl`或ROS2 `/robobaton/camN/exposure`读取。`status=0`时其余字段为零；默认图像继续，曝光中点测试模式会停止。`status=1`仅为最新ISP估计，不证明实际生效帧或真实曝光中心。按相机/组时间核对输入和编码帧，不按sidecar行号或源帧号作为MP4索引。当前软件没有FSYNC关联选项、topic或sidecar。
+从 bag frame metadata、MP4 `exposure.jsonl` 或 ROS2 `/robobaton/camN/exposure` 读取。曝光按采集原始硬件帧 N 的 getter→相邻 N+1 估计，允许 uint32 回绕，不按归一化组号或 SDK 源帧号匹配。首个无前驱采集帧、硬件帧号缺口或无效前驱查询均为 `status=0` 且全零，不跨缺口延用；N 查询失败使 N+1 不可用，有效前驱仍可估计 N。各 worker 会话状态清零，frame-set warmup 即预热，不增加图像缓冲或交付延迟；关闭 warmup 不会生成前驱。默认触发 stamp 和图像交付不变，显式中点使用匹配估计、不可用时仍停止，不回退。`status=1` 不证明实际生效曝光、真实中点或已测物理误差上界；来源字段是更早 getter 的原值，不要改为目标图像或在消费端再移一帧。按相机/组交付时间核对输入和编码帧，不按 sidecar 行号或源帧号作为 MP4 索引。当前软件没有 FSYNC 关联选项、topic 或 sidecar。详见[逐帧曝光观测](development/data-contracts.md#逐帧曝光观测)。
+
+固定 N→N+1 不等于通用 AE 生效延迟；真实 AE 的有效滞后可能不同，不能用这项估计保证逐帧实际应用曝光或判断 AE 已验收。
 
 ## UART 无数据
 

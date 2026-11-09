@@ -46,20 +46,26 @@
 - `observer`：以 RAW 读数包围 SIF VSYNC 捕获寄存器更新，再减去同一 24 MHz 计数器中的 `VSYNC − trigger`，通过随帧 `trig_tv` 精确匹配历史。后台线程继承允许的 CPU 集合，使用 `SCHED_FIFO/60`，每轮休眠 `50µs`；扫描内更新使用本次扫描窗口，重读 TRIG 并确认 VSYNC 稳定。缺少实时调度权限时启动失败。寄存器读取窗口超过不变的 `500µs` admission 上限、捕获缺失或匹配失败即停止。此路径需要 X5 固定寄存器映射和 `/dev/mem` 只读权限；窗口不代表已验证的物理同步精度。
 - `official`：使用同一帧的 `out_img.info.timestamps`（`CLOCK_MONOTONIC_RAW` IRQ 时间），减去 `(tv − trig_tv) × 1000`；`tv` 与 `trig_tv` 是 AON 微秒值，不是 RAW/realtime epoch。此路径绝不启动或使用 SIF MMIO observer。元数据非法、算术溢出或下溢即停止。这是物理误差上界未知的 IRQ 派生触发估计：`reserved[SC132_GROUP_TIMING_VALID]=0`，`reserved[SC132_GROUP_UNCERTAINTY_NS]=UINT32_MAX`，不授予 observer 的有界有效标记。
 
-frame-set 模式默认先丢弃每路 30 帧 warmup；所有启用相机完成 warmup 前立即归还缓冲，不查询曝光、不做图像变换，也不校验这些非交付帧的时间戳。每个交付帧必须满足所选路径：observer 为 `500µs` 窗口内的精确捕获匹配，official 为合法同帧元数据与算术；关闭 warmup 不豁免首帧。
+frame-set 模式默认先丢弃每路 30 帧 warmup；期间每个采集 worker 逐帧查询曝光并预热单硬件帧关联状态，再立即归还缓冲，不做图像变换，也不校验这些非交付帧的时间戳。每个交付帧必须满足所选路径：observer 为 `500µs` 窗口内的精确捕获匹配，official 为合法同帧元数据与算术；关闭 warmup 不豁免首帧，也不会凭空产生曝光前驱。
 
 配组使用所选触发 RAW 估计，再为整组使用同一次新采样的 RAW→realtime 桥接。组时间是各路交付时间的最小值；`max_skew_ns` 表示所选触发估计的差异，不代表曝光或相机/IMU 对齐精度。non-ROS 诊断、RTSP 输入、保存图像和 ROS2 图像时间戳沿用交付值，默认是 realtime 触发估计，测试模式是估算曝光中点。桥随运行中校时更新，允许回拨，不冻结 offset 或强制递增。内部超时仍使用单调时钟；IMU selector 与时钟独立于相机路径。
 
 ### 逐帧曝光观测
 
-采集每帧后、输出变换前查询一次最新 ISP 状态，将结果冻结到 `sc132_frame_info_t.exposure`；保留帧引用后再次读取不会被后续查询覆盖。`status=1`（ESTIMATED）仅是该交付帧附带的曝光估计，不是已证实的传感器逐帧生效参数；源帧号相等也不能证明非原子 getter 的曝光与帧标识同步锁存。没有误差上界，AE 启动/光照突变时相邻值可能明显变化。查询失败、非法时长或 RAW 读时失败时 `status=0`（UNAVAILABLE），其余字段全零，不沿用旧值；默认图像照常交付，开启曝光中点测试时则停止采集。
+每个采集 worker 独占每次会话零初始化的曝光关联状态。采集原始硬件帧 N 时取得的 ISP getter 只用于估计相邻的 N+1；匹配依据是已采集原始硬件帧 ID 的 uint32 相邻关系（允许回绕），不是归一化 `frame_id`、组号或 SDK `source_frame_id`。关联在 frame-set warmup 中预热，只保留 getter 元数据，不额外缓冲图像或增加交付延迟。匹配结果冻结到目标帧的 `sc132_frame_info_t.exposure`；保留帧引用后再次读取不会被后续查询覆盖。
+
+首个无前驱采集帧、硬件帧号缺口或前驱查询无效时，目标帧为 `status=0`（UNAVAILABLE），其余曝光字段全零；不跨缺口延用旧值。查询失败、非法时长或 RAW 读时失败都会使该次 getter 无效。N 的查询失败使 N+1 不可用，但来自有效相邻前驱的估计仍可用于 N。默认图像继续交付；曝光中点测试模式仍在不可用时停止采集，不回退触发时间。
+
+`status=1`（ESTIMATED）只是固定单硬件帧关联估计，不是已证实的传感器逐帧实际生效曝光；非原子 getter 的源身份相等也不是参数同步锁存证明。没有已测物理误差上界，也不据此宣称 AE 行为或实板验收。此语义修复不改变公开结构布局、SONAME、软件版本或默认触发时间戳；consumer 原样转发 `exposure`，不得再施加一帧偏移。
+
+固定 N→N+1 是选择的估计关联规则，不是实际 AE 生效滞后的通用定律；真实 AE 的有效滞后可能不同，不能据此保证任意一帧实际应用的曝光或逐帧身份。
 
 | 字段 | 语义 |
 |---|---|
-| `status` | `0` 不可用（其他曝光字段全零）；`1` 最新 ISP 估计，无精度或实际生效帧保证。 |
+| `status` | `0` 不可用（其他曝光字段全零）；`1` 固定单硬件帧关联估计，无已测物理误差上界或实际生效曝光保证。 |
 | `duration_ns` | SDK 返回的积分秒数转换为 ns，不是主机等待/到帧耗时。 |
-| `source_frame_id` / `source_timestamp` | SDK 当前帧标识；timestamp 为 opaque 源值，不当作 RAW 或 realtime。可与 `raw_frame_id` 对照，但不等于已证明参数生效帧。 |
-| `observed_raw_ns` | 查询完成时 `CLOCK_MONOTONIC_RAW`，不是曝光起点或终点。 |
+| `source_frame_id` / `source_timestamp` | 更早 getter 返回的原始 SDK 身份，保留不改写为目标图像；不参与硬件帧相邻匹配。timestamp 为 opaque 源值，不当作 RAW 或 realtime，也不证明参数生效帧。 |
+| `observed_raw_ns` | 更早 getter 完成时的原始 `CLOCK_MONOTONIC_RAW`，不改写为目标图像时间，也不是曝光起点或终点。 |
 
 默认公开 `timestamp_ns` 是触发沿；测试开关可改为“触发时间＋半曝光时长”，但不宣称真实曝光中点，因为触发到积分起点尚未校准。bag `/cameraN/frame_metadata` 和 tee `camN/frames.jsonl` 中的 `exposure` 保留这些字段。MP4 `exposure.jsonl` 记录输入帧的相机、原始/归一化帧号、组号、组/逐路交付时间及曝光；它可能包含未编码保存的输入帧，应按相机及 `group_timestamp_ns // 1000 * 1000` 对照该路 timestamp CSV，不直接把源帧号当文件帧索引。ROS2 `/robobaton/camN/exposure`（`std_msgs/msg/String`，Reliable KeepLast(8)）发布 `robobaton_exposure_v1` JSON，含 `camera_id/sequence/frame_id/raw_frame_id/timestamp_ns/exposure`；按相机与 `timestamp_ns` 对照 Image `header.stamp`。系统回拨可能重复 stamp，需保留序列与采集边界，不能承诺仅靠 stamp 全局唯一。整数 JSON 必须无损解析。
 
@@ -88,23 +94,24 @@ SC132_TEST_EXPOSURE_MIDPOINT=0 ./cam_demo
 
 non-ROS 联合入口 `sensor_demo` 也可在 `config/sensor_config.yaml` 中设置 `camera.test_exposure_midpoint: true|false`，随包及自动生成的配置默认 `false`。显式 YAML 值覆盖环境变量；省略该键才保留环境变量控制。需重建 `sensor_demo` 与支持此开关的库，改配置后重启；`cam_demo` 不读取该 YAML，ROS2 仍使用环境变量。见 {ref}`non-ROS YAML 配置 <non-ros-yaml>`。
 
-开启时逐路 `timestamp_ns = realtime 触发时间 + floor(exposure.duration_ns / 2)`，使用该帧冻结的最新 ISP 观测，忽略触发到积分起点的延迟，不用主机当前时间、到帧时间或 opaque 源时间。frame info 与 frame-set item 一致；组时间取调整后各路时间的最小值。non-ROS 保存/RTSP、ROS2 Image/CameraInfo 和 exposure 消息沿用这些值，消费端不得再加一次半曝光。曝光不可用、时长为零或加法溢出时停止采集，不静默退回触发时间。
+开启时逐路 `timestamp_ns = realtime 触发时间 + floor(exposure.duration_ns / 2)`，使用按上述原始硬件帧相邻规则与目标图像匹配的前驱 getter 估计，忽略触发到积分起点的延迟，不用主机当前时间、到帧时间或 opaque 源时间。frame info 与 frame-set item 一致；组时间取调整后各路时间的最小值。non-ROS 保存/RTSP、ROS2 Image/CameraInfo 和 exposure 消息沿用这些值，原样转发曝光，不得再移一帧或再加一次半曝光。曝光不可用、时长为零或加法溢出时停止采集，不静默退回触发时间。
 
 配组放行和 `max_skew_ns` 仍使用原触发 RAW，reserved RAW/generation/uncertainty 也不偏移；因此测试模式的组时间与 RAW 审计时间有意表示不同事件。此模式只是未补偿延迟的曝光中点估计，不保证实际生效曝光、误差上界或硬件同步精度。
 
 
 ## IMU
 
-当前公开库要求设备已绑定匹配的 **内核 IIO V3 capture 模块**。已有 V2 capture 模块不兼容，host 模式也不例外；仅重建/部署应用不会升级模块。按 name `icm42670-capture` 枚举唯一实例，核验 scan 布局并通过 BIND 核对控制节点，不假定 `iio:deviceN` 编号。两种时间戳模式在同一二进制中使用同一 IIO 读取与内核 SPI/INT1 owner。库不装载模块、不修改设备树，也没有用户态 SPI/spidev 或自动回退路径。
+当前公开库要求设备已绑定匹配的 **内核 IIO V4 capture 模块**。已有 V2/V3 capture 模块不兼容，host 模式也不例外；仅重建/部署应用不会升级模块。按 name `icm42670-capture` 枚举唯一实例，核验 scan 布局并通过 BIND 核对控制节点，不假定 `iio:deviceN` 编号。两种时间戳模式在同一二进制中使用同一 IIO 读取与内核 SPI/INT1 owner。库不装载模块、不修改设备树，也没有用户态 SPI/spidev 或自动回退路径。
 
 | 项目 | 合同 |
 |---|---|
-| ABI | `5.0`；实体 `libicm42670.so.5.0.0`，SONAME `libicm42670.so.5`，九个导出均使用 `ICM42670_X5_5.0`；全部 consumer 与匹配头文件/库成套重建 |
+| ABI | `6.0`；实体 `libicm42670.so.6.0.0`，SONAME `libicm42670.so.6`，九个导出均使用 `ICM42670_X5_6.0`；全部 consumer 与匹配头文件/库成套重建 |
 | 原生 ODR | `25/50/100/200/400/800/1600Hz`，默认 `800Hz`；其他值拒绝，不重采样 |
 | FIFO watermark | 固定 `1` |
 | 缓冲容量 | `buffer_capacity=4096` 默认；只接受 `256..8192` 的 2 次幂 |
 | 无效六轴载荷策略 | `allow-counted` 默认计数后继续；`strict` 遇无效载荷失败；不是时间精度策略 |
 | 时间戳模式 | 启动配置 `timestamp_mode`：`ICM42670_TIMESTAMP_MODE_HOST=0`（默认）或 `ICM42670_TIMESTAMP_MODE_TMST=1`；应用 `imu_timestamp_mode` 接受 `host` 或 `tmst` |
+| FSYNC诊断 | `fsync_diagnostics=1`默认开启，0关闭；启动配置，不改变host／tmst正常时间 |
 
 | 字段 | 单位与语义 |
 |---|---|
@@ -118,17 +125,21 @@ non-ROS 联合入口 `sensor_demo` 也可在 `config/sensor_config.yaml` 中设�
 | `packet_flags` | 低三位分别为 accel/gyro/temperature valid（`1/2/4`） |
 | `temperature_c` / `accel_mps2[3]` / `gyro_rps[3]` | 摄氏度、`m/s^2`、`rad/s`；`raw` 保存原始六轴/温度值 |
 | `timestamp_mode` | C sample 中数值 `0=HOST`、`1=TMST`；输出 JSON/CSV 使用 `host`/`tmst` |
-| `fifo_tmst` | 原始 FIFO TMST 低 16 位，零扩展存于公开 u32 字段；不是解绕值或 Unix 时间 |
+| `fifo_tmst` | 原始FIFO字段低16位，零扩展到u32；tagged包为FSYNC delta微秒，不是绝对tick、解绕值或Unix时间 |
 | `sample_raw_ns` | host 为 `0`；tmst 为用户态解绕的 FIFO TMST，依据内核拥有的 FIFO/UI 跳变证据映射到 `CLOCK_MONOTONIC_RAW` |
 | `timestamp_uncertainty_ns` | host 为 `UINT32_MAX`（未知）；tmst 为计算映射 admission 上界，单位 ns，不是物理采样精度证书 |
+| `fifo_header` | 原始FIFO头字节，零扩展到u32 |
+| `fsync_flags` | 位 `ICM42670_FSYNC_ENABLED=1`、`ICM42670_FSYNC_TAGGED=2`、`ICM42670_FSYNC_TIME_VALID=4`、`ICM42670_FSYNC_UNRESOLVED=8` |
+| `fsync_sequence` / `fsync_delta_us` | 序号仅真实tag递增；普通包两字段为0；delta是原始tag的微秒间隔 |
+| `fsync_raw_ns` / `fsync_uncertainty_ns` | 独立诊断沿的`CLOCK_MONOTONIC_RAW`值和ns不确定度；无有效沿时为0／`UINT32_MAX`，host的`sample_raw_ns`仍为0 |
 
-host 模式保留内核 MONOTONIC 估计，不提供物理误差上界。tmst 模式使用内核拥有的 FIFO TMST 与有界 UI 跳变观测，由用户态解绕并进行有界仿射 RAW 映射。时间证据缺失、矛盾、过期、歧义或超预算时失败，不回退到 host 或名义 ODR 补造时间。`200µs` 样本映射 admission 是计算边界，不是实测物理精度；不恢复 FSYNC、触发—样本关联或用户态 SPI。
+host 模式保留内核 MONOTONIC 估计，不提供物理误差上界。tmst 模式使用内核拥有的 FIFO TMST 与有界 UI 跳变观测，由用户态解绕并进行有界仿射 RAW 映射。时间证据缺失、矛盾、过期、歧义或超预算时失败，不回退到 host 或名义 ODR 补造时间。`200µs` 样本映射 admission 是计算边界，不是实测物理精度；不提供触发—样本关联或用户态 SPI。
 
 ### Web 姿态预览输入
 
 `sensor_demo` 的 IMU SSE 使用 **`schema_version: 2`**，不保留旧 `sample_timestamp_ns` / `host_timestamp_ns` 别名。会话 `session_id`、应用身份与 `sequence` 保持独立；所有 u64 字段用十进制字符串传输，避免 JavaScript 精度损失。
 
-时间字段显式区分 `sample_realtime_ns`、`sample_monotonic_ns`、`sample_raw_ns`、`observation_monotonic_ns`、`burst_complete_raw_ns` 和 `estimated_period_ns`。`timestamp_mode` 为 `host` 或 `tmst`；host 的 `timestamp_uncertainty_ns` 为 JSON `null`（没有误差上界），tmst 为计算映射 admission。保留 `source_generation`、`evidence_id`、`burst_flags`、`packet_flags`、`timestamp_source`、`fifo_tmst` 及 `bridge_monotonic_ns`、`bridge_raw_ns`、`bridge_realtime_ns`、`bridge_uncertainty_ns`。不能跨 RAW/MONOTONIC 直接作差。ABI5 不提供逐样本 GPIO/mapper 计数，SSE 不伪造零值或继续输出这些字段。
+时间字段显式区分 `sample_realtime_ns`、`sample_monotonic_ns`、`sample_raw_ns`、`observation_monotonic_ns`、`burst_complete_raw_ns` 和 `estimated_period_ns`。`timestamp_mode` 为 `host` 或 `tmst`；host 的 `timestamp_uncertainty_ns` 为 JSON `null`（没有误差上界），tmst 为计算映射 admission。保留 `source_generation`、`evidence_id`、`burst_flags`、`packet_flags`、`timestamp_source`、`fifo_tmst` 及 `bridge_monotonic_ns`、`bridge_raw_ns`、`bridge_realtime_ns`、`bridge_uncertainty_ns`。不能跨 RAW/MONOTONIC 直接作差。ABI6 不提供逐样本 GPIO/mapper 计数，SSE 不伪造零值或继续输出这些字段。
 
 `attitude_accel_mps2`（`m/s²`）和 `attitude_gyro_rps`（`rad/s`）仍为三个元素数组，只供浏览器姿态预览；原始 `accel_mps2` / `gyro_rps`、数值/趋势、原生采样与保存不变。姿态积分和连续性使用所选原生时钟：host 的 MONOTONIC sample 或 tmst 的 RAW sample，不使用 realtime，避免墙钟调整污染积分。
 
@@ -140,14 +151,14 @@ host 模式保留内核 MONOTONIC 估计，不提供物理误差上界。tmst �
 
 `sensor_demo` 保存和 ROS2 输出适配层按模式选原生 sample：host 使用 `sample_monotonic_ns`，桥接 MONOTONIC→REALTIME；tmst 使用 `sample_raw_ns`，桥接 RAW→REALTIME。每个新 `(session_generation,evidence_id,timestamp_mode)` 观测一次桥，同 burst 复用；原生 MONOTONIC 主机字段和 RAW burst 观测均不改写。桥最多尝试三次，所选原生时钟的前后括号宽度超过 `200000ns` 时拒绝，全部失败则输出失败。`bridge_uncertainty_ns` 为括号半宽向上取整，独立于 tmst 样本映射 admission，不是物理采样精度或相机/IMU 同步误差上界。后续 burst 照实保留墙钟回拨，不强制递增。
 
-bag `/imu/data` 与 ROS2 IMU/Temperature 的 `Header.stamp` 使用显式转换的 realtime。bag `/robobaton/imu/timing`（`std_msgs/String`）及 ROS2 同名 topic（`std_msgs/msg/String`，Reliable KeepLast(256)）逐样本保存 `robobaton_imu_timing_v2` JSON：
+bag `/imu/data` 与 ROS2 IMU/Temperature 的 `Header.stamp` 使用显式转换的 realtime。bag `/robobaton/imu/timing`（`std_msgs/String`）及 ROS2 同名 topic（`std_msgs/msg/String`，Reliable KeepLast(256)）逐样本保存 `robobaton_imu_timing_v3` JSON：
 
 - 时钟声明：host 的 `sample_clock` 与 `bridge_clock` 为 `CLOCK_MONOTONIC`，tmst 为 `CLOCK_MONOTONIC_RAW`；`output_clock=CLOCK_REALTIME`，`burst_complete_clock=CLOCK_MONOTONIC_RAW`；
 - 身份：`generation`、`sample_sequence`、`evidence_id`、`burst_flags`；
-- 时间与来源：`sample_monotonic_ns`、`sample_realtime_ns`、`burst_complete_raw_ns`、`observation_monotonic_ns`、`estimated_period_ns`、`timestamp_source`、`packet_flags`，以及 `timestamp_mode`（`host`/`tmst`）、`fifo_tmst`、`sample_raw_ns`、`timestamp_uncertainty_ns`；
+- 时间与来源：`sample_monotonic_ns`、`sample_realtime_ns`、`burst_complete_raw_ns`、`observation_monotonic_ns`、`estimated_period_ns`、`timestamp_source`、`packet_flags`，以及 `timestamp_mode`（`host`/`tmst`）、`fifo_tmst`、`sample_raw_ns`、`timestamp_uncertainty_ns`； FSYNC独立诊断：`fifo_header,fsync_flags,fsync_sequence,fsync_raw_ns,fsync_uncertainty_ns,fsync_delta_us`；
 - 桥观测：`bridge_monotonic_ns`（仅 host；tmst 为零）、`bridge_raw_ns`（仅 tmst；host 为零）、`bridge_realtime_ns`、`bridge_uncertainty_ns`。不得把 RAW 桥基点标为 MONOTONIC，也不得跨时钟作差。
 
-MP4 `imu.csv` 的 `sample_realtime_ns` 是输出 realtime；保留原生时间、身份、burst、来源、桥基点/半宽、温度和 raw 六轴列（generation 列名为 `session_generation`）。新增 selector 列为 `timestamp_mode,fifo_tmst,sample_raw_ns,timestamp_uncertainty_ns,bridge_clock,bridge_raw_ns`。host 的 RAW sample 为零、样本不确定度未知；tmst 独立保留原始 MONOTONIC 估计。没有 FSYNC topic、sidecar、callback、启用选项、触发—样本关联或 `200µs` 物理精度保证。曝光观测与曝光中点测试开关可用于两种相机路径，official 不确定度仍未知。共同 Unix epoch 不代表物理同步。
+MP4 `imu.csv` 的 `sample_realtime_ns` 是输出 realtime；保留原生时间、身份、burst、来源、桥基点/半宽、温度和 raw 六轴列（generation 列名为 `session_generation`）。新增 selector 列为 `timestamp_mode,fifo_tmst,sample_raw_ns,timestamp_uncertainty_ns,bridge_clock,bridge_raw_ns`。host 的 RAW sample 为零、样本不确定度未知；tmst 独立保留原始 MONOTONIC 估计。FSYNC 诊断默认开启，可显式关闭；无独立 topic、sidecar、callback 或触发—样本关联或 `200µs` 物理精度保证。曝光观测与曝光中点测试开关可用于两种相机路径，official 不确定度仍未知。共同 Unix epoch 不代表物理同步。 FSYNC诊断列为`fifo_header,fsync_flags,fsync_sequence,fsync_raw_ns,fsync_uncertainty_ns,fsync_delta_us`；不校正host／tmst、相机帧或group时间，不做最近邻匹配。
 
 JSON 时间戳和序号必须无损读取为整数；epoch 纳秒超过 IEEE-754 安全整数范围，普通 JavaScript `JSON.parse` 会舍入，应使用无损整数解析器。
 
@@ -194,7 +205,7 @@ bag 过载只对完整四路组统一保留/丢弃。默认最小间隔 `10` 使
 | `/robobaton/cam0..3/exposure` | `std_msgs/msg/String` | `robobaton_exposure_v1` 随帧冻结的 ISP 曝光观测；`status=1` 是估计，不保证实际生效帧。 |
 | `/robobaton/imu/data` | `sensor_msgs/msg/Imu` | ICM-42670-P gyro/accel；orientation 不可用。 |
 | `/robobaton/imu/temperature` | `sensor_msgs/msg/Temperature` | ICM-42670-P 温度，复用 IMU sample stamp。 |
-| `/robobaton/imu/timing` | `std_msgs/msg/String` | 逐样本 `robobaton_imu_timing_v2` 原生时钟及桥证据。 |
+| `/robobaton/imu/timing` | `std_msgs/msg/String` | 逐样本 `robobaton_imu_timing_v3` 原生时钟及桥证据。 |
 
 ROS2 QoS：
 
