@@ -25,7 +25,7 @@
 5. PPS 接线前确认 5pin 线序、电平和共地，断电操作。
 6. 系统时间同步不等于采样同步。相机、IMU、PPS、PTP 和 ROS `header.stamp` 属于不同层次，字段语义见[数据合同](../development/data-contracts.md)。
 7. 启动相机 `observer|official` 与 IMU `host|tmst` selector 独立，默认 observer/host；四组合共用相同二进制及 IIO 采集/owner，只改变时间戳轴，切换须停止/重启。observer 保留 `500µs` SIF admission；official 使用同帧 RAW IRQ `timestamps − (tv − trig_tv) × 1000`（AON `tv`/`trig_tv` 单位 µs），不启动 observer，validity0/uncertainty `UINT32_MAX`（物理上界未知）。见 [non-ROS 使用](../usage/non-ros-demo.md) 与 [ROS2 使用](../usage/ros2-demo.md)。
-8. 两种 IMU 模式均保留 `sample_monotonic_ns` 与 `observation_monotonic_ns` 的内核 MONOTONIC 主机证据；`burst_complete_raw_ns` 为独立 RAW，不能跨域直接作差。host 的 RAW sample 为零、不确定度未知。TMST 对内核拥有的 FIFO/UI 跳变证据解绕并作有界仿射 RAW `sample_raw_ns` 映射，`200µs` 计算 admission 不是物理精度。保存/ROS2 每 burst 桥接 host MONOTONIC→REALTIME 或 tmst RAW→REALTIME，分开保留 `bridge_monotonic_ns`/`bridge_raw_ns` 和桥括号半宽。bag record time 独立读取 realtime，照实保留墙钟回拨，不冻结 offset、不合成递增；采集前先校时。均不恢复 FSYNC、spidev 或回退；两模式要求匹配内核 IIO V3（V2 不兼容）。
+8. 两种 IMU 模式均保留 `sample_monotonic_ns` 与 `observation_monotonic_ns` 的内核 MONOTONIC 主机证据；`burst_complete_raw_ns` 为独立 RAW，不能跨域直接作差。host 的 RAW sample 为零、不确定度未知。TMST 对内核拥有的 FIFO/UI 跳变证据解绕并作有界仿射 RAW `sample_raw_ns` 映射，`200µs` 计算 admission 不是物理精度。保存/ROS2 每 burst 桥接 host MONOTONIC→REALTIME 或 tmst RAW→REALTIME，分开保留 `bridge_monotonic_ns`/`bridge_raw_ns` 和桥括号半宽。bag record time 独立读取 realtime，照实保留墙钟回拨，不冻结 offset、不合成递增；采集前先校时。均不提供 FSYNC 关联、spidev 或回退；两模式要求匹配内核 IIO V4（V2/V3 不兼容）。
 9. 这些语义不证明持久 RTC、重启后自动校时、绝对 UTC 或物理同步；能力边界见{ref}`能力与验证边界 <capability-verification-boundary>`。
 
 ## 三种同步方式

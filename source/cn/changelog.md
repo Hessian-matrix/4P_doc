@@ -2,6 +2,17 @@
 
 本文件记录 RoboBaton 4P 公开交付的用户可见更新，版本定义统一遵循 [文档版本政策](release-and-support.md#文档版本政策)。本页文档修订号不自动改变软件版本，也不等于 SO 的 SONAME/ABI 版本。
 
+## 2.0.86 - 2026-11-09
+
+- 在保留 Rust/str0m Web、musl mallocng 与运行包 verifier、固定网页保存目录 `/root/demo/save_data`、系统启动策略、NCM/USB、硬件和镜像说明及全部既有版本记录的基础上，合并独立 FSYNC 诊断、曝光估计关联和标定环视的公开合同；软件仍为 `2.0.0`，文档修订与软件、硬件和 SO ABI 独立。
+- IMU 切换至匹配的内核 IIO V4／公共 ABI6.0：`libicm42670.so.6.0.0`、SONAME `.6`、九个 `ICM42670_X5_6.0` 导出。config 仍为 32 bytes，sample 保留旧 160-byte 前缀并扩为 192 bytes；内核、公开头、SO 和全部 consumer 须成套更新，不保留跨 major shim，应用包不升级内核模块。
+- 独立 FSYNC 诊断默认开启，可通过 non-ROS YAML／CLI 和 ROS2 启动只读参数关闭。bag／ROS2 timing 升级为 `robobaton_imu_timing_v3`，MP4 IMU CSV 追加六个真实逐样本诊断字段；tagged FIFO 字段保留 delta 微秒，无有效沿保留零时间／未知不确定度。正常 host／tmst 与相机时间、Web SSE schema2 不变；不做帧／group 最近邻匹配，不承诺物理同步精度。
+- 相机曝光仍为 ABI3：每个 worker 的零初始化会话状态在 warmup 预热，采集原始硬件帧 N 时的 getter 只估计相邻 N+1，按 uint32 原始硬件 ID 相邻关系匹配。无前驱、缺口或无效前驱查询时 UNAVAILABLE 且全零，不跨缺口沿用；来源身份、opaque 时间与 RAW 查询完成值保留更早 getter 原值，consumer 原样转发，不再移帧，不增加图像缓冲或交付延迟。
+- 默认触发 stamp 不变，显式曝光中点使用匹配估计并继续失败关闭。固定 N→N+1 不是通用 AE 生效延迟；ESTIMATED 不保证逐帧实际生效曝光、已测物理误差上界或 AE 验收，SC132 布局、SONAME 与软件版本不变。
+- 增加独立 `panorama_demo` 的 schema 7 KB4／外参标定驱动 360° 等距柱状 JPEG、可信 LAN 只读 Web 与离线用法；不是四格 RTSP 或 `sensor_demo` 首页，不采集 IMU、不录制、不做深度重建。说明固定安装与像素方向、无穷远／有限球面、盲区、近景视差、latest-only 丢组、亮度均衡、时序约束接缝与低频照明渐变，以及复用渲染 worker 的边界；不保证任意深度无缝或运动无闪跳。
+- 补齐静态 LibYAML/JPEG 依赖、`PANORAMA_OFFLINE_ONLY` 主机构建和完整运行包用法；离线构建不需要 X5 或 Rust，正常 X5 全量构建仍需要固定 Rust Web 工具链。包内携带标定、许可证与新入口，不替换系统 USB 摄像头实现。
+- 同步中英文技术口径，不复制有冲突的并行 `2.0.60`～`2.0.62` 版本标题；其有效内容归入本修订，远端同号记录保留原义。此前 V3／ABI5 的短窗记录仅认证原组成，不认证当前 V4／ABI6、环视、压力、长录或重启；本修订不表示实板部署、验收、已有镜像替换或新软件发布。
+
 ## 2.0.85 - 2026-11-06
 
 - 将 Rust/str0m Web 迁移与 musl mallocng 修复同步到使用、排障和构建说明；补充 `/api/v1/info` 实现标识、工具链 PATH、完整运行包更新／正常重启要求及 RSS 不能等同于泄漏的边界。

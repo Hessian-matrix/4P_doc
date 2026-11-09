@@ -137,7 +137,7 @@ TF 录制同样使用详情中的 `/mnt/sdcard/recordings/...` 实际路径。�
 
 动态 MP4 用 `imu_health_scope=callback_window` 检查本次窗口的原生样本、序号、计数差值与队列写入，等待首个有效 IDR，停止时有界等待共同编码组；这不证明窗口外或整个 producer 无丢失。进程退出后的 producer final health 仅用于仍活跃的启动自动会话。支持的帧率是参数范围，不是零丢失保证，负载边界见第 9 节。
 
-高压 bag 在严格丢组策略耗尽时合法结束为 partial，不是持续压力通过。应用退出的正常收尾保持 IMU 输入直到 producer STOP 排空、consumer 排空后再关闭 writer；动态停录以本次 callback window 为边界，不停止 producer。历史 DDS 发布/接收差额仍未精确归因，不能仅凭保存序列连续证明所有路径头尾无损。旧组成的 FSYNC/长录结果不认证当前 IIO V3/ABI5 集成组成；本轮仅新增 non-ROS HO 保存短窗验证，不认证长录，见{ref}`能力与验证边界 <capability-verification-boundary>`。
+高压 bag 在严格丢组策略耗尽时合法结束为 partial，不是持续压力通过。应用退出的正常收尾保持 IMU 输入直到 producer STOP 排空、consumer 排空后再关闭 writer；动态停录以本次 callback window 为边界，不停止 producer。历史 DDS 发布/接收差额仍未精确归因，不能仅凭保存序列连续证明所有路径头尾无损。旧组成的 FSYNC/长录结果不认证V3/ABI5集成组成或当前V4/ABI6；此前non-ROS HO保存短窗证据仅认证原组成，不认证长录，见{ref}`能力与验证边界 <capability-verification-boundary>`。
 
 | 模式 | 入口 | 主要输出 | 完整保存判据 |
 |---|---|---|---|
@@ -150,9 +150,11 @@ complete 首先是 recorder 发布结果，不证明所有物理样本或曝光�
 
 相机图像/metadata 使用所选 observer/official realtime 触发估计或显式曝光中点估计。保存按启动 `imu_timestamp_mode` 每 burst 桥接 host MONOTONIC→REALTIME 或 tmst RAW→REALTIME；tmst 下也不覆盖原始 MONOTONIC 主机估计。bag `/imu/data` Header 与 MP4 `imu.csv` 的 `sample_realtime_ns` 是输出值。bag `/robobaton/imu/timing` JSON 和 CSV 保留模式、原始 FIFO low16 `fifo_tmst`、`sample_raw_ns`、`timestamp_uncertainty_ns`、原生 host/burst 证据、身份/来源，以及正确标注且独立的 MONOTONIC/RAW 桥基点与半宽。host 的 RAW sample 为零、样本不确定度 `UINT32_MAX`；桥不确定度与 tmst `200µs` 计算 admission 均不是物理精度。图像 CSV 仍为微秒量化组时间，exposure sidecar 保留逐路输入值。bag record time 独立读取 realtime 并保留回拨；MP4 播放仍相对/名义。共同 epoch 不代表物理同步，录制前先校时。
 
-bag timing schema `robobaton_imu_timing_v2` 与 ROS2 `/robobaton/imu/timing` 一致；bag `/robobaton/session_config` 记录 `camera_timestamp_path`、`imu_timestamp_mode`。通过 [non-ROS YAML/CLI](non-ros-demo.md) 选择任一四组合，停止/重启后切换，均使用相同二进制与 IIO 采集/owner。每种组合均要求匹配的内核 IIO V3 capture 模块，现有 V2 模块不兼容，应用部署不升级模块。无 FSYNC 选项/topic/sidecar、spidev 或回退。official 绝不使用 SIF observer 时间，validity0/uncertainty `UINT32_MAX`。当前 non-ROS HO 短窗证据及未验收范围见{ref}`能力与验证边界 <capability-verification-boundary>`。不声明四组合保存验收；见[数据合同](../development/data-contracts.md#imu)。
+bag timing schema `robobaton_imu_timing_v3` 与 ROS2 `/robobaton/imu/timing` 一致；bag `/robobaton/session_config` 记录 `camera_timestamp_path`、`imu_timestamp_mode`、`imu_fsync_diagnostics`。通过 [non-ROS YAML/CLI](non-ros-demo.md) 选择任一四组合，停止/重启后切换，均使用相同二进制与 IIO 采集/owner。每种组合均要求匹配的内核 IIO V4 capture 模块，现有 V2/V3 模块不兼容，应用部署不升级模块。FSYNC 诊断默认开启，可显式关闭，无独立 topic/sidecar 或关联、spidev 或回退。official 绝不使用 SIF observer 时间，validity0/uncertainty `UINT32_MAX`。当前 non-ROS HO 短窗证据及未验收范围见{ref}`能力与验证边界 <capability-verification-boundary>`。不声明四组合保存验收；见[数据合同](../development/data-contracts.md#imu)。 独立诊断由YAML `imu.fsync_diagnostics: true`或CLI `--imu-fsync-diagnostics on|off`控制；JSON／CSV逐样本原样保存`fifo_header,fsync_flags,fsync_sequence,fsync_raw_ns,fsync_uncertainty_ns,fsync_delta_us`。无有效沿为RAW=0／uncertainty=`UINT32_MAX`，普通包sequence/delta=0；tagged `fifo_tmst`为delta微秒。不改相机帧/group诊断，不在线宣称匹配。
 
-bag `/cameraN/frame_metadata`、tee `camN/frames.jsonl` 和 MP4 `exposure.jsonl` 保存逐帧冻结的 `exposure`。`status=1` 是最新 ISP 观测估计，不是已证实的该帧实际曝光；`0` 是不可用，不沿用上一帧。MP4 sidecar 描述输入帧，可能多于实际编码帧，按相机及微秒量化的组触发时间对照 timestamp CSV。字段、关联键与误差边界见[逐帧曝光观测](../development/data-contracts.md#逐帧曝光观测)。
+bag `/cameraN/frame_metadata`、tee `camN/frames.jsonl` 和 MP4 `exposure.jsonl` 原样保存逐帧冻结的 `exposure`。采集原始硬件帧 N 时取得的 getter 只估计相邻 N+1（允许 uint32 回绕），按已采集原始硬件帧 ID 而非归一化组号或 SDK 源帧号匹配；保存端不得再移一帧。`status=1` 是固定单硬件帧关联估计，没有已测物理误差上界或实际生效曝光证明；无前驱、硬件缺口或无效前驱 getter 时为 `0` 且全零，不跨缺口延用。N 查询失败影响 N+1，有效前驱仍可估计 N；来源字段保留更早 getter 的原值，不改成目标图像的身份或时间。关联在各 worker 的零初始化会话状态中于 warmup 预热，无额外图像缓冲或交付延迟；默认触发 stamp 不变，显式中点模式使用匹配估计并在不可用时停止。MP4 sidecar 描述输入帧，可能多于实际编码帧，按相机及微秒量化的组交付时间对照 timestamp CSV。字段、关联键与限制见[逐帧曝光观测](../development/data-contracts.md#逐帧曝光观测)。
+
+固定 N→N+1 只是估计关联规则；真实 AE 的有效滞后可能不同，不保证任何一帧实际应用的曝光，也不构成 AE 验收。
 
 ## 2. 进阶：版本与运行包一致性
 

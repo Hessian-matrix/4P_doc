@@ -119,7 +119,7 @@ typedef void (*sc132_frame_set_callback_t)(
 | `width` / `height` | 交付图像的有效宽/高，单位像素，使用当前帧实际输出方向和尺寸。 |
 | `stride` | 相邻行起点间的字节距离；当前 NV12 的 Y/UV 平面共用该行跨度，可能大于有效宽度。 |
 | `vstride` | Y 平面垂直布局行数，单位行，可能因对齐大于有效高度，不是图像有效行数。 |
-| `exposure` | 随该帧冻结的最新 ISP 曝光观测，字段及限制见下表。 |
+| `exposure` | 以相邻前一原始硬件帧 getter 估计并随目标帧冻结的曝光；不是同帧最新 getter，字段及限制见下表。 |
 
 `sequence`、`raw_frame_id` 和 `frame_id` 分别描述软件计数、SDK 原始身份和归一化配组身份，不能混用，也不能直接作为 MP4 的 `frame_index`。
 
@@ -138,13 +138,17 @@ Y、UV 必须分别使用各自地址；不能假设两平面连续、UV 从 `y_
 
 | `sc132_exposure_info_t` 字段 | 含义与限制 |
 |---|---|
-| `status` | `0`（`SC132_EXPOSURE_UNAVAILABLE`）不可用，其余曝光字段全零，不复用上一帧；`1`（`SC132_EXPOSURE_ESTIMATED`）为最新 ISP 估计，没有误差上界或实际生效帧保证。 |
-| `source_frame_id` | ISP 查询返回的 SDK 当前帧标识；可与原始帧号对照，但相等不证明参数与帧原子绑定。 |
+| `status` | `0`（`SC132_EXPOSURE_UNAVAILABLE`）不可用，其余曝光字段全零；`1`（`SC132_EXPOSURE_ESTIMATED`）为固定单硬件帧关联估计，没有已测物理误差上界或实际生效曝光保证。 |
+| `source_frame_id` | 相邻前驱采集时 getter 返回的原始 SDK 帧标识；不改写为目标图像，不用于硬件帧相邻匹配，也不证明原子参数绑定。 |
 | `duration_ns` | SDK 报告的积分秒数转换为 ns，不是主机等待或采集耗时。 |
-| `source_timestamp` | SDK 的 opaque 源时间值，不定义为 RAW/realtime，不能用于 Unix 时间对齐。 |
-| `observed_raw_ns` | 查询完成时的 `CLOCK_MONOTONIC_RAW`，单位 ns；不是积分开始或结束时刻。 |
+| `source_timestamp` | 更早 getter 的原始 opaque SDK 源时间，不改写为目标图像，不定义为 RAW/realtime，不能用于 Unix 时间对齐。 |
+| `observed_raw_ns` | 更早 getter 完成时的原始 `CLOCK_MONOTONIC_RAW`，单位 ns；不改写为目标图像时间，也不是积分开始或结束时刻。 |
 
-保留同一帧后再次读取，观测不会被后续帧覆盖；这仍不证明该帧实际生效曝光。触发到积分起点尚未校准，测试模式的“触发时间＋半曝光时长”只是估算中点，不能认定为真实曝光中点，也不要对已调整的 `timestamp_ns` 重复加半曝光。详见[曝光观测合同](data-contracts.md#逐帧曝光观测)。
+每个采集 worker 独占每次会话零初始化的状态，采集原始硬件帧 N 时取得的 getter 只估计 N+1。只按已采集原始硬件帧 ID 的 uint32 相邻关系（允许回绕）匹配，不按归一化帧号、组号或 SDK `source_frame_id`；frame-set warmup 中即预热，无额外图像缓冲或交付延迟。首个无前驱采集帧、硬件缺口或无效前驱查询均为不可用且全零，不跨缺口延用。N 查询失败使 N+1 不可用，有效前驱仍可估计 N。保留同一帧后再次读取不被后续查询覆盖。consumer 原样转发曝光，不得再移一帧。
+
+默认触发时间戳、公开布局、SONAME 和软件版本不变。显式中点模式使用已匹配估计，不可用时仍停止；触发到积分起点尚未校准，“触发时间＋半曝光时长”不是实际生效曝光或真实中点证明，也不要对已调整的 `timestamp_ns` 重复加半曝光。详见[曝光观测合同](data-contracts.md#逐帧曝光观测)。
+
+固定 N→N+1 只是估计关联规则；真实 AE 的有效滞后可能不同，不构成通用 AE 生效延迟或逐帧实际应用曝光保证。
 
 #### 帧组和条目字段
 
@@ -256,7 +260,7 @@ int run_camera(void) {
 
 ## `libicm42670.so`
 
-non-ROS 头文件：`include/icm42670_driver.h`；ROS2：`include/robobaton_4p_ros2_demo/icm42670_driver.h`。ABI `5.0`，实体 `libicm42670.so.5.0.0`，SONAME `libicm42670.so.5`，所有九个 C 导出仅使用 `ICM42670_X5_5.0`。相对 ABI4 是布局与语义不兼容的完整切换；同步头文件、库及所有重建 consumer，删除旧 major 库，不建立跨 major 链接或旧符号别名。要求匹配的内核 IIO V3 capture 模块；V2 即使 host 模式也不兼容。软件 VERSION 独立。
+non-ROS 头文件：`include/icm42670_driver.h`；ROS2：`include/robobaton_4p_ros2_demo/icm42670_driver.h`。ABI `6.0`，实体 `libicm42670.so.6.0.0`，SONAME `libicm42670.so.6`，所有九个 C 导出仅使用 `ICM42670_X5_6.0`。相对 ABI5 保留原160字节 sample 前缀，但结构尺寸和 config 语义不兼容；同步头文件、库及所有重建 consumer，删除旧 major 库，不建立跨 major 链接或旧符号别名。要求匹配的内核 IIO V4 capture 模块；V2/V3 即使 host 模式也不兼容。软件 VERSION 独立。
 
 | 导出 | 合同 |
 |---|---|
@@ -272,9 +276,9 @@ non-ROS 头文件：`include/icm42670_driver.h`；ROS2：`include/robobaton_4p_r
 
 状态为 `OK=0`、`INVALID_ARGUMENT=-1`、`INVALID_STATE=-2`、`IO_ERROR=-3`、`INTERNAL_ERROR=-4`（宏前缀 `ICM42670_STATUS_`）。
 
-`icm42670_config_t` 全为 u32：`struct_size, sample_rate_hz, fifo_watermark_samples, buffer_capacity, sample_drop_policy, timestamp_mode, reserved[2]`。使用 `ICM42670_CONFIG_INIT`：默认 `800Hz`、watermark `1`、buffer `4096`、`ALLOW_COUNTED`、`ICM42670_TIMESTAMP_MODE_HOST=0`；`ICM42670_TIMESTAMP_MODE_TMST=1` 选择 TMST。ODR 仅 `25/50/100/200/400/800/1600`；watermark 必须1，buffer 为256..8192的2次幂，reserved 为0。非法 mode 拒绝；创建 handle 时设置，切换需 stop/重建 handle/restart。`ALLOW_COUNTED`/`STRICT` 仅控制无效六轴 payload，不控制时间精度。两模式共用同一 IIO 读取/owner，无用户态 SPI/spidev、模块装载、DT 修改或回退。
+`icm42670_config_t` 全为 u32：`struct_size, sample_rate_hz, fifo_watermark_samples, buffer_capacity, sample_drop_policy, timestamp_mode, fsync_diagnostics, reserved[1]`。结构为32bytes。`fsync_diagnostics`只接受0/1，默认1，0关闭独立诊断；使用 `ICM42670_CONFIG_INIT`：默认 `800Hz`、watermark `1`、buffer `4096`、`ALLOW_COUNTED`、`ICM42670_TIMESTAMP_MODE_HOST=0`；`ICM42670_TIMESTAMP_MODE_TMST=1` 选择 TMST。ODR 仅 `25/50/100/200/400/800/1600`；watermark 必须1，buffer 为256..8192的2次幂，reserved 为0。非法 mode 拒绝；创建 handle 时设置，切换需 stop/重建 handle/restart。`ALLOW_COUNTED`/`STRICT` 仅控制无效六轴 payload，不控制时间精度。两模式共用同一 IIO 读取/owner，无用户态 SPI/spidev、模块装载、DT 修改或回退。
 
-`icm42670_sample_t` 包含 u32 `struct_size/session_generation`，u64 `sample_monotonic_ns/sample_sequence`，u32 `burst_flags/fifo_tmst`，u64 `evidence_id/burst_complete_raw_ns/observation_monotonic_ns/estimated_period_ns`，u32 `timestamp_source/packet_flags`，double `temperature_c/accel_mps2[3]/gyro_rps[3]`，16-byte `raw`（int16 温度、accel[3]、gyro[3]、reserved），尾部为 u64 `sample_raw_ns` 与 u32 `timestamp_uncertainty_ns/timestamp_mode`。`fifo_tmst` 是原始 u16 FIFO 值零扩展到 u32。两模式均保留原始 MONOTONIC 主机估计和独立 RAW burst 完成值，禁止跨时钟直接作差。host 的 `sample_raw_ns=0`、uncertainty 为 `UINT32_MAX`。TMST 依据内核拥有的 FIFO/UI 跳变证据，由用户态解绕并作有界仿射 RAW 映射，`200µs` 为计算 admission 而非物理精度。输出适配层将所选原生 sample 时钟桥接到 realtime，分开保留 MONOTONIC/RAW 桥基点。字段、flags、schema v2 及全部 health 字段见[IMU 数据合同](data-contracts.md#imu)；不恢复 FSYNC API 或触发—样本关联。
+`icm42670_sample_t` 包含 u32 `struct_size/session_generation`，u64 `sample_monotonic_ns/sample_sequence`，u32 `burst_flags/fifo_tmst`，u64 `evidence_id/burst_complete_raw_ns/observation_monotonic_ns/estimated_period_ns`，u32 `timestamp_source/packet_flags`，double `temperature_c/accel_mps2[3]/gyro_rps[3]`，16-byte `raw`（int16 温度、accel[3]、gyro[3]、reserved），原160bytes前缀尾部为 u64 `sample_raw_ns` 与 u32 `timestamp_uncertainty_ns/timestamp_mode`；再追加 u32 `fifo_header/fsync_flags`、u64 `fsync_sequence/fsync_raw_ns`、u32 `fsync_uncertainty_ns/fsync_delta_us`，共192bytes。`fifo_tmst` 是原始 u16 FIFO 值零扩展到 u32，tagged时为FSYNC delta微秒而非绝对tick。两模式均保留原始 MONOTONIC 主机估计和独立 RAW burst 完成值，禁止跨时钟直接作差。host 的 `sample_raw_ns=0`、uncertainty 为 `UINT32_MAX`。TMST 依据内核拥有的 FIFO/UI 跳变证据，由用户态解绕并作有界仿射 RAW 映射，`200µs` 为计算 admission 而非物理精度。输出适配层将所选原生 sample 时钟桥接到 realtime，分开保留 MONOTONIC/RAW 桥基点。字段、flags、schema v3 及全部 health 字段见[IMU 数据合同](data-contracts.md#imu)；独立 FSYNC 诊断随 sample 输出，无独立 callback 或触发—样本关联。
 
 callback 的 sample 借用至返回，不抛异常、不调用 stop/destroy。异步消费须自行复制并保持 user_data 到 stop 返回；停止期间仍可能接收样本，应并行排空队列，不能先关接纳。所有覆盖 sample 交付后才 ACK 对应 record。`transport_complete` 只认证完整消费/ACK 的停止集合，不覆盖 fence 外物理尾部、不抵消 fatal。健康必须检查 stop 返回值、health 返回值、generation、错误与计数，不能只看最后一个样本。
 
@@ -399,4 +403,4 @@ int open_rtsp(prrtsp_stream_t **stream) {
 
 `libsc132.so`、`libicm42670.so`、`libprrtsp.so`、公开头文件和 demo 程序必须来自同一公开交付包。不要把当前 `.so` 单独替换到未迁移程序；ROS2 install 路径使用 `RoboBaton_4P_ROS2_demo` 自身携带的公开头文件、运行库和 manifest，不要与 non-ROS `/root/demo` 运行包混用。
 
-当前库集合为 `libicm42670.so.5.0.0` / `ICM42670_X5_5.0`、`libsc132.so.3.0.0` / `LIBSC132_3.0`、`libprrtsp.so.2.0.1` / `LIBPRRTSP_2.0`。移除 ICM42670 旧 `.2`/`.3`/`.4` 和 SC132 旧 `.2` 库，成套重建全部 consumer，不保留跨 major 别名；ROS2 不携带 PRRTSP。应用包不安装所需的匹配 IIO V3 内核模块。
+当前库集合为 `libicm42670.so.6.0.0` / `ICM42670_X5_6.0`、`libsc132.so.3.0.0` / `LIBSC132_3.0`、`libprrtsp.so.2.0.1` / `LIBPRRTSP_2.0`。移除 ICM42670 旧 `.2`/`.3`/`.4`/`.5` 和 SC132 旧 `.2` 库，成套重建全部 consumer，不保留跨 major 别名；ROS2 不携带 PRRTSP。应用包不安装所需的匹配 IIO V4 内核模块。

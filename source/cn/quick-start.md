@@ -25,7 +25,7 @@ cd /root/demo
 
 `sensor_demo` 默认运行四路 SC132 相机、H.264 网页预览和 ICM-42670-P IMU（原生默认 `800Hz`）采集；RTSP 默认关闭，本节命令用 `--rtsp` 显式开启 PRRTSP v2 推流。默认图像为 `1280x1088@30fps`，支持 `25/30/40/50/60fps`；输出画布支持 `1280x1088`/`640x480`/`720x480`/`1280x720`。这是实现的参数集合，不保证所有保存/ROS2 路径持续达到目标帧率或零丢失；当前已验证范围与未闭环问题见{ref}`能力与验证边界 <capability-verification-boundary>`。
 
-默认不保存。bag/MP4、曝光估计及四组合启动 YAML/CLI 示例见 [non-ROS 使用](usage/non-ros-demo.md) 与[数据保存](usage/save-data-guide.md)。默认 `camera_timestamp_path: observer`、`imu_timestamp_mode: host`；停止/重启后切换 official 和/或 tmst，仍使用相同二进制/IIO 路径。所有 IMU 模式均要求匹配的内核 IIO V3 capture 模块，V2 不兼容。独立 CLI 保留 MONOTONIC，tmst 另报告 RAW sample；保存/ROS2 将所选原生时钟桥接到 realtime。observer 需 `/dev/mem` 只读权限并保留 `500µs` admission；official 不启动 observer，物理误差未知。TMST `200µs` admission 是计算边界而非物理精度，无 FSYNC/spidev/回退。当前 non-ROS HO 短窗证据及未验收范围见{ref}`能力与验证边界 <capability-verification-boundary>`。
+默认不保存。bag/MP4、曝光估计及四组合启动 YAML/CLI 示例见 [non-ROS 使用](usage/non-ros-demo.md) 与[数据保存](usage/save-data-guide.md)。默认 `camera_timestamp_path: observer`、`imu_timestamp_mode: host`；停止/重启后切换 official 和/或 tmst，仍使用相同二进制/IIO 路径。所有 IMU 模式均要求匹配的内核 IIO V4 capture 模块，V2/V3 不兼容。独立 CLI 保留 MONOTONIC，tmst 另报告 RAW sample；保存/ROS2 将所选原生时钟桥接到 realtime。observer 需 `/dev/mem` 只读权限并保留 `500µs` admission；official 不启动 observer，物理误差未知。TMST `200µs` admission 是计算边界而非物理精度，提供独立FSYNC诊断，无触发关联／spidev／回退。当前 non-ROS HO 短窗证据及未验收范围见{ref}`能力与验证边界 <capability-verification-boundary>`。
 
 四路 RTSP URL：
 

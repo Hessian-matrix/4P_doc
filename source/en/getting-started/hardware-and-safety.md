@@ -67,7 +67,7 @@ Generic USB-UART adapters connect only TX/RX/GND by default, not VCC. Check cros
 
 ## Trigger and Sampling
 
-All camera entries use VIN LPWM hardware triggering, not software GPIO. The kernel IIO driver owns IMU SPI/INT1; applications must not claim them through another path. Current software provides no FSYNC association. Shared wiring does not establish sample/exposure synchronization; frame arrival and host-assigned time are not physical exposure time.
+All camera entries use VIN LPWM hardware triggering, not software GPIO. The kernel IIO driver owns IMU SPI/INT1; applications must not claim them through another path. Current IIO V4/ABI6 provides only independent FSYNC diagnostics, enabled by default, without trigger-to-sample association or correction of host/tmst or camera time. Shared wiring does not establish sample/exposure synchronization; frame arrival and host-assigned time are not physical exposure time.
 
 ## Camera Application Resource Constraints
 

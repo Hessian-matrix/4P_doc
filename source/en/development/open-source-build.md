@@ -4,7 +4,7 @@ This page explains how to cross-compile the example code in the public demo repo
 
 Scope:
 
-- [`RoboBaton_4p_demo`](https://github.com/Hessian-matrix/RoboBaton_4p_demo/tree/V2_main): non-ROS four-camera RTSP, IMU, UART, and SocketCAN CAN examples.
+- [`RoboBaton_4p_demo`](https://github.com/Hessian-matrix/RoboBaton_4p_demo/tree/V2_main): non-ROS four-camera RTSP, calibrated panorama JPEG/Web, IMU, UART, and SocketCAN CAN examples.
 - [`RoboBaton_4P_ROS2_demo`](https://github.com/Hessian-matrix/RoboBaton_4P_ROS2_demo/tree/V2_main): ROS2 four-camera NV12/raw+compressed images, CameraInfo, exposure observations, IMU, temperature, and IMU timing metadata topic examples.
 
 V2 source and documentation use the `V2_main` main branch. The clone commands below select it explicitly; switch existing checkouts to `V2_main` before building too.
@@ -17,6 +17,7 @@ The public demo repositories build the user-side example programs:
 RoboBaton_4p_demo
 ├── cam_demo
 ├── mosaic_rtsp_demo
+├── panorama_demo
 ├── sensor_demo
 ├── imu_reader_demo
 ├── serial_port_demo
@@ -41,7 +42,7 @@ Each library family has one regular `libNAME.so.M.m.p` file and two exact same-d
 
 Non-ROS `runtime-provenance.json` uses v3: regular-file bytes and raw link text are bound separately; source-input links are hashed by link text. Regenerate packages with older provenance using the current script. This does not change software versions or SONAME/ABI. Both SHA-256 manifests still include resolved-byte hashes for aliases; these do not replace link-metadata verification.
 
-The current matched set is ICM42670 `libicm42670.so.5.0.0`, SONAME `libicm42670.so.5`, nine exports under `ICM42670_X5_5.0`; SC132 `libsc132.so.3.0.0`, SONAME `libsc132.so.3`, `LIBSC132_3.0`; PRRTSP `libprrtsp.so.2.0.1`, SONAME `libprrtsp.so.2`, `LIBPRRTSP_2.0`. Synchronize public headers and libraries, remove old ICM42670 `.2/.3/.4` and SC132 `.2` libraries, and rebuild every consumer without cross-major links. All four startup timestamp pairs use the same binaries/IIO capture, not separate scheme-specific builds; see [non-ROS Usage](../usage/non-ros-demo.md) and [ROS2 Usage](../usage/ros2-demo.md). Every IMU mode requires the matched kernel IIO V3 capture module; the existing V2 module is incompatible. Public demo builds/package verifiers do not build, install, or upgrade that kernel module. Software `2.0.0`, hardware V2.2, documentation revision, and SO ABI are independent. See {ref}`Capability and Verification Boundaries <capability-verification-boundary>` for the current non-ROS HO short smoke and unverified scope. compilation does not certify four-way operation, throughput, pressure, or long recording. See {ref}`Capability and Verification Boundaries <capability-verification-boundary>`.
+The current matched set is ICM42670 `libicm42670.so.6.0.0`, SONAME `libicm42670.so.6`, nine exports under `ICM42670_X5_6.0`; SC132 `libsc132.so.3.0.0`, SONAME `libsc132.so.3`, `LIBSC132_3.0`; PRRTSP `libprrtsp.so.2.0.1`, SONAME `libprrtsp.so.2`, `LIBPRRTSP_2.0`. Synchronize public headers and libraries, remove old ICM42670 `.2/.3/.4/.5` and SC132 `.2` libraries, and rebuild every consumer without cross-major links. All four startup timestamp pairs use the same binaries/IIO capture, not separate scheme-specific builds; see [non-ROS Usage](../usage/non-ros-demo.md) and [ROS2 Usage](../usage/ros2-demo.md). Every IMU mode requires the matched kernel IIO V4 capture module; the existing V2/V3 module is incompatible. Public demo builds/package verifiers do not build, install, or upgrade that kernel module. Software `2.0.0`, hardware V2.2, documentation revision, and SO ABI are independent. See {ref}`Capability and Verification Boundaries <capability-verification-boundary>` for the current non-ROS HO short smoke and unverified scope. compilation does not certify four-way operation, throughput, pressure, or long recording. See {ref}`Capability and Verification Boundaries <capability-verification-boundary>`.
 
 The current matching Buildroot image supplies `/usr/bin/python3`, C++/SDK runtime libraries, and `/opt/ros/humble`. Application packages supply their programs, configuration, matched producers, and tools. The ROS2 install also carries selected transitive dependencies and NumPy's BLAS/LAPACK/Fortran libraries, not just the two producers; it does not replace the system interpreter or BSP. Checks on a flashed device cover Python `3.10.12`, actual non-ROS loading, and ROS2 version/package queries in the package environment. Builds and package/install verifiers do not validate every runtime path. See [Current Image Contents](../ops/system-flashing.md).
 
@@ -102,7 +103,25 @@ git clone --branch V2_main https://github.com/Hessian-matrix/RoboBaton_4p_demo.g
 cd RoboBaton_4p_demo
 ```
 
-Building all six demos and application-owned `sensor_web` additionally requires exact Rust `1.95.0`, cargo-zigbuild `0.23.0`, Zig `0.16.0`, and the `aarch64-unknown-linux-musl` target on the host; the device needs no compiler. Install these tools and fetch Cargo.lock dependencies during a network-enabled provisioning step. Actual builds are frozen/offline and do not automatically install toolchains or dependencies.
+### Panorama Static Dependencies and Host Offline Builds
+
+`panorama_demo` uses static LibYAML/JPEG for YAML parsing and JPEG encoding/decoding. Normal X5 configuration must find AArch64 `yaml.h`, `jpeglib.h`, `libyaml.a`, and `libjpeg.a` in the toolchain's target search paths. Provision matching toolchain/sysroot dependencies first; never link host x86_64 libraries. CMake overrides `PANORAMA_YAML_INCLUDE_DIR`, `PANORAMA_JPEG_INCLUDE_DIR`, `PANORAMA_YAML_LIBRARY`, and `PANORAMA_JPEG_LIBRARY` may explicitly name the matching target headers/static archives. Standard packaging recreates the build directory, so target dependencies must also be discoverable through its toolchain search paths, not only an old CMake cache that will be removed.
+
+For host JPEG processing only, use the host compiler/development packages in a separate terminal, without an X5 toolchain:
+
+```bash
+sudo apt-get install -y build-essential cmake libyaml-dev libjpeg-dev
+cmake -S . -B build_panorama_host -DPANORAMA_OFFLINE_ONLY=ON
+cmake --build build_panorama_host --target panorama_demo -j
+./build_panorama_host/panorama_demo --calibration config/calibration.yaml \
+  --images /path/to/group --once --output /path/to/new-panorama.jpg
+```
+
+`PANORAMA_OFFLINE_ONLY=ON` configures only the panorama JPEG/Web target and returns before Rust Web, X5 SDK, or producer discovery. It needs neither Rust, cargo-zigbuild, Zig, X5, nor sensor SOs; it is not a full live-capture runtime package. The host must also provide static `libyaml.a`/`libjpeg.a`; runtime shared libraries alone are insufficient. Inputs are `cam0.jpg`..`cam3.jpg` from one group in calibrated pixel orientation/dimensions; filenames do not certify synchronization. Omit `--once` for trusted-LAN static Web; output must not overwrite an existing file. See {ref}`Calibrated Panorama <non-ros-panorama>` for parameters and algorithm limits.
+
+Normal full X5 builds retain `PANORAMA_OFFLINE_ONLY=OFF` (default), the pinned Rust Web toolchain below, and target static YAML/JPEG dependencies. Runtime packages carry the `panorama_demo` launcher/ELF, `config/calibration.yaml`, and `licenses/panorama/THIRD_PARTY_NOTICES.txt`. Neither static library needs separate on-device installation; JPEG notices include the Independent JPEG Group license. This entry is not the system UVC backend and performs no IMU acquisition, recording, or depth reconstruction. Successful compilation or package verification establishes neither board acceptance, performance, nor seam accuracy.
+
+Building all seven demos and application-owned `sensor_web` additionally requires exact Rust `1.95.0`, cargo-zigbuild `0.23.0`, Zig `0.16.0`, and the `aarch64-unknown-linux-musl` target on the host; the device needs no compiler. Install these tools and fetch Cargo.lock dependencies during a network-enabled provisioning step. Actual builds are frozen/offline and do not automatically install toolchains or dependencies.
 
 ```bash
 export CARGO=/path/to/rust1.95/bin/cargo # replace with the installed toolchain
@@ -124,6 +143,7 @@ Or build a single target:
 ```bash
 cmake --build build_x5 --target cam_demo -j
 cmake --build build_x5 --target mosaic_rtsp_demo -j
+cmake --build build_x5 --target panorama_demo -j
 cmake --build build_x5 --target sensor_demo -j
 cmake --build build_x5 --target imu_reader_demo -j
 cmake --build build_x5 --target serial_port_demo -j
@@ -146,6 +166,7 @@ Build artifacts are at:
 ```text
 build_x5/cam_demo
 build_x5/mosaic_rtsp_demo
+build_x5/panorama_demo
 build_x5/sensor_demo
 build_x5/imu_reader_demo
 build_x5/serial_port_demo
@@ -157,6 +178,7 @@ Check the target architecture:
 ```bash
 file build_x5/cam_demo
 file build_x5/mosaic_rtsp_demo
+file build_x5/panorama_demo
 file build_x5/sensor_demo
 file build_x5/imu_reader_demo
 file build_x5/serial_port_demo
@@ -175,9 +197,9 @@ TOOLCHAIN_FILE="$TOOLCHAIN_FILE" scripts/package_runtime.sh
 
 The script:
 
-1. Reconfigures and builds the six consumer demos.
+1. Reconfigures and builds the seven consumer demos and `sensor_web`.
 2. Copies matching runtime libraries from the current repository's `lib/`.
-3. Generates the top-level launcher scripts, `env.sh`, `config/sensor_config.yaml`, and `bin/`.
+3. Generates the top-level launcher scripts, `env.sh`, `config/sensor_config.yaml`, `config/calibration.yaml`, panorama notices, and `bin/`.
 4. Writes and verifies `manifest.sha256` and `runtime-provenance.json`; standalone clones bind the source commit and file hashes, while composition checkouts also bind the parent gitlink.
 5. Outputs `Runtime package generated and verified: <demo-dir>`.
 
